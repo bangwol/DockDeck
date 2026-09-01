@@ -5,36 +5,28 @@
 <h1 align="center">DockDeck</h1>
 
 <p align="center">
-  A terminal and AI usage dashboard that live beside your macOS Dock.
+  A terminal and an AI usage dashboard that live beside your macOS Dock.
 </p>
 
-DockDeck turns the space around a bottom-aligned Dock into two compact developer panels:
+<p align="center">
+  <img src="assets/dockdeck-overview.png" alt="DockDeck terminal and remaining-usage panels beside the macOS Dock" />
+</p>
 
-```text
-┌──────────────────┐  ┌──────────── macOS Dock ────────────┐  ┌──────────────────┐
-│ Terminal         │  │                                    │  │ Codex / Claude   │
-└──────────────────┘  └────────────────────────────────────┘  └──────────────────┘
-```
+<p align="center">
+  <sub>Compact terminal on the left; remaining Codex and Claude capacity on the right.</sub>
+</p>
 
-The terminal stays interactive on the left. The read-only usage panel stays on the right. Both follow the Dock across displays, Spaces, and auto-hide transitions without becoming ordinary app windows.
-
-> DockDeck is in early development. The current version is `0.1.0`.
+DockDeck uses the space beside a bottom-aligned Dock for two compact developer panels. The terminal stays interactive on the left, while the read-only usage panel stays on the right. Both follow the Dock across displays, Spaces, and auto-hide transitions.
 
 ## Features
 
-- A persistent login shell powered by [SwiftTerm](https://github.com/migueldeicaza/SwiftTerm).
-- Remaining Codex quota through the official `codex app-server` protocol.
-- Remaining Claude quota from Claude Code's official status-line payload.
-- Dock-aware positioning, multi-display tracking, and auto-hide behavior.
-- Matching left and right panel widths derived from the smaller side of the Dock.
-- A non-interactive usage panel that cannot steal keyboard focus.
-- A compact `% ` prompt inside DockDeck without changing the user's shell files.
-- Automatic terminal expansion when clicked, with remembered size controls.
-- Native edge resizing while click-expanded; the last width and height are restored next time.
-- Native Liquid Glass on macOS 26, with a translucent visual-effect fallback on earlier macOS.
-- Stronger terminal tint while expanded for readable text over any desktop.
-- Manual large terminal mode and built-in appearance controls.
-- Twenty terminal themes with configurable font, tint, and corner radius.
+- Persistent [SwiftTerm](https://github.com/migueldeicaza/SwiftTerm) login shell with a compact `% ` prompt that does not change user shell files.
+- Remaining Codex and Claude capacity from their supported local interfaces; no browser cookies or private web endpoints.
+- Dock-aware, symmetric placement across displays, Spaces, and auto-hide transitions.
+- Read-only usage panel that never takes keyboard focus.
+- Click-to-focus terminal expansion, native edge resizing, and remembered dimensions.
+- Native Liquid Glass on macOS 26, with a translucent fallback and stronger terminal tint on earlier macOS.
+- Manual large-terminal mode plus 20 themes with configurable font, tint, and corner radius.
 
 Keyboard shortcuts:
 
@@ -45,35 +37,35 @@ Keyboard shortcuts:
 | `⌘R` | Refresh usage data |
 | `⌘Q` | Quit DockDeck |
 
-Click the terminal to enter its focused size. Drag any window edge to resize it; DockDeck stores the resulting width and height ratios and restores them on the next click. The terminal menu's **Settings…** panel provides the same width and height controls. `⌘E` remains a separate, fixed 75% large-terminal mode.
+Click the terminal to expand it. Drag any edge to resize it; DockDeck restores those proportions the next time it expands. The terminal menu's **Settings…** panel provides the same controls. `⌘E` toggles a separate, fixed 75% large-terminal mode.
 
 ## Requirements
 
 - macOS 13 or later
-- Swift 5.9 or later
-- Accessibility permission for precise Dock tracking
+- Accessibility permission for Dock geometry tracking
 - [Codex CLI](https://github.com/openai/codex) signed in locally for Codex usage data
-- Claude Code `2.1.251` or later with the optional bridge configured for Claude usage data
+- Claude Code `2.1.80` or later with the optional bridge configured for Claude usage data
+- Swift 5.9 or later when building from source
 
 Without Accessibility permission, DockDeck remains usable in fixed fallback positions. Only a bottom-aligned Dock is tracked precisely; side-aligned Docks use the fallback layout.
 
 ## Reading the usage panel
 
-`CODEX` and `CLAUDE` are always written in full. Every percentage and filled bar represents capacity **remaining**, not capacity used. For example, `22%` means 22% remains and 78% has been used.
+Every percentage and filled bar represents capacity **remaining**, not capacity used. For example, `22%` means 22% remains and 78% has been used.
 
-Codex displays whichever 5-hour and weekly windows the signed-in plan currently returns. A Plus response with both windows shows both; a Pro-or-higher response with only the weekly window shows only `7d`. DockDeck uses the returned window durations instead of hard-coding plan names. See OpenAI's [Codex plan guide](https://help.openai.com/en/articles/11369540-using-codex-with-your-chatgpt-plan/).
+Codex displays whichever 5-hour and weekly windows the signed-in account returns. DockDeck uses the returned durations instead of guessing the plan. OpenAI documents a shared 5-hour window for local and cloud tasks and notes that weekly limits may also apply in the [Codex pricing guide](https://learn.chatgpt.com/docs/pricing).
 
-Claude displays its 5-hour and weekly windows. `FBL` is added when Claude Code supplies a separate Fable window as `seven_day_fable` or `fable`. Anthropic documents [Fable's plan-specific allowance](https://support.claude.com/en/articles/15424964-claude-fable-5-on-your-plan), but its current status-line reference guarantees only the 5-hour and weekly fields. DockDeck therefore hides unavailable Fable data instead of estimating it.
+Claude displays the 5-hour and weekly fields available in Claude Code's status-line payload. The current official schema exposes only `five_hour` and `seven_day`, so DockDeck cannot currently show a separate Fable meter. It does not estimate missing data or call undocumented account endpoints. Anthropic documents [Fable's plan-specific availability](https://support.claude.com/en/articles/15424964-claude-fable-5-on-your-plan).
 
 - More than 50% remaining: normal theme color
 - 20–50% remaining: orange
 - Less than 20% remaining: red
 
-## Build from source
-
-From the repository root:
+## Run from source
 
 ```bash
+git clone https://github.com/bangwol/DockDeck.git
+cd DockDeck
 swift test
 swift run DockDeck
 ```
@@ -84,44 +76,40 @@ Enable Dock geometry diagnostics when needed:
 DOCKDECK_DEBUG=1 swift run DockDeck
 ```
 
-### Build a local app bundle
+## Start at login
+
+```bash
+./scripts/install.sh
+```
+
+The installer builds a local app bundle, registers a per-user LaunchAgent, starts DockDeck immediately, and starts it at future logins. It prefers the sole Apple Development identity in the login Keychain so Accessibility approval can survive rebuilds. No certificate name or account information is written to the repository.
+
+If there is no single Apple Development identity, the installer creates a self-signed local fallback. macOS may request Accessibility approval again after rebuilding with that fallback. Select a different installed identity when needed:
+
+```bash
+DOCKDECK_SIGNING_IDENTITY="certificate name or SHA-1 hash" ./scripts/install.sh
+```
+
+Review the script before running it. To remove the LaunchAgent:
+
+```bash
+./scripts/uninstall.sh
+```
+
+The uninstall script removes the login item only. It leaves the local signing certificate and build output in place.
+
+## Build a distributable local bundle
 
 ```bash
 ./scripts/package.sh
 open .build/release-dist/DockDeck.app
 ```
 
-This produces a universal, ad-hoc signed `DockDeck.app` and `DockDeck.zip`. It does not modify login items or the Keychain. Public distribution still requires Developer ID signing and notarization.
-
-### Start at login for local development
-
-```bash
-./scripts/install.sh
-```
-
-The installer registers a per-user LaunchAgent and prefers the sole Apple Development identity in the login Keychain. Its Apple-anchored designated requirement keeps Accessibility approval stable across local rebuilds. No certificate name or account information is written to the repository.
-
-If there is no single Apple Development identity, the installer creates a self-signed local fallback. Current macOS releases may require Accessibility approval again after rebuilding with that fallback. Select a different installed identity explicitly when needed:
-
-```bash
-DOCKDECK_SIGNING_IDENTITY="certificate name or SHA-1 hash" ./scripts/install.sh
-```
-
-Review the script before running it.
-
-To remove the LaunchAgent:
-
-```bash
-./scripts/uninstall.sh
-```
-
-The uninstall script removes the login item only. It does not remove the local signing certificate or build output.
+This produces a universal, ad-hoc signed `DockDeck.app` and `DockDeck.zip` without changing login items or the Keychain. Public distribution requires Developer ID signing and notarization.
 
 ## Usage data and privacy
 
-DockDeck does not read browser cookies, browser credential stores, or private web endpoints.
-It observes only mouse-down occurrence to collapse the focused terminal; it does not record
-global keystrokes, pointer coordinates, or clicked content.
+DockDeck does not read browser cookies, browser credential stores, or private web endpoints. It observes only mouse-down occurrence to collapse the focused terminal; it does not record global keystrokes, pointer coordinates, or clicked content.
 
 | Provider | Source | Local behavior |
 | --- | --- | --- |
@@ -136,10 +124,7 @@ The Claude cache is written atomically to:
 
 The cache directory uses `0700` permissions and the file uses `0600` permissions.
 
-DockDeck also writes a small zsh startup hook to
-`~/Library/Caches/DockDeck/Shell/.zshenv`. It preserves the user's normal zsh startup files and
-changes only the DockDeck terminal prompt. The directory uses `0700` permissions and the hook
-uses `0600` permissions.
+DockDeck also writes a small zsh startup hook to `~/Library/Caches/DockDeck/Shell/.zshenv`. It preserves the user's normal zsh startup files and changes only the DockDeck terminal prompt. The directory uses `0700` permissions and the hook uses `0600` permissions.
 
 ## Configure Claude Code
 
@@ -165,14 +150,14 @@ Native installations can update themselves:
 claude update
 ```
 
-Confirm that the installed version is `2.1.251` or later, then start Claude Code once and complete sign-in:
+Confirm that the installed version is `2.1.80` or later, then start Claude Code once and complete sign-in:
 
 ```bash
 claude --version
 claude
 ```
 
-Claude Code added `rate_limits` to status-line input in `2.1.251`. The field appears only for supported Claude.ai subscriptions and only after the first API response in a session.
+Claude Code added `rate_limits` to status-line input in `2.1.80`. Each 5-hour or weekly window can be absent, and the payload appears only after the first API response for supported accounts.
 
 ### 2. Locate the DockDeck bridge
 
