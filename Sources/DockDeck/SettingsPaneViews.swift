@@ -383,12 +383,17 @@ private struct DeckPreviewCard: View {
     var body: some View {
         GroupBox {
             VStack(spacing: 8) {
-                ForEach(model.moduleDefinitions(on: side)) { definition in
-                    DeckModuleCard(
-                        definition: definition,
-                        side: side,
-                        model: model,
-                        draggedModule: $draggedModule)
+                let definitions = model.moduleDefinitions(on: side)
+                if definitions.isEmpty {
+                    EmptyDeckDropZone()
+                } else {
+                    ForEach(definitions) { definition in
+                        DeckModuleCard(
+                            definition: definition,
+                            side: side,
+                            model: model,
+                            draggedModule: $draggedModule)
+                    }
                 }
             }
             .frame(maxWidth: .infinity, minHeight: 74, alignment: .top)
@@ -401,6 +406,31 @@ private struct DeckPreviewCard: View {
             of: [deckModuleType.identifier],
             delegate: DeckModuleDropDelegate(
                 side: side, target: nil, model: model, draggedModule: $draggedModule))
+    }
+}
+
+private struct EmptyDeckDropZone: View {
+    var body: some View {
+        VStack(spacing: 5) {
+            Image(systemName: "square.and.arrow.down")
+                .font(.title3)
+            Text("Drop modules here")
+                .font(.callout.weight(.medium))
+            Text("This side stays hidden while empty.")
+                .font(.caption)
+        }
+        .foregroundStyle(.secondary)
+        .frame(maxWidth: .infinity, minHeight: 74)
+        .background(
+            RoundedRectangle(cornerRadius: 8)
+                .fill(Color.primary.opacity(0.025)))
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(
+                    Color.secondary.opacity(0.35),
+                    style: StrokeStyle(lineWidth: 1, dash: [5, 4])))
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Empty deck. Drop modules here. This side stays hidden.")
     }
 }
 

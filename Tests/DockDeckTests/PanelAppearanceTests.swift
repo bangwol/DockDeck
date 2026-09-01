@@ -1,4 +1,5 @@
 import Cocoa
+import SwiftUI
 import XCTest
 
 @testable import DockDeck
@@ -71,6 +72,26 @@ final class PanelAppearanceTests: XCTestCase {
         XCTAssertEqual(configuration.right.first, .usage)
     }
 
+    func testDeckConfigurationAllowsEveryModuleOnOneSide() {
+        let allLeft = PanelDeckConfiguration(
+            left: PanelModuleID.builtIns,
+            right: [],
+            enabled: [.terminal, .usage]
+        ).normalized()
+        let allRight = PanelDeckConfiguration(
+            left: [],
+            right: PanelModuleID.builtIns,
+            enabled: [.terminal, .usage]
+        ).normalized()
+
+        XCTAssertEqual(allLeft.left, PanelModuleID.builtIns)
+        XCTAssertTrue(allLeft.right.isEmpty)
+        XCTAssertTrue(allLeft.enabledModules(on: .right).isEmpty)
+        XCTAssertTrue(allRight.left.isEmpty)
+        XCTAssertEqual(allRight.right, PanelModuleID.builtIns)
+        XCTAssertTrue(allRight.enabledModules(on: .left).isEmpty)
+    }
+
     func testSettingsModelSwapsCompleteDecksWithoutDroppingFutureModules() {
         let futureModule = PanelModuleID(rawValue: "future-clock")
         let model = makeSettingsModel(
@@ -117,6 +138,20 @@ final class PanelAppearanceTests: XCTestCase {
         XCTAssertEqual(model.values.deckConfiguration.left, [.terminal, .systemStats])
         XCTAssertEqual(Array(model.moduleDefinitions.prefix(2).map(\.id)), [.terminal, .usage])
         XCTAssertTrue(model.moduleDefinitions.dropFirst(2).allSatisfy { !model.isEnabled($0.id) })
+    }
+
+    func testSettingsModelCanEmptyADeck() {
+        let model = makeSettingsModel(
+            configuration: .legacy(order: .terminalLeft, enabledPanels: .all))
+
+        for module in model.moduleDefinitions(on: .right).map(\.id) {
+            model.moveModule(module, to: .left)
+        }
+
+        XCTAssertEqual(
+            model.moduleDefinitions(on: .left).map(\.id),
+            PanelModuleID.builtIns)
+        XCTAssertTrue(model.moduleDefinitions(on: .right).isEmpty)
     }
 
     func testSettingsModelKeepsTheLastModuleVisible() {
@@ -274,6 +309,23 @@ final class PanelAppearanceTests: XCTestCase {
         XCTAssertEqual(PanelSettings.activeModule(on: .right), .weather)
     }
 
+    func testEmptyDeckHasNoActiveModule() {
+        let previousConfiguration = PanelSettings.deckConfiguration
+        let previousLeft = PanelSettings.activeModule(on: .left)
+        let previousRight = PanelSettings.activeModule(on: .right)
+        defer {
+            PanelSettings.deckConfiguration = previousConfiguration
+            PanelSettings.setActiveModule(previousLeft, on: .left)
+            PanelSettings.setActiveModule(previousRight, on: .right)
+        }
+        PanelSettings.deckConfiguration = PanelDeckConfiguration(
+            left: PanelModuleID.builtIns,
+            right: [],
+            enabled: [.terminal, .usage])
+
+        XCTAssertNil(PanelSettings.activeModule(on: .right))
+    }
+
     func testSettingsModelLimitsServiceMonitorEndpoints() {
         let model = makeSettingsModel(
             configuration: .legacy(order: .terminalLeft, enabledPanels: .all))
@@ -310,6 +362,31 @@ final class PanelAppearanceTests: XCTestCase {
             XCTAssertGreaterThan(bitmap.pixelsWide, 0)
             XCTAssertGreaterThan(bitmap.pixelsHigh, 0)
         }
+    }
+
+    func testEmptyDeckDropZoneRenders() throws {
+        let configuration = PanelDeckConfiguration(
+            left: [],
+            right: PanelModuleID.builtIns,
+            enabled: [.terminal, .usage]
+        ).normalized()
+        let model = makeSettingsModel(configuration: configuration)
+        let snapshotSize = NSSize(width: 620, height: 640)
+        let rootView = DecksSettingsView(model: model)
+            .frame(width: snapshotSize.width, height: snapshotSize.height)
+            .background(Color(nsColor: .windowBackgroundColor))
+            .environment(\.colorScheme, .dark)
+        let view = NSHostingView(rootView: rootView)
+        view.appearance = NSAppearance(named: .darkAqua)
+        view.frame = NSRect(origin: .zero, size: snapshotSize)
+        view.layoutSubtreeIfNeeded()
+
+        let bitmap = try XCTUnwrap(view.bitmapImageRepForCachingDisplay(in: view.bounds))
+        view.cacheDisplay(in: view.bounds, to: bitmap)
+
+        XCTAssertEqual(view.frame.size, snapshotSize)
+        XCTAssertGreaterThan(bitmap.pixelsWide, 0)
+        XCTAssertGreaterThan(bitmap.pixelsHigh, 0)
     }
 
     func testServiceSettingsRenderMaximumEndpoints() throws {

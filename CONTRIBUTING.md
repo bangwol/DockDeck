@@ -56,10 +56,12 @@ swift test
   persist battery serial numbers, and stop sampling while disabled.
 - Keep Network on primary-interface byte counters only. Do not inspect packets,
   addresses, or destinations; clear the previous sample when disabled.
-- Read-only modules share the read-only Deck and must render correctly at the
-  compact panel size before they are registered. Keep module switching manual
-  and predictable; do not add automatic rotation, drag reordering, or module
-  installation without implementing and testing those runtime behaviors.
+- Read-only modules can be assigned to either Deck and must render correctly at
+  the compact panel size before they are registered. Keep module switching
+  manual and predictable, preserve enabled-first ordering and independent Deck
+  selections, and test settings changes against the runtime. Do not add
+  automatic rotation or module installation without implementing and testing
+  those runtime behaviors.
 
 ## PR guidelines
 

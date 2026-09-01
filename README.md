@@ -18,7 +18,7 @@
   <sub>Compact terminal and configurable Codex and Claude usage beside the macOS Dock. Open the image for full resolution.</sub>
 </p>
 
-DockDeck uses the space beside a bottom-aligned Dock for two compact module Decks. Assign Terminal, Usage, System Stats, Service Monitor, Weather, Schedule, World Clock, Battery, and Network to either side; each Deck shows one enabled module at a time. The terminal stays interactive whenever it is selected. Both Decks follow the Dock across displays, Spaces, and auto-hide transitions.
+DockDeck uses the space beside a bottom-aligned Dock for up to two compact module Decks. Assign Terminal, Usage, System Stats, Service Monitor, Weather, Schedule, World Clock, Battery, and Network to either side; each non-empty Deck shows one enabled module at a time. The terminal stays interactive whenever it is selected. Both Decks follow the Dock across displays, Spaces, and auto-hide transitions.
 
 ## Features
 
@@ -32,7 +32,7 @@ DockDeck uses the space beside a bottom-aligned Dock for two compact module Deck
 - Internal battery level, power state, and the system-provided charge or discharge estimate.
 - Local download and upload throughput for the current primary network interface.
 - Dock-aware, symmetric placement across displays, Spaces, and auto-hide transitions.
-- Read-only module Deck with manual module switching; right-click it to select a module or open its settings.
+- Independent manual module selection per Deck; right-click either Deck to select a module or open its settings.
 - A shared sidebar-based Settings window with Deck cards, module detail pages, side placement, and independent module visibility controls.
 - Disabled modules stop their background timers and subprocesses instead of merely hiding their panels.
 - Click-to-focus terminal expansion, native edge resizing, and remembered dimensions.
@@ -53,11 +53,21 @@ DockDeck reserves the Command-key shortcuts above plus the standard `⌘C`, `⌘
 
 Click the terminal to expand it, then click elsewhere to return it to the Dock. Drag any edge to resize it; DockDeck restores those proportions the next time it expands. Right-click either Deck to switch among its enabled modules. Open the shared **Settings…** panel from either panel. `⌘E` selects Terminal and toggles a separate, fixed 75% large-terminal mode; its menu action is labeled **Return Terminal to Dock** while active. Running `exit` starts a fresh DockDeck login shell; use `⌘Q` to quit the app.
 
-Settings are organized into **Decks**, module-specific pages, and **Appearance**. Drag module cards within a Deck to set its cycle order or between Decks to change sides. Enabled modules stay above disabled modules; the same moves are available from each card's context menu. You can also swap the complete left and right Decks. At least one module remains enabled so Settings stays reachable. Disabled modules stop sampling and subprocesses. DockDeck remembers each Deck's selected module and the last Settings section you opened.
+Settings are organized into **Decks**, module-specific pages, and **Appearance**. Drag module cards within a Deck to set its cycle order or between Decks to change sides. Enabled modules stay above disabled modules; the same moves are available from each card's context menu. Move every card to one Deck if you want the other side completely empty and hidden. You can also swap the complete left and right Decks. At least one module remains enabled so Settings stays reachable. Disabled modules stop sampling and subprocesses. DockDeck remembers each Deck's selected module and the last Settings section you opened.
+
+<p align="center">
+  <a href="assets/dockdeck-decks-settings.png">
+    <img src="assets/dockdeck-decks-settings.png" width="620" alt="DockDeck Decks settings with an empty left Deck and every module arranged on the right" />
+  </a>
+</p>
+
+<p align="center">
+  <sub>An empty Deck remains a drop target in Settings and is hidden beside the Dock.</sub>
+</p>
 
 ## Reading System Stats
 
-System Stats reports CPU utilization since the previous sample, physical memory in use, and startup-volume disk space in use. It uses local macOS host and file-system APIs, requires no additional permission, and performs no network requests. Enable it under **Settings → Decks**, then right-click the read-only Deck to switch modules.
+System Stats reports CPU utilization since the previous sample, physical memory in use, and startup-volume disk space in use. It uses local macOS host and file-system APIs, requires no additional permission, and performs no network requests. Enable it under **Settings → Decks**, then right-click its Deck to switch modules.
 
 ## Monitoring services
 
