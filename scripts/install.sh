@@ -117,6 +117,7 @@ cp "$BRIDGE_BIN_PATH" "$APP_BRIDGE_PATH"
 cp "$REPO_DIR/assets/AppIcon.icns" "$APP_PATH/Contents/Resources/AppIcon.icns"
 cp "$REPO_DIR/LICENSE" "$LICENSES_PATH/DockDeck.txt"
 cp "$REPO_DIR/ThirdPartyLicenses/SwiftTerm.txt" "$LICENSES_PATH/SwiftTerm.txt"
+cp "$REPO_DIR/ThirdPartyLicenses/Open-Meteo.txt" "$LICENSES_PATH/Open-Meteo.txt"
 
 cat > "$APP_PATH/Contents/Info.plist" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>

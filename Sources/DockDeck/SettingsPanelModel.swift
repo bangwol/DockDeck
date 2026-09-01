@@ -7,6 +7,7 @@ enum SettingsPaneID: String, CaseIterable, Identifiable {
     case usage
     case systemStats
     case serviceMonitor
+    case weather
     case appearance
 
     var id: Self { self }
@@ -18,6 +19,7 @@ enum SettingsPaneID: String, CaseIterable, Identifiable {
         case .usage: "Usage"
         case .systemStats: "System Stats"
         case .serviceMonitor: "Service Monitor"
+        case .weather: "Weather"
         case .appearance: "Appearance"
         }
     }
@@ -29,6 +31,7 @@ enum SettingsPaneID: String, CaseIterable, Identifiable {
         case .usage: "Choose how account limits are displayed."
         case .systemStats: "Monitor local CPU, memory, and disk usage."
         case .serviceMonitor: "Check the availability of your services."
+        case .weather: "Show current conditions for a selected city."
         case .appearance: "Adjust the shared panel surface."
         }
     }
@@ -40,6 +43,7 @@ enum SettingsPaneID: String, CaseIterable, Identifiable {
         case .usage: "chart.bar"
         case .systemStats: "gauge.with.dots.needle.67percent"
         case .serviceMonitor: "network"
+        case .weather: "cloud.sun"
         case .appearance: "paintbrush"
         }
     }
@@ -69,6 +73,9 @@ enum PanelModuleRegistry {
         PanelModuleDefinition(
             id: .serviceMonitor, title: "Service Monitor", subtitle: "HTTPS availability",
             symbolName: "network", settingsPane: .serviceMonitor),
+        PanelModuleDefinition(
+            id: .weather, title: "Weather", subtitle: "Selected-city conditions",
+            symbolName: "cloud.sun", settingsPane: .weather),
     ]
 
     static func definition(for id: PanelModuleID) -> PanelModuleDefinition? {
@@ -103,6 +110,12 @@ struct ServiceMonitorSettingsState: Equatable {
     var refreshInterval: TimeInterval
 }
 
+struct WeatherSettingsState: Equatable {
+    var location: WeatherLocation?
+    var temperatureUnit: WeatherTemperatureUnit
+    var refreshInterval: TimeInterval
+}
+
 struct AppearanceSettingsState: Equatable {
     var cornerRadius: CGFloat
     var tintOpacity: CGFloat
@@ -114,6 +127,7 @@ struct SettingsPanelValues: Equatable {
     var usage: UsageSettingsState
     var systemStats: SystemStatsSettingsState
     var serviceMonitor: ServiceMonitorSettingsState
+    var weather: WeatherSettingsState
     var appearance: AppearanceSettingsState
 
     func normalized() -> Self {
@@ -145,6 +159,12 @@ enum ServiceMonitorSettingsChange {
     case refreshInterval(TimeInterval)
 }
 
+enum WeatherSettingsChange {
+    case location(WeatherLocation?)
+    case temperatureUnit(WeatherTemperatureUnit)
+    case refreshInterval(TimeInterval)
+}
+
 enum AppearanceSettingsChange {
     case cornerRadius(CGFloat)
     case tintOpacity(CGFloat)
@@ -156,6 +176,7 @@ enum SettingsPanelChange {
     case usage(UsageSettingsChange)
     case systemStats(SystemStatsSettingsChange)
     case serviceMonitor(ServiceMonitorSettingsChange)
+    case weather(WeatherSettingsChange)
     case appearance(AppearanceSettingsChange)
 }
 
@@ -354,6 +375,25 @@ final class SettingsPanelModel: ObservableObject {
         }) ?? PanelSettings.defaultServiceMonitorRefreshInterval
         updateValues { $0.serviceMonitor.refreshInterval = selected }
         onChange?(.serviceMonitor(.refreshInterval(selected)))
+    }
+
+    func setWeatherLocation(_ location: WeatherLocation?) {
+        let location = location?.normalizedForStorage()
+        updateValues { $0.weather.location = location }
+        onChange?(.weather(.location(location)))
+    }
+
+    func setWeatherTemperatureUnit(_ unit: WeatherTemperatureUnit) {
+        updateValues { $0.weather.temperatureUnit = unit }
+        onChange?(.weather(.temperatureUnit(unit)))
+    }
+
+    func setWeatherRefreshInterval(_ value: TimeInterval) {
+        let selected = PanelSettings.weatherRefreshIntervals.min(by: {
+            abs($0 - value) < abs($1 - value)
+        }) ?? PanelSettings.defaultWeatherRefreshInterval
+        updateValues { $0.weather.refreshInterval = selected }
+        onChange?(.weather(.refreshInterval(selected)))
     }
 
     func setValues(_ values: SettingsPanelValues) {

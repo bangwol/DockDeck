@@ -14,6 +14,7 @@ final class ReadOnlyDeckPanelController: NSObject, NSMenuDelegate {
     private let usageStore: UsageStore
     private let systemStatsStore: SystemStatsStore
     private let serviceMonitorStore: ServiceMonitorStore
+    private let weatherStore: WeatherStore
     private weak var menuTarget: AnyObject?
     private var theme: Theme
 
@@ -23,11 +24,13 @@ final class ReadOnlyDeckPanelController: NSObject, NSMenuDelegate {
         usageStore: UsageStore,
         systemStatsStore: SystemStatsStore,
         serviceMonitorStore: ServiceMonitorStore,
+        weatherStore: WeatherStore,
         menuTarget: AnyObject
     ) {
         self.usageStore = usageStore
         self.systemStatsStore = systemStatsStore
         self.serviceMonitorStore = serviceMonitorStore
+        self.weatherStore = weatherStore
         self.theme = theme
         self.menuTarget = menuTarget
 
@@ -54,6 +57,7 @@ final class ReadOnlyDeckPanelController: NSObject, NSMenuDelegate {
                 usageStore: usageStore,
                 systemStatsStore: systemStatsStore,
                 serviceMonitorStore: serviceMonitorStore,
+                weatherStore: weatherStore,
                 activeModule: PanelSettings.activeReadOnlyModule,
                 theme: theme))
         hostingView.frame = surfaceView.bounds
@@ -92,6 +96,7 @@ final class ReadOnlyDeckPanelController: NSObject, NSMenuDelegate {
             usageStore: usageStore,
             systemStatsStore: systemStatsStore,
             serviceMonitorStore: serviceMonitorStore,
+            weatherStore: weatherStore,
             activeModule: activeModule,
             theme: theme)
     }

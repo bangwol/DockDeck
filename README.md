@@ -5,7 +5,7 @@
 <h1 align="center">DockDeck</h1>
 
 <p align="center">
-  A terminal and compact developer modules that live beside your macOS Dock.
+  A terminal and compact developer module deck that lives beside your macOS Dock.
 </p>
 
 <p align="center">
@@ -18,7 +18,7 @@
   <sub>Compact terminal and configurable Codex and Claude usage beside the macOS Dock. Open the image for full resolution.</sub>
 </p>
 
-DockDeck uses the space beside a bottom-aligned Dock for two compact developer panels. The terminal stays interactive while a read-only Deck hosts Usage, System Stats, and Service Monitor modules; either Deck can be hidden or placed on either side. Both follow the Dock across displays, Spaces, and auto-hide transitions.
+DockDeck uses the space beside a bottom-aligned Dock for two compact developer panels. The terminal stays interactive while a read-only Deck hosts Usage, System Stats, Service Monitor, and Weather modules; either Deck can be hidden or placed on either side. Both follow the Dock across displays, Spaces, and auto-hide transitions.
 
 ## Features
 
@@ -26,6 +26,7 @@ DockDeck uses the space beside a bottom-aligned Dock for two compact developer p
 - Remaining or used Codex and Claude capacity from their supported local interfaces; either provider can be selected independently, with no browser cookies or private web endpoints.
 - Local CPU, memory, and disk utilization with a configurable 1–10 second sampling interval.
 - HTTPS service availability and latency checks for up to four user-configured endpoints.
+- Current temperature, daily high and low, and conditions for a user-selected city.
 - Dock-aware, symmetric placement across displays, Spaces, and auto-hide transitions.
 - Read-only module Deck with manual module switching; right-click it to select a module or open its settings.
 - A shared sidebar-based Settings window with Deck cards, module detail pages, side placement, and independent module visibility controls.
@@ -61,6 +62,12 @@ Service Monitor sends a `HEAD` request every 15–120 seconds to up to four URLs
 Checks use an ephemeral `URLSession` with caches, cookies, and credential storage disabled. DockDeck stores service names and URLs in local preferences, rejects URL user-info and common secret query fields, and does not use response bodies. Do not place secrets in URL paths. Enable and configure the module under **Settings → Decks → Service Monitor**.
 
 On macOS 15 or later, the first local-network check can show Apple's Local Network permission prompt. DockDeck includes a purpose string and waits for the decision; public HTTPS checks do not require this permission. The permission can be changed later under **System Settings → Privacy & Security → Local Network**. See Apple's [local network privacy technote](https://developer.apple.com/documentation/technotes/tn3179-understanding-local-network-privacy).
+
+## Checking weather
+
+Weather uses the [Open-Meteo Forecast API](https://open-meteo.com/en/docs) and [Geocoding API](https://open-meteo.com/en/docs/geocoding-api). Search for a city under **Settings → Weather**, select one result, and enable the module. DockDeck does not use IP geolocation or request macOS Location permission. It stores the selected city and coordinates in local preferences; search text and coordinates are sent over HTTPS only when searching or while the enabled module refreshes. Requests use an ephemeral session without persistent caches, cookies, or credential storage.
+
+The built-in `api.open-meteo.com` service is keyless and limited to non-commercial use. Its weather and location data are [CC BY 4.0](https://open-meteo.com/en/license), so the compact panel and Settings include the required Open-Meteo attribution link. DockDeck rounds temperatures and maps weather codes to labels and SF Symbols for display. Review [Open-Meteo's terms and privacy details](https://open-meteo.com/en/terms) before enabling the module; commercial distributions need a suitable commercial API arrangement and are not supported by the current keyless provider.
 
 ## Requirements
 
@@ -155,6 +162,7 @@ DockDeck does not read browser cookies, browser credential stores, or private we
 | Claude | Claude Code status-line JSON | Stores only `rate_limits` and an observation timestamp in a local cache |
 | System Stats | macOS host and file-system APIs | Samples CPU, physical memory, and startup-volume capacity locally |
 | Service Monitor | User-configured HTTPS or local HTTP URLs | Sends cookie-free `HEAD` requests; rejects common URL credential fields before local storage |
+| Weather | Open-Meteo forecast and geocoding APIs | Sends submitted searches and selected coordinates over HTTPS only while used; stores the selected city locally |
 
 The Claude cache is written atomically to:
 

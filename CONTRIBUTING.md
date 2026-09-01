@@ -35,13 +35,17 @@ swift test
 - Keep placement and visibility in `PanelDeckConfiguration`; its versioned
   storage preserves unknown module IDs for forward compatibility.
 - Keep module state and change events in `SettingsPanelModel`, module-specific
-  controls in `SettingsPaneViews`, and window hosting in `SettingsPanelView`.
+  controls in a focused settings view, and window hosting in `SettingsPanelView`.
 - Keep shared surface controls under Appearance.
 - Put provider-level controls in the owning module pane. Usage providers must
   stop their own polling or subprocess when deselected.
 - Keep Service Monitor probes credential-free and on the ephemeral session.
   Public endpoints require HTTPS; local HTTP support must stay within the
   narrow `NSAllowsLocalNetworking` exception.
+- Keep Weather opt-in, selected-city only, and on the fixed Open-Meteo HTTPS
+  hosts. Do not add IP geolocation or request Location permission. Preserve
+  visible attribution, the non-commercial free-API warning, and disabled-state
+  network shutdown.
 - Read-only modules share the read-only Deck and must render correctly at the
   compact panel size before they are registered. Keep module switching manual
   and predictable; do not add automatic rotation, drag reordering, or module

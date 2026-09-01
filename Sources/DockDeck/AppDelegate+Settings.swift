@@ -79,6 +79,10 @@ extension AppDelegate {
             self.serviceMonitorStore.updateConfiguration(
                 endpoints: PanelSettings.serviceMonitorEndpoints,
                 refreshInterval: PanelSettings.serviceMonitorRefreshInterval)
+            self.weatherStore.updateConfiguration(
+                location: PanelSettings.weatherLocation,
+                unit: PanelSettings.weatherTemperatureUnit,
+                refreshInterval: PanelSettings.weatherRefreshInterval)
             self.applyCornerRadius()
             self.applyTintOpacity()
             self.applyFont()
@@ -134,6 +138,10 @@ extension AppDelegate {
             serviceMonitor: ServiceMonitorSettingsState(
                 endpoints: PanelSettings.serviceMonitorEndpoints,
                 refreshInterval: PanelSettings.serviceMonitorRefreshInterval),
+            weather: WeatherSettingsState(
+                location: PanelSettings.weatherLocation,
+                temperatureUnit: PanelSettings.weatherTemperatureUnit,
+                refreshInterval: PanelSettings.weatherRefreshInterval),
             appearance: AppearanceSettingsState(
                 cornerRadius: PanelSettings.cornerRadius,
                 tintOpacity: PanelSettings.tintOpacity
@@ -182,6 +190,15 @@ extension AppDelegate {
             serviceMonitorStore.updateConfiguration(
                 endpoints: PanelSettings.serviceMonitorEndpoints,
                 refreshInterval: interval)
+        case .weather(.location(let location)):
+            PanelSettings.weatherLocation = location
+            applyWeatherConfiguration()
+        case .weather(.temperatureUnit(let unit)):
+            PanelSettings.weatherTemperatureUnit = unit
+            applyWeatherConfiguration()
+        case .weather(.refreshInterval(let interval)):
+            PanelSettings.weatherRefreshInterval = interval
+            applyWeatherConfiguration()
         case .appearance(.cornerRadius(let radius)):
             PanelSettings.cornerRadius = radius
             applyCornerRadius()
@@ -189,6 +206,13 @@ extension AppDelegate {
             PanelSettings.tintOpacity = opacity
             applyTintOpacity()
         }
+    }
+
+    private func applyWeatherConfiguration() {
+        weatherStore.updateConfiguration(
+            location: PanelSettings.weatherLocation,
+            unit: PanelSettings.weatherTemperatureUnit,
+            refreshInterval: PanelSettings.weatherRefreshInterval)
     }
 
     private func closeSettingsPanel() {

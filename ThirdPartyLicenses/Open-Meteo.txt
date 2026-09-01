@@ -1,0 +1,11 @@
+Weather and location data by Open-Meteo.com
+https://open-meteo.com/
+
+Data licence: Creative Commons Attribution 4.0 International (CC BY 4.0)
+https://creativecommons.org/licenses/by/4.0/
+https://open-meteo.com/en/license
+
+DockDeck rounds temperatures and maps weather codes to text labels and Apple
+SF Symbols for compact display. Use of Open-Meteo's hosted API is also subject
+to its current terms, including the free endpoint's non-commercial-use limit:
+https://open-meteo.com/en/terms

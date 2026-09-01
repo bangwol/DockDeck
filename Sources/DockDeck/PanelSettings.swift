@@ -81,8 +81,11 @@ struct PanelModuleID: Hashable, Codable {
     static let usage = PanelModuleID(rawValue: "usage")
     static let systemStats = PanelModuleID(rawValue: "system-stats")
     static let serviceMonitor = PanelModuleID(rawValue: "service-monitor")
+    static let weather = PanelModuleID(rawValue: "weather")
 
-    static let readOnlyBuiltIns: [PanelModuleID] = [.usage, .systemStats, .serviceMonitor]
+    static let readOnlyBuiltIns: [PanelModuleID] = [
+        .usage, .systemStats, .serviceMonitor, .weather,
+    ]
 
     init(rawValue: String) {
         self.rawValue = rawValue
@@ -187,6 +190,8 @@ enum PanelSettings {
     static let systemStatsRefreshIntervals: [TimeInterval] = [1, 2, 5, 10]
     static let defaultServiceMonitorRefreshInterval: TimeInterval = 30
     static let serviceMonitorRefreshIntervals: [TimeInterval] = [15, 30, 60, 120]
+    static let defaultWeatherRefreshInterval: TimeInterval = 30 * 60
+    static let weatherRefreshIntervals: [TimeInterval] = [15 * 60, 30 * 60, 60 * 60]
 
     private static let cornerRadiusKey = "DockDeck.settings.cornerRadius"
     private static let tintOpacityKey = "DockDeck.settings.tintOpacity"
@@ -204,6 +209,9 @@ enum PanelSettings {
     private static let serviceMonitorEndpointsKey = "DockDeck.settings.serviceMonitorEndpoints"
     private static let serviceMonitorRefreshIntervalKey =
         "DockDeck.settings.serviceMonitorRefreshInterval"
+    private static let weatherLocationKey = "DockDeck.settings.weatherLocation"
+    private static let weatherTemperatureUnitKey = "DockDeck.settings.weatherTemperatureUnit"
+    private static let weatherRefreshIntervalKey = "DockDeck.settings.weatherRefreshInterval"
     private static let panelOrderKey = "DockDeck.settings.panelOrder"
     private static let enabledPanelsKey = "DockDeck.settings.enabledPanels"
     private static let panelDeckConfigurationKey =
@@ -384,6 +392,51 @@ enum PanelSettings {
         }
     }
 
+    static var weatherLocation: WeatherLocation? {
+        get {
+            guard let data = UserDefaults.standard.data(forKey: weatherLocationKey),
+                let location = try? JSONDecoder().decode(WeatherLocation.self, from: data)
+            else { return nil }
+            return location.normalizedForStorage()
+        }
+        set {
+            guard let location = newValue?.normalizedForStorage(),
+                let data = try? JSONEncoder().encode(location)
+            else {
+                UserDefaults.standard.removeObject(forKey: weatherLocationKey)
+                return
+            }
+            UserDefaults.standard.set(data, forKey: weatherLocationKey)
+        }
+    }
+
+    static var weatherTemperatureUnit: WeatherTemperatureUnit {
+        get {
+            UserDefaults.standard.string(forKey: weatherTemperatureUnitKey)
+                .flatMap(WeatherTemperatureUnit.init(rawValue:)) ?? .celsius
+        }
+        set { UserDefaults.standard.set(newValue.rawValue, forKey: weatherTemperatureUnitKey) }
+    }
+
+    static var weatherRefreshInterval: TimeInterval {
+        get {
+            let defaults = UserDefaults.standard
+            guard defaults.object(forKey: weatherRefreshIntervalKey) != nil else {
+                return defaultWeatherRefreshInterval
+            }
+            let value = defaults.double(forKey: weatherRefreshIntervalKey)
+            return weatherRefreshIntervals.min(by: {
+                abs($0 - value) < abs($1 - value)
+            }) ?? defaultWeatherRefreshInterval
+        }
+        set {
+            let value = weatherRefreshIntervals.min(by: {
+                abs($0 - newValue) < abs($1 - newValue)
+            }) ?? defaultWeatherRefreshInterval
+            UserDefaults.standard.set(value, forKey: weatherRefreshIntervalKey)
+        }
+    }
+
     static var enabledPanels: EnabledPanels {
         get {
             var panels: EnabledPanels = []
@@ -476,6 +529,9 @@ enum PanelSettings {
         defaults.removeObject(forKey: activeReadOnlyModuleKey)
         defaults.removeObject(forKey: serviceMonitorEndpointsKey)
         defaults.removeObject(forKey: serviceMonitorRefreshIntervalKey)
+        defaults.removeObject(forKey: weatherLocationKey)
+        defaults.removeObject(forKey: weatherTemperatureUnitKey)
+        defaults.removeObject(forKey: weatherRefreshIntervalKey)
         defaults.removeObject(forKey: panelOrderKey)
         defaults.removeObject(forKey: enabledPanelsKey)
         defaults.removeObject(forKey: panelDeckConfigurationKey)

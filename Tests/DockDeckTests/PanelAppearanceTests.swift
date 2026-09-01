@@ -14,7 +14,7 @@ final class PanelAppearanceTests: XCTestCase {
         let configuration = PanelDeckConfiguration.legacy(
             order: .terminalRight, enabledPanels: .terminal)
 
-        XCTAssertEqual(configuration.left, [.usage, .systemStats, .serviceMonitor])
+        XCTAssertEqual(configuration.left, [.usage, .systemStats, .serviceMonitor, .weather])
         XCTAssertEqual(configuration.right, [.terminal])
         XCTAssertEqual(configuration.enabled, [.terminal])
         XCTAssertEqual(configuration.side(containing: .terminal), .right)
@@ -31,7 +31,7 @@ final class PanelAppearanceTests: XCTestCase {
         let decoded = try JSONDecoder().decode(PanelDeckConfiguration.self, from: data)
 
         XCTAssertEqual(decoded.left, [.terminal, clock])
-        XCTAssertEqual(decoded.right, [.usage, .systemStats, .serviceMonitor])
+        XCTAssertEqual(decoded.right, [.usage, .systemStats, .serviceMonitor, .weather])
         XCTAssertEqual(decoded.enabled, [clock])
     }
 
@@ -43,7 +43,7 @@ final class PanelAppearanceTests: XCTestCase {
         ).normalized()
 
         XCTAssertEqual(configuration.left, [.terminal])
-        XCTAssertEqual(configuration.right, [.usage, .systemStats, .serviceMonitor])
+        XCTAssertEqual(configuration.right, [.usage, .systemStats, .serviceMonitor, .weather])
     }
 
     func testSettingsModelSwapsCompleteDecksWithoutDroppingFutureModules() {
@@ -63,7 +63,7 @@ final class PanelAppearanceTests: XCTestCase {
 
         XCTAssertEqual(
             model.values.deckConfiguration.left,
-            [.usage, .systemStats, .serviceMonitor])
+            [.usage, .systemStats, .serviceMonitor, .weather])
         XCTAssertEqual(model.values.deckConfiguration.right, [.terminal, clock])
         XCTAssertEqual(persistedConfiguration, model.values.deckConfiguration)
     }
@@ -90,10 +90,11 @@ final class PanelAppearanceTests: XCTestCase {
         XCTAssertEqual(Set(PanelModuleRegistry.all.map(\.id)).count, PanelModuleRegistry.all.count)
         XCTAssertEqual(
             model.availablePanes,
-            [.decks, .terminal, .usage, .systemStats, .serviceMonitor, .appearance])
+            [.decks, .terminal, .usage, .systemStats, .serviceMonitor, .weather, .appearance])
         XCTAssertEqual(model.moduleDefinition(for: .usage)?.id, .usage)
         XCTAssertEqual(model.moduleDefinition(for: .systemStats)?.id, .systemStats)
         XCTAssertEqual(model.moduleDefinition(for: .serviceMonitor)?.id, .serviceMonitor)
+        XCTAssertEqual(model.moduleDefinition(for: .weather)?.id, .weather)
     }
 
     func testModuleRuntimeCoordinatorStartsAndStopsOnlyChangedModules() {
@@ -156,6 +157,27 @@ final class PanelAppearanceTests: XCTestCase {
 
         XCTAssertEqual(model.values.systemStats.refreshInterval, 5)
         XCTAssertEqual(emittedInterval, 5)
+    }
+
+    func testSettingsModelEmitsNormalizedWeatherChanges() {
+        let model = makeSettingsModel(
+            configuration: .legacy(order: .terminalLeft, enabledPanels: .all))
+        let location = WeatherLocation(
+            id: 1_835_848, name: " Seoul ", latitude: 37.566, longitude: 126.9784,
+            countryCode: "kr", country: "South Korea", admin1: "Seoul",
+            timezone: "Asia/Seoul")
+        var changes: [SettingsPanelChange] = []
+        model.onChange = { changes.append($0) }
+
+        model.setWeatherLocation(location)
+        model.setWeatherTemperatureUnit(.fahrenheit)
+        model.setWeatherRefreshInterval(1_000)
+
+        XCTAssertEqual(model.values.weather.location?.name, "Seoul")
+        XCTAssertEqual(model.values.weather.location?.countryCode, "KR")
+        XCTAssertEqual(model.values.weather.temperatureUnit, .fahrenheit)
+        XCTAssertEqual(model.values.weather.refreshInterval, 900)
+        XCTAssertEqual(changes.count, 3)
     }
 
     func testReadOnlyDeckSelectionCyclesEnabledModules() {
@@ -231,7 +253,29 @@ final class PanelAppearanceTests: XCTestCase {
 
         let bitmap = try XCTUnwrap(view.bitmapImageRepForCachingDisplay(in: view.bounds))
         view.cacheDisplay(in: view.bounds, to: bitmap)
+        XCTAssertEqual(view.frame.size, SettingsPanelView.preferredSize)
+        XCTAssertGreaterThan(bitmap.pixelsWide, 0)
+        XCTAssertGreaterThan(bitmap.pixelsHigh, 0)
+    }
 
+    func testWeatherSettingsRenderSelectedLocation() throws {
+        var configuration = PanelDeckConfiguration.legacy(
+            order: .terminalLeft, enabledPanels: .all)
+        configuration.setEnabled(true, for: .weather)
+        var values = makeSettingsValues(configuration: configuration)
+        values.weather.location = WeatherLocation(
+            id: 1_835_848, name: "Seoul", latitude: 37.566, longitude: 126.9784,
+            countryCode: "KR", country: "South Korea", admin1: "Seoul",
+            timezone: "Asia/Seoul")
+        let view = SettingsPanelView(
+            selectedPane: .weather,
+            values: values,
+            fontNames: ["Menlo", TerminalTheme.systemFontName])
+        view.frame = NSRect(origin: .zero, size: SettingsPanelView.preferredSize)
+        view.layoutSubtreeIfNeeded()
+
+        let bitmap = try XCTUnwrap(view.bitmapImageRepForCachingDisplay(in: view.bounds))
+        view.cacheDisplay(in: view.bounds, to: bitmap)
         XCTAssertEqual(view.frame.size, SettingsPanelView.preferredSize)
         XCTAssertGreaterThan(bitmap.pixelsWide, 0)
         XCTAssertGreaterThan(bitmap.pixelsHigh, 0)
@@ -276,6 +320,7 @@ final class PanelAppearanceTests: XCTestCase {
             usageStore: UsageStore(),
             systemStatsStore: SystemStatsStore(),
             serviceMonitorStore: ServiceMonitorStore(),
+            weatherStore: WeatherStore(),
             menuTarget: NSObject())
         let menu = try XCTUnwrap(controller.panel.contentView?.menu)
 
@@ -315,6 +360,8 @@ final class PanelAppearanceTests: XCTestCase {
             systemStats: SystemStatsSettingsState(refreshInterval: 2),
             serviceMonitor: ServiceMonitorSettingsState(
                 endpoints: [], refreshInterval: 30),
+            weather: WeatherSettingsState(
+                location: nil, temperatureUnit: .celsius, refreshInterval: 1_800),
             appearance: AppearanceSettingsState(
                 cornerRadius: 10, tintOpacity: 0.6))
     }
