@@ -16,7 +16,7 @@
   <sub>Compact terminal and configurable Codex and Claude usage beside the macOS Dock.</sub>
 </p>
 
-DockDeck uses the space beside a bottom-aligned Dock for two compact developer panels. The terminal stays interactive while the usage panel remains read-only; either panel can be placed on either side. Both follow the Dock across displays, Spaces, and auto-hide transitions.
+DockDeck uses the space beside a bottom-aligned Dock for two compact developer panels. The terminal stays interactive while the usage panel remains read-only; either panel can be hidden or placed on either side. Both follow the Dock across displays, Spaces, and auto-hide transitions.
 
 ## Features
 
@@ -24,6 +24,7 @@ DockDeck uses the space beside a bottom-aligned Dock for two compact developer p
 - Remaining or used Codex and Claude capacity from their supported local interfaces; no browser cookies or private web endpoints.
 - Dock-aware, symmetric placement across displays, Spaces, and auto-hide transitions.
 - Read-only usage panel with configurable values, font, size, and color; right-click it for the shared settings menu.
+- Independent Terminal and Usage visibility controls; at least one panel remains visible so settings stay accessible.
 - Click-to-focus terminal expansion, native edge resizing, and remembered dimensions.
 - Native Liquid Glass on macOS 26, with a translucent fallback and stronger terminal tint on earlier macOS.
 - Manual large-terminal mode plus 20 themes with configurable fonts, tint, corner radius, and panel placement.
@@ -37,6 +38,8 @@ Keyboard shortcuts:
 | `⌘,` | Open the shared settings panel |
 | `⌘R` | Refresh usage data and Dock layout |
 | `⌘Q` | Quit DockDeck |
+
+DockDeck reserves the Command-key shortcuts above plus the standard `⌘C`, `⌘V`, and `⌘A` editing shortcuts. `Ctrl` combinations, Option/Meta, Esc, Tab, arrow keys, Home/End, Delete, and F1–F12 continue through SwiftTerm's normal terminal input handling. Option acts as Meta by default. Page Up and Page Down follow SwiftTerm's terminal scrolling behavior unless the running terminal application requests cursor-key handling.
 
 Click the terminal to expand it. Drag any edge to resize it; DockDeck restores those proportions the next time it expands. Open the shared **Settings…** panel from the terminal menu, app menu, or usage-panel context menu. `⌘E` toggles a separate, fixed 75% large-terminal mode.
 

@@ -2,7 +2,10 @@ import Cocoa
 
 extension AppDelegate {
     @objc func toggleSettingsPanel(_ sender: Any?) {
-        toggleSettingsPanel(anchor: panel, restoreTerminalFocus: true)
+        let terminalEnabled = PanelSettings.enabledPanels.contains(.terminal)
+        toggleSettingsPanel(
+            anchor: terminalEnabled ? panel : quotaPanel,
+            restoreTerminalFocus: terminalEnabled)
     }
 
     @objc func openUsageSettings(_ sender: Any?) {
@@ -38,7 +41,8 @@ extension AppDelegate {
             usageFontSize: PanelSettings.usageFontSize,
             usageDisplayMode: PanelSettings.usageDisplayMode,
             usageTextColor: PanelSettings.usageTextColor,
-            panelOrder: PanelSettings.panelOrder)
+            panelOrder: PanelSettings.panelOrder,
+            enabledPanels: PanelSettings.enabledPanels)
 
         view.onCornerRadiusChange = { [weak self] radius in
             PanelSettings.cornerRadius = radius
@@ -77,6 +81,10 @@ extension AppDelegate {
             PanelSettings.panelOrder = order
             self?.applyPanelOrder()
         }
+        view.onEnabledPanelsChange = { [weak self] enabledPanels in
+            PanelSettings.enabledPanels = enabledPanels
+            self?.applyPanelVisibility()
+        }
         view.onReset = { [weak self, weak view] in
             guard let self else { return }
             PanelSettings.resetToDefaults()
@@ -95,7 +103,8 @@ extension AppDelegate {
                 usageFontSize: PanelSettings.usageFontSize,
                 usageDisplayMode: PanelSettings.usageDisplayMode,
                 usageTextColor: PanelSettings.usageTextColor,
-                panelOrder: PanelSettings.panelOrder)
+                panelOrder: PanelSettings.panelOrder,
+                enabledPanels: PanelSettings.enabledPanels)
             self.resizeFocusedTerminalIfNeeded()
         }
         view.onCancel = { [weak self] in
@@ -125,7 +134,7 @@ extension AppDelegate {
     private func closeSettingsPanel(restoreTerminalFocus: Bool) {
         settingsPanel?.orderOut(nil)
         settingsPanel = nil
-        guard restoreTerminalFocus else { return }
+        guard restoreTerminalFocus, PanelSettings.enabledPanels.contains(.terminal) else { return }
         panel.makeKeyAndOrderFront(nil)
         panel.makeFirstResponder(terminalView)
     }
@@ -135,8 +144,9 @@ extension AppDelegate {
         let inset: CGFloat = 8
         let desiredX = anchor.frame.midX - size.width / 2
         let x = min(max(desiredX, host.minX + inset), host.maxX - size.width - inset)
+        let desiredY = anchor.frame.maxY + inset
         let y = min(
-            max(anchor.frame.minY, host.minY + inset),
+            max(desiredY, host.minY + inset),
             host.maxY - size.height - inset)
         return NSPoint(x: x, y: y)
     }
@@ -160,6 +170,21 @@ extension AppDelegate {
 
     func applyPanelOrder() {
         isFrozen = false
+        refreshCoarseCaches()
+        runEvaluation()
+    }
+
+    func applyPanelVisibility() {
+        if !PanelSettings.enabledPanels.contains(.terminal) {
+            isExpanded = false
+            isFocusExpanded = false
+            isFrozen = false
+            terminalPanelController.setResizable(false)
+            if panel.isVisible { panel.orderOut(nil) }
+        }
+        if !PanelSettings.enabledPanels.contains(.usage) {
+            hideQuota(reason: "disabled in settings")
+        }
         refreshCoarseCaches()
         runEvaluation()
     }

@@ -61,6 +61,19 @@ enum PanelOrder: String, CaseIterable {
     }
 }
 
+struct EnabledPanels: OptionSet {
+    let rawValue: Int
+
+    static let terminal = EnabledPanels(rawValue: 1 << 0)
+    static let usage = EnabledPanels(rawValue: 1 << 1)
+    static let all: EnabledPanels = [.terminal, .usage]
+
+    static func resolved(_ panels: EnabledPanels) -> EnabledPanels {
+        let knownPanels = panels.intersection(.all)
+        return knownPanels.isEmpty ? .all : knownPanels
+    }
+}
+
 enum PanelSettings {
     static let minimumUsageFontSize: CGFloat = 8
     static let maximumUsageFontSize: CGFloat = 14
@@ -76,6 +89,7 @@ enum PanelSettings {
     private static let usageFontSizeKey = "DockDeck.settings.usageFontSize"
     private static let usageTextColorKey = "DockDeck.settings.usageTextColor"
     private static let panelOrderKey = "DockDeck.settings.panelOrder"
+    private static let enabledPanelsKey = "DockDeck.settings.enabledPanels"
 
     static var cornerRadius: CGFloat {
         get {
@@ -151,6 +165,18 @@ enum PanelSettings {
         set { UserDefaults.standard.set(newValue.rawValue, forKey: panelOrderKey) }
     }
 
+    static var enabledPanels: EnabledPanels {
+        get {
+            let defaults = UserDefaults.standard
+            guard defaults.object(forKey: enabledPanelsKey) != nil else { return .all }
+            return .resolved(EnabledPanels(rawValue: defaults.integer(forKey: enabledPanelsKey)))
+        }
+        set {
+            UserDefaults.standard.set(
+                EnabledPanels.resolved(newValue).rawValue, forKey: enabledPanelsKey)
+        }
+    }
+
     static var focusWidthMultiplier: CGFloat {
         get {
             let defaults = UserDefaults.standard
@@ -199,5 +225,6 @@ enum PanelSettings {
         defaults.removeObject(forKey: usageFontSizeKey)
         defaults.removeObject(forKey: usageTextColorKey)
         defaults.removeObject(forKey: panelOrderKey)
+        defaults.removeObject(forKey: enabledPanelsKey)
     }
 }

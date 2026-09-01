@@ -144,29 +144,46 @@ extension AppDelegate {
 
     func showPanels(for presence: DockPresence) {
         let frames = collapsedFrames(for: presence)
-        if let terminalFrame = terminalFrame(for: presence) {
+        let enabledPanels = PanelSettings.enabledPanels
+        if enabledPanels.contains(.terminal), let terminalFrame = terminalFrame(for: presence) {
             showTerminal(terminalFrame)
         } else if panel.isVisible {
-            debugLog("visibility", "hiding terminal; insufficient space beside Dock")
+            let reason = enabledPanels.contains(.terminal)
+                ? "insufficient space beside Dock" : "disabled in settings"
+            debugLog("visibility", "hiding terminal; \(reason)")
             panel.orderOut(nil)
         }
 
-        if let quotaFrame = frames.quota {
-            if !quotaPanel.isVisible { quotaPanel.orderFrontRegardless() }
-            applyQuotaFrame(quotaFrame)
+        if enabledPanels.contains(.usage), let quotaFrame = frames.quota {
+            showQuota(quotaFrame)
         } else {
-            hideQuota()
+            let reason = enabledPanels.contains(.usage)
+                ? "insufficient space beside Dock" : "disabled in settings"
+            hideQuota(reason: reason)
         }
     }
 
     func showTerminal(_ frame: NSRect, animated: Bool = false) {
+        guard PanelSettings.enabledPanels.contains(.terminal) else {
+            if panel.isVisible { panel.orderOut(nil) }
+            return
+        }
         if !panel.isVisible { panel.orderFrontRegardless() }
         applyFrame(frame, animated: animated)
     }
 
-    func hideQuota() {
+    func showQuota(_ frame: NSRect) {
+        guard PanelSettings.enabledPanels.contains(.usage) else {
+            hideQuota(reason: "disabled in settings")
+            return
+        }
+        if !quotaPanel.isVisible { quotaPanel.orderFrontRegardless() }
+        applyQuotaFrame(frame)
+    }
+
+    func hideQuota(reason: String = "insufficient space beside Dock") {
         guard quotaPanel.isVisible else { return }
-        debugLog("visibility", "hiding quota; insufficient space beside Dock")
+        debugLog("visibility", "hiding quota; \(reason)")
         quotaPanel.orderOut(nil)
     }
 

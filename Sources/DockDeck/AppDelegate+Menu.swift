@@ -42,6 +42,7 @@ extension AppDelegate {
     }
 
     @objc func toggleExpanded(_ sender: Any?) {
+        guard PanelSettings.enabledPanels.contains(.terminal) else { return }
         refreshCoarseCaches()
         let presence = resolveDockPresence()
 
@@ -67,8 +68,7 @@ extension AppDelegate {
         if let presence, case .concealed = presence {
             hideQuota()
         } else if let presence, let frame = quotaFrame(for: presence) {
-            if !quotaPanel.isVisible { quotaPanel.orderFrontRegardless() }
-            applyQuotaFrame(frame)
+            showQuota(frame)
         } else {
             hideQuota()
         }

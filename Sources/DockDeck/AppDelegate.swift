@@ -93,8 +93,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if case .concealed? = initialPresence {
             debugLog("visibility", "launching concealed (auto-hiding Dock is off screen)")
         } else {
-            if initialFrames.terminal != nil { panel.orderFrontRegardless() }
-            if initialFrames.quota != nil { quotaPanel.orderFrontRegardless() }
+            let enabledPanels = PanelSettings.enabledPanels
+            if enabledPanels.contains(.terminal), initialFrames.terminal != nil {
+                panel.orderFrontRegardless()
+            }
+            if enabledPanels.contains(.usage), initialFrames.quota != nil {
+                quotaPanel.orderFrontRegardless()
+            }
         }
         panel.makeFirstResponder(terminalView)
         NotificationCenter.default.addObserver(

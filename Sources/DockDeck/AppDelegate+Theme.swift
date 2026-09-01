@@ -24,10 +24,14 @@ extension AppDelegate {
         if let pickerPanel = themePickerPanel {
             pickerPanel.orderOut(nil)
             themePickerPanel = nil
-            panel.makeKeyAndOrderFront(nil)
-            panel.makeFirstResponder(terminalView)
+            if PanelSettings.enabledPanels.contains(.terminal) {
+                panel.makeKeyAndOrderFront(nil)
+                panel.makeFirstResponder(terminalView)
+            }
             return
         }
+
+        guard PanelSettings.enabledPanels.contains(.terminal) else { return }
 
         let picker = ThemePickerView(themes: Theme.all, selectedID: currentTheme.id)
         picker.onCommit = { [weak self] theme in

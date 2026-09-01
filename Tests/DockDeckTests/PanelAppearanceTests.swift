@@ -4,6 +4,12 @@ import XCTest
 @testable import DockDeck
 
 final class PanelAppearanceTests: XCTestCase {
+    func testEnabledPanelsKeepsSingleSelectionsAndRecoversEmptyState() {
+        XCTAssertEqual(EnabledPanels.resolved(.terminal), .terminal)
+        XCTAssertEqual(EnabledPanels.resolved(.usage), .usage)
+        XCTAssertEqual(EnabledPanels.resolved([]), .all)
+    }
+
     func testReadableTerminalUsesStrongerTintThanCompactPanels() {
         let compact = PanelAppearance.tintOpacity(base: 0.65, presentation: .compact)
         let readable = PanelAppearance.tintOpacity(base: 0.65, presentation: .readable)

@@ -20,6 +20,10 @@ final class SettingsPanelView: NSView {
     private let usageDisplayPopup = NSPopUpButton(frame: .zero, pullsDown: false)
     private let usageColorPopup = NSPopUpButton(frame: .zero, pullsDown: false)
     private let panelOrderPopup = NSPopUpButton(frame: .zero, pullsDown: false)
+    private let terminalPanelCheckbox = NSButton(
+        checkboxWithTitle: "Terminal", target: nil, action: nil)
+    private let usagePanelCheckbox = NSButton(
+        checkboxWithTitle: "Usage", target: nil, action: nil)
     private let fontNames: [String]
     private let usageDisplayModes = UsageDisplayMode.allCases
     private let usageColors = UsageTextColor.allCases
@@ -34,6 +38,7 @@ final class SettingsPanelView: NSView {
     var onUsageDisplayModeChange: ((UsageDisplayMode) -> Void)?
     var onUsageTextColorChange: ((UsageTextColor) -> Void)?
     var onPanelOrderChange: ((PanelOrder) -> Void)?
+    var onEnabledPanelsChange: ((EnabledPanels) -> Void)?
     var onReset: (() -> Void)?
     var onCancel: (() -> Void)?
 
@@ -43,7 +48,7 @@ final class SettingsPanelView: NSView {
         fontNames: [String], selectedTerminalFontName: String,
         selectedUsageFontName: String, usageFontSize: CGFloat,
         usageDisplayMode: UsageDisplayMode, usageTextColor: UsageTextColor,
-        panelOrder: PanelOrder
+        panelOrder: PanelOrder, enabledPanels: EnabledPanels
     ) {
         self.fontNames = fontNames
         let width = controlWidth + padding * 2
@@ -77,6 +82,19 @@ final class SettingsPanelView: NSView {
         y += 16 + sectionGap
 
         y = addSection("PANELS", at: y)
+
+        y = addLabel("Visible panels", at: y)
+        configurePanelCheckbox(
+            terminalPanelCheckbox, enabled: enabledPanels.contains(.terminal))
+        terminalPanelCheckbox.frame = NSRect(
+            x: padding, y: y, width: controlWidth / 2, height: 18)
+        addSubview(terminalPanelCheckbox)
+        configurePanelCheckbox(usagePanelCheckbox, enabled: enabledPanels.contains(.usage))
+        usagePanelCheckbox.frame = NSRect(
+            x: padding + controlWidth / 2, y: y, width: controlWidth / 2, height: 18)
+        addSubview(usagePanelCheckbox)
+        updatePanelCheckboxes()
+        y += 18 + rowGap
 
         y = addLabel("Placement", at: y)
         configurePopup(panelOrderPopup, action: #selector(panelOrderChanged))
@@ -210,7 +228,7 @@ final class SettingsPanelView: NSView {
         focusWidthMultiplier: CGFloat, focusHeightMultiplier: CGFloat,
         terminalFontName: String, usageFontName: String, usageFontSize: CGFloat,
         usageDisplayMode: UsageDisplayMode, usageTextColor: UsageTextColor,
-        panelOrder: PanelOrder
+        panelOrder: PanelOrder, enabledPanels: EnabledPanels
     ) {
         cornerRadiusSlider.doubleValue = Double(cornerRadius)
         tintOpacitySlider.doubleValue = Double(tintOpacity)
@@ -222,6 +240,9 @@ final class SettingsPanelView: NSView {
         select(usageDisplayMode, in: usageDisplayModes, popup: usageDisplayPopup)
         select(usageTextColor, in: usageColors, popup: usageColorPopup)
         select(panelOrder, in: panelOrders, popup: panelOrderPopup)
+        terminalPanelCheckbox.state = enabledPanels.contains(.terminal) ? .on : .off
+        usagePanelCheckbox.state = enabledPanels.contains(.usage) ? .on : .off
+        updatePanelCheckboxes()
         updateValueLabels()
     }
 
@@ -275,6 +296,18 @@ final class SettingsPanelView: NSView {
         onPanelOrderChange?(panelOrders[index])
     }
 
+    @objc private func panelVisibilityChanged(_ sender: NSButton) {
+        var enabledPanels: EnabledPanels = []
+        if terminalPanelCheckbox.state == .on { enabledPanels.insert(.terminal) }
+        if usagePanelCheckbox.state == .on { enabledPanels.insert(.usage) }
+        guard !enabledPanels.isEmpty else {
+            sender.state = .on
+            return
+        }
+        updatePanelCheckboxes()
+        onEnabledPanelsChange?(enabledPanels)
+    }
+
     @objc private func resetTapped() {
         onReset?()
     }
@@ -311,6 +344,21 @@ final class SettingsPanelView: NSView {
     private func configurePopup(_ popup: NSPopUpButton, action: Selector) {
         popup.target = self
         popup.action = action
+    }
+
+    private func configurePanelCheckbox(_ checkbox: NSButton, enabled: Bool) {
+        checkbox.target = self
+        checkbox.action = #selector(panelVisibilityChanged(_:))
+        checkbox.state = enabled ? .on : .off
+        checkbox.font = NSFont.systemFont(ofSize: 10, weight: .medium)
+        checkbox.toolTip = "At least one panel must remain visible"
+    }
+
+    private func updatePanelCheckboxes() {
+        let terminalEnabled = terminalPanelCheckbox.state == .on
+        let usageEnabled = usagePanelCheckbox.state == .on
+        terminalPanelCheckbox.isEnabled = !terminalEnabled || usageEnabled
+        usagePanelCheckbox.isEnabled = !usageEnabled || terminalEnabled
     }
 
     private func configureFontPopup(
