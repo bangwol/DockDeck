@@ -60,46 +60,45 @@ private struct QuotaRow: View {
         let spacing: CGFloat = compact ? 4 : 6
         let providerWidth: CGFloat = compact ? 44 : 54
 
-        VStack(spacing: 2) {
-            HStack(alignment: .firstTextBaseline, spacing: spacing) {
-                Text(provider.name)
-                    .font(configuration.font(weight: .bold))
+        HStack(alignment: .center, spacing: spacing) {
+            Text(provider.name)
+                .font(configuration.font(weight: .bold))
+                .foregroundStyle(providerColor)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+                .frame(width: providerWidth, alignment: .leading)
+
+            if windows.isEmpty {
+                Text(provider.freshness.label ?? "WAITING")
+                    .font(
+                        configuration.font(
+                            size: max(configuration.fontSize - 1, 7), weight: .semibold))
                     .foregroundStyle(providerColor)
                     .lineLimit(1)
-                    .minimumScaleFactor(0.8)
-                    .frame(width: providerWidth, alignment: .leading)
-
-                if windows.isEmpty {
-                    Text(provider.freshness.label ?? "WAITING")
-                        .font(
-                            configuration.font(
-                                size: max(configuration.fontSize - 1, 7), weight: .semibold))
-                        .foregroundStyle(providerColor)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.75)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                } else {
-                    ForEach(windows) { window in
-                        MeterLabel(
-                            window: window,
-                            configuration: configuration,
-                            baseColor: baseColor,
-                            meterColor: meterColor(for: window),
-                            dense: windows.count > 2)
-                        .frame(maxWidth: .infinity)
+                    .minimumScaleFactor(0.75)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            } else {
+                VStack(spacing: 2) {
+                    HStack(spacing: spacing) {
+                        ForEach(windows) { window in
+                            MeterLabel(
+                                window: window,
+                                configuration: configuration,
+                                baseColor: baseColor,
+                                meterColor: meterColor(for: window),
+                                dense: windows.count > 2)
+                            .frame(maxWidth: .infinity)
+                        }
                     }
-                }
-            }
 
-            if !windows.isEmpty {
-                HStack(spacing: spacing) {
-                    Color.clear.frame(width: providerWidth, height: 3)
-                    ForEach(windows) { window in
-                        MeterBar(
-                            value: configuration.displayMode.value(for: window),
-                            baseColor: baseColor,
-                            meterColor: meterColor(for: window))
-                        .frame(maxWidth: .infinity)
+                    HStack(spacing: spacing) {
+                        ForEach(windows) { window in
+                            MeterBar(
+                                value: configuration.displayMode.value(for: window),
+                                baseColor: baseColor,
+                                meterColor: meterColor(for: window))
+                            .frame(maxWidth: .infinity)
+                        }
                     }
                 }
             }
