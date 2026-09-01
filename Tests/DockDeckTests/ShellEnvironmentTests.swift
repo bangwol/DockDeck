@@ -15,6 +15,7 @@ final class ShellEnvironmentTests: XCTestCase {
         let attributes = try FileManager.default.attributesOfItem(atPath: hook.path)
 
         XCTAssertTrue(contents.contains("PROMPT='%% '"))
+        XCTAssertTrue(contents.contains("unsetopt PROMPT_SP"))
         XCTAssertTrue(contents.contains("source \"$ZDOTDIR/.zshenv\""))
         XCTAssertEqual(attributes[.posixPermissions] as? NSNumber, 0o600)
     }

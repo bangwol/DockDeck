@@ -13,6 +13,7 @@ enum ShellEnvironment {
         function _dockdeck_compact_prompt {
             PROMPT='%% '
             RPROMPT=''
+            unsetopt PROMPT_SP
         }
         add-zsh-hook precmd _dockdeck_compact_prompt
         unset DOCKDECK_USER_ZDOTDIR
