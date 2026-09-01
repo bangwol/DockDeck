@@ -158,7 +158,7 @@ extension AppDelegate {
     }
 
     func restoreLastFullyVisibleFrameIfStranded(on host: NSScreen) {
-        guard !isExpanded, panel.frame.minY < host.frame.minY else { return }
+        guard !isExpanded, !isFocusExpanded, panel.frame.minY < host.frame.minY else { return }
         guard let remembered = collapsedFrame,
             NSScreen.screens.contains(where: { $0.frame.contains(remembered) })
         else {
@@ -169,7 +169,9 @@ extension AppDelegate {
     }
 
     func applyFrame(_ frame: NSRect, animated: Bool = false) {
-        if !isExpanded, NSScreen.screens.contains(where: { $0.frame.contains(frame) }) {
+        if !isExpanded, !isFocusExpanded,
+            NSScreen.screens.contains(where: { $0.frame.contains(frame) })
+        {
             collapsedFrame = frame
         }
         guard panel.frame != frame else { return }

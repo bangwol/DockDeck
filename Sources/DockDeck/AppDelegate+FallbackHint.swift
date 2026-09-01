@@ -2,6 +2,7 @@ import Cocoa
 
 extension AppDelegate {
     static let fallbackHintOverlap: CGFloat = 6
+    static let fallbackHintWidth: CGFloat = 300
     static let fallbackHintMessage = """
         This is DockDeck — a terminal and usage deck that live beside your Dock on every desktop.
 
@@ -15,7 +16,7 @@ extension AppDelegate {
     func installFallbackHintIfNeeded() {
         guard hintPanel == nil else { return }
         let (hint, tintView, label) = FallbackHintPanel.make(
-            message: Self.fallbackHintMessage, width: Self.fallbackWidth, theme: currentTheme,
+            message: Self.fallbackHintMessage, width: Self.fallbackHintWidth, theme: currentTheme,
             cornerRadius: PanelSettings.cornerRadius, tintOpacity: PanelSettings.tintOpacity,
             font: TerminalTheme.font(named: PanelSettings.fontName),
             target: self, action: #selector(dismissFallbackHint))
@@ -41,7 +42,7 @@ extension AppDelegate {
             hintPanel?.orderOut(nil)
             return
         }
-        guard panel.isVisible, lastPresenceUntracked, !isExpanded else {
+        guard panel.isVisible, lastPresenceUntracked, !isExpanded, !isFocusExpanded else {
             hint.orderOut(nil)
             return
         }

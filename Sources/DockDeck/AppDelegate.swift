@@ -19,12 +19,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     var tintView: NSView { terminalPanelController.tintView }
     var menuButton: NSButton { terminalPanelController.menuButton }
     var trackingTimer: Timer!
+    var terminalLocalMouseMonitor: Any?
+    var terminalGlobalMouseMonitor: Any?
     var currentTheme = Theme.theme(
         id: UserDefaults.standard.string(forKey: AppPreferences.themeIDKey) ?? "")
     var themePickerPanel: KeyablePanel?
     var settingsPanel: KeyablePanel?
 
     var isExpanded = false
+    var isFocusExpanded = false
     var isFrozen = false
     var wasConcealed = false
     var expansionScreenID: CGDirectDisplayID?
@@ -67,7 +70,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             ?? NSRect(
                 x: initialTerminalFrame.maxX + DockPanelLayout.gap,
                 y: initialTerminalFrame.minY,
-                width: DockPanelLayout.fallbackQuotaWidth,
+                width: DockPanelLayout.fallbackPanelWidth,
                 height: initialTerminalFrame.height)
         collapsedFrame = initialFrames.terminal
         lastPresenceUntracked = initialPresence?.isUntracked ?? true
@@ -89,6 +92,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             if initialFrames.quota != nil { quotaPanel.orderFrontRegardless() }
         }
         panel.makeFirstResponder(terminalView)
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(terminalPanelDidResignKey(_:)),
+            name: NSWindow.didResignKeyNotification, object: panel)
+        terminalLocalMouseMonitor = NSEvent.addLocalMonitorForEvents(
+            matching: [.leftMouseDown, .rightMouseDown]
+        ) { [weak self] event in
+            if event.window === self?.panel {
+                self?.expandTerminalForFocus()
+            }
+            return event
+        }
+        terminalGlobalMouseMonitor = NSEvent.addGlobalMonitorForEvents(
+            matching: [.leftMouseDown, .rightMouseDown]
+        ) { [weak self] _ in
+            DispatchQueue.main.async {
+                self?.collapseTerminalAfterFocus()
+            }
+        }
 
         if !accessibilityTrusted {
             installFallbackHintIfNeeded()
@@ -118,6 +139,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        NotificationCenter.default.removeObserver(self)
+        if let terminalLocalMouseMonitor { NSEvent.removeMonitor(terminalLocalMouseMonitor) }
+        if let terminalGlobalMouseMonitor { NSEvent.removeMonitor(terminalGlobalMouseMonitor) }
         trackingTimer?.invalidate()
         usageStore.stop()
     }

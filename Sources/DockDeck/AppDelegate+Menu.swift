@@ -47,6 +47,7 @@ extension AppDelegate {
                 panel.orderOut(nil)
             }
         } else {
+            isFocusExpanded = false
             isExpanded = true
             let screen = expansionScreen(fallingBackTo: presence?.host)
             expansionScreenID = screen.flatMap(displayID(of:))

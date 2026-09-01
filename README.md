@@ -26,15 +26,18 @@ The terminal stays interactive on the left. The read-only usage panel stays on t
 - Live Codex quota data through the official `codex app-server` protocol.
 - Claude quota data from Claude Code's official status-line payload.
 - Dock-aware positioning, multi-display tracking, and auto-hide behavior.
+- Matching left and right panel widths derived from the smaller side of the Dock.
 - A non-interactive usage panel that cannot steal keyboard focus.
-- Full-height terminal expansion and built-in appearance controls.
+- A compact `% ` prompt inside DockDeck without changing the user's shell files.
+- Automatic 2× width / 4× height terminal expansion when the terminal is clicked.
+- Manual large terminal mode and built-in appearance controls.
 - Twenty terminal themes with configurable font, tint, and corner radius.
 
 Keyboard shortcuts:
 
 | Shortcut | Action |
 | --- | --- |
-| `⌘E` | Expand or collapse the terminal |
+| `⌘E` | Toggle the manual large terminal mode |
 | `⌘T` | Open the theme picker |
 | `⌘R` | Refresh usage data |
 | `⌘Q` | Quit DockDeck |
@@ -92,6 +95,8 @@ The uninstall script removes the login item only. It does not remove the local s
 ## Usage data and privacy
 
 DockDeck does not read browser cookies, browser credential stores, or private web endpoints.
+It observes only mouse-down occurrence to collapse the focused terminal; it does not record
+global keystrokes, pointer coordinates, or clicked content.
 
 | Provider | Source | Local behavior |
 | --- | --- | --- |
@@ -105,6 +110,11 @@ The Claude cache is written atomically to:
 ```
 
 The cache directory uses `0700` permissions and the file uses `0600` permissions.
+
+DockDeck also writes a small zsh startup hook to
+`~/Library/Caches/DockDeck/Shell/.zshenv`. It preserves the user's normal zsh startup files and
+changes only the DockDeck terminal prompt. The directory uses `0700` permissions and the hook
+uses `0600` permissions.
 
 ## Configure the Claude bridge
 

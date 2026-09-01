@@ -7,7 +7,7 @@ enum UsageFreshness: Equatable {
     case stale
     case signIn
     case unavailable
-    case installBridge
+    case setupClaude
 
     var label: String? {
         switch self {
@@ -16,7 +16,7 @@ enum UsageFreshness: Equatable {
         case .stale: "STALE"
         case .signIn: "SIGN IN"
         case .unavailable: "OFFLINE"
-        case .installBridge: "INSTALL BRIDGE"
+        case .setupClaude: "SET UP CLAUDE"
         }
     }
 }
@@ -158,7 +158,7 @@ final class UsageStore: ObservableObject {
             let freshness: UsageFreshness
             switch error {
             case .bridgeNotInstalled:
-                freshness = .installBridge
+                freshness = .setupClaude
             case .authenticationRequired:
                 freshness = .signIn
             default:

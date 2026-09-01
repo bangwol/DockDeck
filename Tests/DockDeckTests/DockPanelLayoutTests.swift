@@ -16,14 +16,14 @@ final class DockPanelLayoutTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(frames.quota!.minX, tray.maxX)
     }
 
-    func testNarrowSideIsHiddenInsteadOfOverlappingDock() {
+    func testAsymmetricSidesUseMatchingSmallerWidth() {
         let host = NSRect(x: 0, y: 0, width: 1000, height: 700)
         let tray = NSRect(x: 180, y: 0, width: 590, height: 64)
 
         let frames = DockPanelLayout.frames(tray: tray, hostFrame: host)
 
-        XCTAssertNil(frames.terminal)
-        XCTAssertEqual(frames.quota, NSRect(x: 774, y: -5, width: 226, height: 64))
+        XCTAssertEqual(frames.terminal, NSRect(x: 0, y: -5, width: 176, height: 64))
+        XCTAssertEqual(frames.quota, NSRect(x: 824, y: -5, width: 176, height: 64))
     }
 
     func testCompactPanelsFitCurrentScreenGeometry() {
@@ -34,5 +34,45 @@ final class DockPanelLayoutTests: XCTestCase {
 
         XCTAssertEqual(frames.terminal?.width, 214)
         XCTAssertEqual(frames.quota?.width, 214)
+    }
+
+    func testVeryNarrowSidesAreHiddenInsteadOfOverlappingDock() {
+        let host = NSRect(x: 0, y: 0, width: 1000, height: 700)
+        let tray = NSRect(x: 150, y: 0, width: 714, height: 64)
+
+        let frames = DockPanelLayout.frames(tray: tray, hostFrame: host)
+
+        XCTAssertNil(frames.terminal)
+        XCTAssertNil(frames.quota)
+    }
+
+    func testFocusedTerminalGrowsTwoByFourAndStaysOnScreen() {
+        let host = NSRect(x: 0, y: 0, width: 1800, height: 1169)
+        let collapsed = NSRect(x: 0, y: -5, width: 214, height: 65)
+
+        let focused = DockPanelLayout.focusedTerminalFrame(
+            collapsed: collapsed, hostFrame: host)
+
+        XCTAssertEqual(focused, NSRect(x: 0, y: 0, width: 428, height: 260))
+        XCTAssertTrue(host.contains(focused))
+    }
+
+    func testFocusedTerminalIsCappedToSmallScreen() {
+        let host = NSRect(x: 100, y: 50, width: 320, height: 200)
+        let collapsed = NSRect(x: 100, y: 50, width: 240, height: 64)
+
+        let focused = DockPanelLayout.focusedTerminalFrame(
+            collapsed: collapsed, hostFrame: host)
+
+        XCTAssertEqual(focused, host)
+    }
+
+    func testFallbackPanelsUseMatchingWidths() {
+        let host = NSRect(x: 0, y: 0, width: 1800, height: 1169)
+
+        let frames = DockPanelLayout.fallbackFrames(hostFrame: host, reservedHeight: 65)
+
+        XCTAssertEqual(frames.terminal, NSRect(x: 0, y: 0, width: 214, height: 65))
+        XCTAssertEqual(frames.quota, NSRect(x: 1586, y: 0, width: 214, height: 65))
     }
 }
