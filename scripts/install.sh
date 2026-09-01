@@ -27,6 +27,8 @@ APP_PATH="$BUILD_DIR/DockDeck.app"
 APP_BIN_PATH="$APP_PATH/Contents/MacOS/DockDeck"
 APP_BRIDGE_PATH="$APP_PATH/Contents/Resources/bin/dockdeck-claude-bridge"
 LICENSES_PATH="$APP_PATH/Contents/Resources/Licenses"
+INSTALLED_APP_PATH="$HOME/Applications/DockDeck.app"
+INSTALLED_APP_BIN_PATH="$INSTALLED_APP_PATH/Contents/MacOS/DockDeck"
 PLIST_PATH="$HOME/Library/LaunchAgents/$LABEL.plist"
 LOG_PATH="$HOME/Library/Logs/DockDeck.log"
 LSREGISTER="/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister"
@@ -133,10 +135,17 @@ EOF
 
 codesign --force --deep --sign "$SIGNING_IDENTITY" --identifier "$LABEL" "$APP_PATH"
 
-# Keep Accessibility settings pointed at the signed login-item build when a
-# separately packaged ad-hoc preview has also been opened on this Mac.
+launchctl unload "$PLIST_PATH" 2>/dev/null || true
+mkdir -p "$HOME/Applications"
+rm -rf "$INSTALLED_APP_PATH"
+ditto "$APP_PATH" "$INSTALLED_APP_PATH"
+codesign --verify --deep --strict "$INSTALLED_APP_PATH"
+
+# Keep Accessibility settings pointed at the stable signed installation when
+# separately packaged or intermediate builds also exist on this Mac.
 "$LSREGISTER" -u "$REPO_DIR/.build/release-dist/DockDeck.app" 2>/dev/null || true
-"$LSREGISTER" -f "$APP_PATH"
+"$LSREGISTER" -u "$APP_PATH" 2>/dev/null || true
+"$LSREGISTER" -f "$INSTALLED_APP_PATH"
 
 mkdir -p "$HOME/Library/LaunchAgents"
 
@@ -149,7 +158,7 @@ cat > "$PLIST_PATH" <<EOF
     <string>$LABEL</string>
     <key>ProgramArguments</key>
     <array>
-        <string>$APP_BIN_PATH</string>
+        <string>$INSTALLED_APP_BIN_PATH</string>
     </array>
     <key>RunAtLoad</key>
     <true/>
@@ -161,10 +170,9 @@ cat > "$PLIST_PATH" <<EOF
 </plist>
 EOF
 
-launchctl unload "$PLIST_PATH" 2>/dev/null || true
 launchctl load "$PLIST_PATH"
 
-echo "Installed and started."
+echo "Installed $INSTALLED_APP_PATH and started."
 echo
 echo "If the panel isn't tracking the Dock, check System Settings ->"
 echo "Privacy & Security -> Accessibility for a \"DockDeck\" entry and"

@@ -82,7 +82,7 @@ DOCKDECK_DEBUG=1 swift run DockDeck
 ./scripts/install.sh
 ```
 
-The installer builds a local app bundle, registers a per-user LaunchAgent, starts DockDeck immediately, and starts it at future logins. It prefers the sole Apple Development identity in the login Keychain so Accessibility approval can survive rebuilds. No certificate name or account information is written to the repository.
+The installer builds and signs `~/Applications/DockDeck.app`, registers a per-user LaunchAgent, starts DockDeck immediately, and starts it at future logins. The stable app path and signing identity allow Accessibility approval to survive rebuilds. It prefers the sole Apple Development identity in the login Keychain. No certificate name or account information is written to the repository.
 
 If there is no single Apple Development identity, the installer creates a self-signed local fallback. macOS may request Accessibility approval again after rebuilding with that fallback. Select a different installed identity when needed:
 
@@ -96,7 +96,7 @@ Review the script before running it. To remove the LaunchAgent:
 ./scripts/uninstall.sh
 ```
 
-The uninstall script removes the login item only. It leaves the local signing certificate and build output in place.
+The uninstall script removes the login item only. It leaves the installed app, local signing certificate, and build output in place.
 
 ## Build a distributable local bundle
 
@@ -161,15 +161,14 @@ Claude Code added `rate_limits` to status-line input in `2.1.80`. Each 5-hour or
 
 ### 2. Locate the DockDeck bridge
 
-After running `./scripts/install.sh` from the repository, the bridge is inside the generated app bundle:
+After running `./scripts/install.sh`, the bridge is inside the installed app bundle:
 
 ```bash
-cd /path/to/DockDeck
-BRIDGE_PATH="$(pwd)/.build/release/DockDeck.app/Contents/Resources/bin/dockdeck-claude-bridge"
+BRIDGE_PATH="$HOME/Applications/DockDeck.app/Contents/Resources/bin/dockdeck-claude-bridge"
 test -x "$BRIDGE_PATH" && printf '%s\n' "$BRIDGE_PATH"
 ```
 
-If DockDeck is copied to `/Applications`, use `/Applications/DockDeck.app/Contents/Resources/bin/dockdeck-claude-bridge` instead.
+For a system-wide copy, use `/Applications/DockDeck.app/Contents/Resources/bin/dockdeck-claude-bridge` instead.
 
 ### 3. Add the status line
 
@@ -179,7 +178,7 @@ DockDeck never edits `~/.claude/settings.json` automatically. Preserve its exist
 {
   "statusLine": {
     "type": "command",
-    "command": "\"/absolute/path/to/DockDeck/.build/release/DockDeck.app/Contents/Resources/bin/dockdeck-claude-bridge\"",
+    "command": "\"/Users/your-name/Applications/DockDeck.app/Contents/Resources/bin/dockdeck-claude-bridge\"",
     "refreshInterval": 60
   }
 }
