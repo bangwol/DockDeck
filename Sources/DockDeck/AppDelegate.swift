@@ -32,6 +32,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         id: UserDefaults.standard.string(forKey: AppPreferences.themeIDKey) ?? "")
     var themePickerPanel: KeyablePanel?
     var settingsPanel: KeyablePanel?
+    var settingsPanelRestoresTerminalFocus = false
 
     var terminalPanelMode: TerminalPanelMode = .docked
     var isExpanded: Bool { terminalPanelMode == .large }

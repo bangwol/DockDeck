@@ -26,7 +26,7 @@ DockDeck uses the space beside a bottom-aligned Dock for two compact developer p
 - Remaining or used Codex and Claude capacity from their supported local interfaces; no browser cookies or private web endpoints.
 - Dock-aware, symmetric placement across displays, Spaces, and auto-hide transitions.
 - Read-only usage panel with configurable values, font, size, and color; right-click it for the shared settings menu.
-- Independent Terminal and Usage visibility controls; at least one panel remains visible so settings stay accessible.
+- A shared sidebar-based Settings window with Deck cards for side placement and independent Terminal and Usage visibility controls.
 - Click-to-focus terminal expansion, native edge resizing, and remembered dimensions.
 - Native Liquid Glass on macOS 26, with a translucent fallback and stronger terminal tint on earlier macOS.
 - Manual large-terminal mode plus 20 themes with configurable fonts, tint, corner radius, and panel placement.
@@ -44,6 +44,8 @@ Keyboard shortcuts:
 DockDeck reserves the Command-key shortcuts above plus the standard `⌘C`, `⌘V`, and `⌘A` editing shortcuts. `Ctrl` combinations, Option/Meta, Esc, Tab, arrow keys, Home/End, Delete, and F1–F12 continue through SwiftTerm's normal terminal input handling. Option acts as Meta by default. Page Up and Page Down follow SwiftTerm's terminal scrolling behavior unless the running terminal application requests cursor-key handling.
 
 Click the terminal to expand it, then click elsewhere to return it to the Dock. Drag any edge to resize it; DockDeck restores those proportions the next time it expands. Open the shared **Settings…** panel from the terminal menu, app menu, or usage-panel context menu. `⌘E` toggles a separate, fixed 75% large-terminal mode; its menu action is labeled **Return Terminal to Dock** while active. Running `exit` starts a fresh DockDeck login shell; use `⌘Q` to quit the app.
+
+Settings are organized into **Decks**, **Terminal**, **Usage**, and **Appearance**. Decks show the modules assigned to each side of the Dock, let either current module be hidden, and swap the complete left and right Decks. At least one module remains visible so Settings stays reachable. DockDeck remembers the last Settings section you opened.
 
 ## Requirements
 

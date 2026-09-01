@@ -1,34 +1,85 @@
 import Cocoa
+import SwiftUI
 
-final class SettingsPanelView: NSView {
-    private let padding: CGFloat = 12
-    private let rowGap: CGFloat = 11
-    private let sectionGap: CGFloat = 16
-    private let controlWidth: CGFloat = 220
-    private let closeButtonSize: CGFloat = 14
+enum SettingsPaneID: String, CaseIterable, Identifiable {
+    case decks
+    case terminal
+    case usage
+    case appearance
 
-    private let cornerRadiusSlider = NSSlider()
-    private let tintOpacitySlider = NSSlider()
-    private let focusWidthSlider = NSSlider()
-    private let focusHeightSlider = NSSlider()
-    private let usageFontSizeSlider = NSSlider()
-    private let focusWidthLabel = NSTextField(labelWithString: "")
-    private let focusHeightLabel = NSTextField(labelWithString: "")
-    private let usageFontSizeLabel = NSTextField(labelWithString: "")
-    private let terminalFontPopup = NSPopUpButton(frame: .zero, pullsDown: false)
-    private let usageFontPopup = NSPopUpButton(frame: .zero, pullsDown: false)
-    private let usageDisplayPopup = NSPopUpButton(frame: .zero, pullsDown: false)
-    private let usageColorPopup = NSPopUpButton(frame: .zero, pullsDown: false)
-    private let panelOrderPopup = NSPopUpButton(frame: .zero, pullsDown: false)
-    private let terminalPanelCheckbox = NSButton(
-        checkboxWithTitle: "Terminal", target: nil, action: nil)
-    private let usagePanelCheckbox = NSButton(
-        checkboxWithTitle: "Usage", target: nil, action: nil)
-    private let fontNames: [String]
-    private let usageDisplayModes = UsageDisplayMode.allCases
-    private let usageColors = UsageTextColor.allCases
-    private let panelOrders = PanelOrder.allCases
+    var id: Self { self }
 
+    var title: String {
+        switch self {
+        case .decks: "Decks"
+        case .terminal: "Terminal"
+        case .usage: "Usage"
+        case .appearance: "Appearance"
+        }
+    }
+
+    var subtitle: String {
+        switch self {
+        case .decks: "Choose which modules appear beside the Dock."
+        case .terminal: "Control terminal expansion and text."
+        case .usage: "Choose how account limits are displayed."
+        case .appearance: "Adjust the shared panel surface."
+        }
+    }
+
+    var symbolName: String {
+        switch self {
+        case .decks: "rectangle.stack"
+        case .terminal: "terminal"
+        case .usage: "chart.bar"
+        case .appearance: "paintbrush"
+        }
+    }
+
+    var windowTitle: String { "DockDeck — \(title)" }
+}
+
+struct PanelModuleDefinition: Identifiable, Equatable {
+    let id: PanelModuleID
+    let title: String
+    let subtitle: String
+    let symbolName: String
+
+    static func definition(for id: PanelModuleID) -> Self? {
+        switch id {
+        case .terminal:
+            Self(
+                id: id, title: "Terminal", subtitle: "Interactive login shell",
+                symbolName: "terminal")
+        case .usage:
+            Self(
+                id: id, title: "Usage", subtitle: "Codex and Claude limits",
+                symbolName: "chart.bar")
+        default:
+            nil
+        }
+    }
+}
+
+final class SettingsPanelModel: ObservableObject {
+    @Published var selectedPane: SettingsPaneID {
+        didSet { onPaneChange?(selectedPane) }
+    }
+    @Published private(set) var deckConfiguration: PanelDeckConfiguration
+    @Published private(set) var cornerRadius: CGFloat
+    @Published private(set) var tintOpacity: CGFloat
+    @Published private(set) var focusWidthMultiplier: CGFloat
+    @Published private(set) var focusHeightMultiplier: CGFloat
+    @Published private(set) var terminalFontName: String
+    @Published private(set) var usageFontName: String
+    @Published private(set) var usageFontSize: CGFloat
+    @Published private(set) var usageDisplayMode: UsageDisplayMode
+    @Published private(set) var usageTextColor: UsageTextColor
+
+    let fontNames: [String]
+
+    var onPaneChange: ((SettingsPaneID) -> Void)?
+    var onDeckConfigurationChange: ((PanelDeckConfiguration) -> Void)?
     var onCornerRadiusChange: ((CGFloat) -> Void)?
     var onTintOpacityChange: ((CGFloat) -> Void)?
     var onFocusSizeChange: ((CGFloat, CGFloat) -> Void)?
@@ -37,379 +88,718 @@ final class SettingsPanelView: NSView {
     var onUsageFontSizeChange: ((CGFloat) -> Void)?
     var onUsageDisplayModeChange: ((UsageDisplayMode) -> Void)?
     var onUsageTextColorChange: ((UsageTextColor) -> Void)?
-    var onPanelOrderChange: ((PanelOrder) -> Void)?
-    var onEnabledPanelsChange: ((EnabledPanels) -> Void)?
     var onReset: (() -> Void)?
     var onCancel: (() -> Void)?
 
     init(
-        cornerRadius: CGFloat, tintOpacity: CGFloat,
-        focusWidthMultiplier: CGFloat, focusHeightMultiplier: CGFloat,
-        fontNames: [String], selectedTerminalFontName: String,
-        selectedUsageFontName: String, usageFontSize: CGFloat,
-        usageDisplayMode: UsageDisplayMode, usageTextColor: UsageTextColor,
-        panelOrder: PanelOrder, enabledPanels: EnabledPanels
+        selectedPane: SettingsPaneID,
+        deckConfiguration: PanelDeckConfiguration,
+        cornerRadius: CGFloat,
+        tintOpacity: CGFloat,
+        focusWidthMultiplier: CGFloat,
+        focusHeightMultiplier: CGFloat,
+        fontNames: [String],
+        terminalFontName: String,
+        usageFontName: String,
+        usageFontSize: CGFloat,
+        usageDisplayMode: UsageDisplayMode,
+        usageTextColor: UsageTextColor
     ) {
-        self.fontNames = fontNames
-        let width = controlWidth + padding * 2
+        self.selectedPane = selectedPane
+        self.deckConfiguration = deckConfiguration.normalized()
+        self.cornerRadius = cornerRadius
+        self.tintOpacity = tintOpacity
+        self.focusWidthMultiplier = focusWidthMultiplier
+        self.focusHeightMultiplier = focusHeightMultiplier
+        self.terminalFontName = terminalFontName
+        self.usageFontName = usageFontName
+        self.usageFontSize = usageFontSize
+        self.usageDisplayMode = usageDisplayMode
+        self.usageTextColor = usageTextColor
 
-        super.init(frame: NSRect(x: 0, y: 0, width: width, height: 0))
-        wantsLayer = true
-        layer?.backgroundColor = NSColor.black.withAlphaComponent(0.78).cgColor
-        layer?.cornerRadius = 10
-        layer?.masksToBounds = true
-        layer?.borderWidth = 1
-        layer?.borderColor = NSColor.white.withAlphaComponent(0.15).cgColor
+        var availableFonts = fontNames
+        for selectedFont in [terminalFontName, usageFontName]
+            where !availableFonts.contains(selectedFont)
+        {
+            availableFonts.insert(selectedFont, at: 0)
+        }
+        self.fontNames = availableFonts
+    }
 
-        var y: CGFloat = padding
+    var moduleDefinitions: [PanelModuleDefinition] {
+        (deckConfiguration.left + deckConfiguration.right).compactMap {
+            PanelModuleDefinition.definition(for: $0)
+        }
+    }
 
-        let title = Self.makeLabel("DockDeck Settings", size: 12, weight: .semibold, alpha: 0.88)
-        title.frame = NSRect(
-            x: padding, y: y, width: controlWidth - closeButtonSize - 6, height: 16)
-        addSubview(title)
+    func moduleDefinitions(on side: PanelSide) -> [PanelModuleDefinition] {
+        let modules = side == .left ? deckConfiguration.left : deckConfiguration.right
+        return modules.compactMap { PanelModuleDefinition.definition(for: $0) }
+    }
 
-        let closeButton = NSButton(
-            image: NSImage(systemSymbolName: "xmark", accessibilityDescription: "Close")!,
-            target: self, action: #selector(closeTapped))
-        closeButton.frame = NSRect(
-            x: width - padding - closeButtonSize, y: y + 1,
-            width: closeButtonSize, height: closeButtonSize)
-        closeButton.isBordered = false
-        closeButton.imagePosition = .imageOnly
-        closeButton.contentTintColor = NSColor.white.withAlphaComponent(0.5)
-        (closeButton.cell as? NSButtonCell)?.imageScaling = .scaleProportionallyDown
-        addSubview(closeButton)
-        y += 16 + sectionGap
+    func side(containing module: PanelModuleID) -> PanelSide? {
+        deckConfiguration.side(containing: module)
+    }
 
-        y = addSection("PANELS", at: y)
+    func isEnabled(_ module: PanelModuleID) -> Bool {
+        deckConfiguration.contains(module)
+    }
 
-        y = addLabel("Visible panels", at: y)
-        configurePanelCheckbox(
-            terminalPanelCheckbox, enabled: enabledPanels.contains(.terminal))
-        terminalPanelCheckbox.frame = NSRect(
-            x: padding, y: y, width: controlWidth / 2, height: 18)
-        addSubview(terminalPanelCheckbox)
-        configurePanelCheckbox(usagePanelCheckbox, enabled: enabledPanels.contains(.usage))
-        usagePanelCheckbox.frame = NSRect(
-            x: padding + controlWidth / 2, y: y, width: controlWidth / 2, height: 18)
-        addSubview(usagePanelCheckbox)
-        updatePanelCheckboxes()
-        y += 18 + rowGap
+    func canDisable(_ module: PanelModuleID) -> Bool {
+        !isEnabled(module)
+            || moduleDefinitions.contains { $0.id != module && isEnabled($0.id) }
+    }
 
-        y = addLabel("Placement", at: y)
-        configurePopup(panelOrderPopup, action: #selector(panelOrderChanged))
-        panelOrders.forEach { panelOrderPopup.addItem(withTitle: $0.title) }
-        panelOrderPopup.frame = NSRect(x: padding, y: y, width: controlWidth, height: 22)
-        select(panelOrder, in: panelOrders, popup: panelOrderPopup)
-        addSubview(panelOrderPopup)
-        y += 22 + rowGap
+    func selectPane(_ pane: SettingsPaneID) {
+        selectedPane = pane
+    }
 
-        y = addLabel("Corner radius", at: y)
-        configureSlider(
-            cornerRadiusSlider, min: 0, max: 24, value: cornerRadius,
-            action: #selector(cornerRadiusChanged))
-        cornerRadiusSlider.frame = NSRect(x: padding, y: y, width: controlWidth, height: 20)
-        addSubview(cornerRadiusSlider)
-        y += 20 + rowGap
+    func setEnabled(_ enabled: Bool, for module: PanelModuleID) {
+        guard enabled || canDisable(module) else { return }
+        var configuration = deckConfiguration
+        configuration.setEnabled(enabled, for: module)
+        publish(configuration)
+    }
 
-        y = addLabel("Theme tint", at: y)
-        configureSlider(
-            tintOpacitySlider, min: 0.2, max: 1, value: tintOpacity,
-            action: #selector(opacityChanged))
-        tintOpacitySlider.frame = NSRect(x: padding, y: y, width: controlWidth, height: 20)
-        addSubview(tintOpacitySlider)
-        y += 20 + sectionGap
+    func swapDecks() {
+        var configuration = deckConfiguration
+        swap(&configuration.left, &configuration.right)
+        publish(configuration)
+    }
 
-        y = addSection("TERMINAL", at: y)
+    func setCornerRadius(_ value: CGFloat) {
+        cornerRadius = value.rounded()
+        onCornerRadiusChange?(cornerRadius)
+    }
 
-        configureValueLabel(focusWidthLabel)
-        focusWidthLabel.frame = NSRect(x: padding, y: y, width: controlWidth, height: 14)
-        addSubview(focusWidthLabel)
-        y += 18
-        configureSlider(
-            focusWidthSlider,
-            min: DockPanelLayout.minimumFocusedWidthMultiplier,
-            max: DockPanelLayout.maximumFocusedWidthMultiplier,
-            value: focusWidthMultiplier, action: #selector(focusSizeChanged))
-        focusWidthSlider.frame = NSRect(x: padding, y: y, width: controlWidth, height: 20)
-        addSubview(focusWidthSlider)
-        y += 20 + rowGap
+    func setTintOpacity(_ value: CGFloat) {
+        tintOpacity = (value * 100).rounded() / 100
+        onTintOpacityChange?(tintOpacity)
+    }
 
-        configureValueLabel(focusHeightLabel)
-        focusHeightLabel.frame = NSRect(x: padding, y: y, width: controlWidth, height: 14)
-        addSubview(focusHeightLabel)
-        y += 18
-        configureSlider(
-            focusHeightSlider,
-            min: DockPanelLayout.minimumFocusedHeightMultiplier,
-            max: DockPanelLayout.maximumFocusedHeightMultiplier,
-            value: focusHeightMultiplier, action: #selector(focusSizeChanged))
-        focusHeightSlider.frame = NSRect(x: padding, y: y, width: controlWidth, height: 20)
-        addSubview(focusHeightSlider)
-        y += 20 + rowGap
+    func setFocusWidthMultiplier(_ value: CGFloat) {
+        focusWidthMultiplier = (value * 4).rounded() / 4
+        onFocusSizeChange?(focusWidthMultiplier, focusHeightMultiplier)
+    }
 
-        y = addLabel("Terminal font", at: y)
-        configureFontPopup(
-            terminalFontPopup, selectedName: selectedTerminalFontName,
-            action: #selector(terminalFontChanged))
-        terminalFontPopup.frame = NSRect(x: padding, y: y, width: controlWidth, height: 22)
-        addSubview(terminalFontPopup)
-        y += 22 + sectionGap
+    func setFocusHeightMultiplier(_ value: CGFloat) {
+        focusHeightMultiplier = (value * 4).rounded() / 4
+        onFocusSizeChange?(focusWidthMultiplier, focusHeightMultiplier)
+    }
 
-        y = addSection("USAGE", at: y)
+    func setTerminalFontName(_ value: String) {
+        terminalFontName = value
+        onTerminalFontChange?(value)
+    }
 
-        y = addLabel("Values", at: y)
-        configurePopup(usageDisplayPopup, action: #selector(usageDisplayChanged))
-        usageDisplayModes.forEach { usageDisplayPopup.addItem(withTitle: $0.title) }
-        usageDisplayPopup.frame = NSRect(x: padding, y: y, width: controlWidth, height: 22)
-        select(usageDisplayMode, in: usageDisplayModes, popup: usageDisplayPopup)
-        addSubview(usageDisplayPopup)
-        y += 22 + rowGap
+    func setUsageFontName(_ value: String) {
+        usageFontName = value
+        onUsageFontChange?(value)
+    }
 
-        y = addLabel("Usage font", at: y)
-        configureFontPopup(
-            usageFontPopup, selectedName: selectedUsageFontName,
-            action: #selector(usageFontChanged))
-        usageFontPopup.frame = NSRect(x: padding, y: y, width: controlWidth, height: 22)
-        addSubview(usageFontPopup)
-        y += 22 + rowGap
+    func setUsageFontSize(_ value: CGFloat) {
+        usageFontSize = value.rounded()
+        onUsageFontSizeChange?(usageFontSize)
+    }
 
-        configureValueLabel(usageFontSizeLabel)
-        usageFontSizeLabel.frame = NSRect(x: padding, y: y, width: controlWidth, height: 14)
-        addSubview(usageFontSizeLabel)
-        y += 18
-        configureSlider(
-            usageFontSizeSlider,
-            min: PanelSettings.minimumUsageFontSize,
-            max: PanelSettings.maximumUsageFontSize,
-            value: usageFontSize, action: #selector(usageFontSizeChanged))
-        usageFontSizeSlider.frame = NSRect(x: padding, y: y, width: controlWidth, height: 20)
-        addSubview(usageFontSizeSlider)
-        y += 20 + rowGap
+    func setUsageDisplayMode(_ value: UsageDisplayMode) {
+        usageDisplayMode = value
+        onUsageDisplayModeChange?(value)
+    }
 
-        y = addLabel("Text color", at: y)
-        configurePopup(usageColorPopup, action: #selector(usageColorChanged))
-        usageColors.forEach { usageColorPopup.addItem(withTitle: $0.title) }
-        usageColorPopup.frame = NSRect(x: padding, y: y, width: controlWidth, height: 22)
-        select(usageTextColor, in: usageColors, popup: usageColorPopup)
-        addSubview(usageColorPopup)
-        y += 22 + sectionGap
+    func setUsageTextColor(_ value: UsageTextColor) {
+        usageTextColor = value
+        onUsageTextColorChange?(value)
+    }
 
-        let resetButton = NSButton(
-            title: "Reset to Defaults", target: self, action: #selector(resetTapped))
-        resetButton.isBordered = false
-        resetButton.contentTintColor = NSColor.white.withAlphaComponent(0.58)
-        resetButton.font = NSFont.systemFont(ofSize: 10)
-        resetButton.frame = NSRect(x: padding, y: y, width: controlWidth, height: 14)
-        addSubview(resetButton)
-        y += 14 + padding
+    func setValues(
+        deckConfiguration: PanelDeckConfiguration,
+        cornerRadius: CGFloat,
+        tintOpacity: CGFloat,
+        focusWidthMultiplier: CGFloat,
+        focusHeightMultiplier: CGFloat,
+        terminalFontName: String,
+        usageFontName: String,
+        usageFontSize: CGFloat,
+        usageDisplayMode: UsageDisplayMode,
+        usageTextColor: UsageTextColor
+    ) {
+        self.deckConfiguration = deckConfiguration.normalized()
+        self.cornerRadius = cornerRadius
+        self.tintOpacity = tintOpacity
+        self.focusWidthMultiplier = focusWidthMultiplier
+        self.focusHeightMultiplier = focusHeightMultiplier
+        self.terminalFontName = terminalFontName
+        self.usageFontName = usageFontName
+        self.usageFontSize = usageFontSize
+        self.usageDisplayMode = usageDisplayMode
+        self.usageTextColor = usageTextColor
+    }
 
-        updateValueLabels()
-        frame = NSRect(x: 0, y: 0, width: width, height: y)
+    private func publish(_ configuration: PanelDeckConfiguration) {
+        let configuration = configuration.normalized()
+        deckConfiguration = configuration
+        onDeckConfigurationChange?(configuration)
+    }
+}
+
+final class SettingsPanelView: NSView {
+    static let preferredSize = NSSize(width: 700, height: 520)
+
+    private let model: SettingsPanelModel
+    private let hostingView: NSHostingView<SettingsRootView>
+
+    var onPaneChange: ((SettingsPaneID) -> Void)? {
+        get { model.onPaneChange }
+        set { model.onPaneChange = newValue }
+    }
+    var onDeckConfigurationChange: ((PanelDeckConfiguration) -> Void)? {
+        get { model.onDeckConfigurationChange }
+        set { model.onDeckConfigurationChange = newValue }
+    }
+    var onCornerRadiusChange: ((CGFloat) -> Void)? {
+        get { model.onCornerRadiusChange }
+        set { model.onCornerRadiusChange = newValue }
+    }
+    var onTintOpacityChange: ((CGFloat) -> Void)? {
+        get { model.onTintOpacityChange }
+        set { model.onTintOpacityChange = newValue }
+    }
+    var onFocusSizeChange: ((CGFloat, CGFloat) -> Void)? {
+        get { model.onFocusSizeChange }
+        set { model.onFocusSizeChange = newValue }
+    }
+    var onTerminalFontChange: ((String) -> Void)? {
+        get { model.onTerminalFontChange }
+        set { model.onTerminalFontChange = newValue }
+    }
+    var onUsageFontChange: ((String) -> Void)? {
+        get { model.onUsageFontChange }
+        set { model.onUsageFontChange = newValue }
+    }
+    var onUsageFontSizeChange: ((CGFloat) -> Void)? {
+        get { model.onUsageFontSizeChange }
+        set { model.onUsageFontSizeChange = newValue }
+    }
+    var onUsageDisplayModeChange: ((UsageDisplayMode) -> Void)? {
+        get { model.onUsageDisplayModeChange }
+        set { model.onUsageDisplayModeChange = newValue }
+    }
+    var onUsageTextColorChange: ((UsageTextColor) -> Void)? {
+        get { model.onUsageTextColorChange }
+        set { model.onUsageTextColorChange = newValue }
+    }
+    var onReset: (() -> Void)? {
+        get { model.onReset }
+        set { model.onReset = newValue }
+    }
+    var onCancel: (() -> Void)? {
+        get { model.onCancel }
+        set { model.onCancel = newValue }
+    }
+
+    init(
+        selectedPane: SettingsPaneID,
+        deckConfiguration: PanelDeckConfiguration,
+        cornerRadius: CGFloat,
+        tintOpacity: CGFloat,
+        focusWidthMultiplier: CGFloat,
+        focusHeightMultiplier: CGFloat,
+        fontNames: [String],
+        selectedTerminalFontName: String,
+        selectedUsageFontName: String,
+        usageFontSize: CGFloat,
+        usageDisplayMode: UsageDisplayMode,
+        usageTextColor: UsageTextColor
+    ) {
+        let model = SettingsPanelModel(
+            selectedPane: selectedPane,
+            deckConfiguration: deckConfiguration,
+            cornerRadius: cornerRadius,
+            tintOpacity: tintOpacity,
+            focusWidthMultiplier: focusWidthMultiplier,
+            focusHeightMultiplier: focusHeightMultiplier,
+            fontNames: fontNames,
+            terminalFontName: selectedTerminalFontName,
+            usageFontName: selectedUsageFontName,
+            usageFontSize: usageFontSize,
+            usageDisplayMode: usageDisplayMode,
+            usageTextColor: usageTextColor)
+        self.model = model
+        hostingView = NSHostingView(rootView: SettingsRootView(model: model))
+
+        super.init(frame: NSRect(origin: .zero, size: Self.preferredSize))
+        hostingView.frame = bounds
+        hostingView.autoresizingMask = [.width, .height]
+        addSubview(hostingView)
+        setAccessibilityLabel("DockDeck Settings")
     }
 
     required init?(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
     }
 
-    override var isFlipped: Bool { true }
-    override var acceptsFirstResponder: Bool { true }
-
-    override func keyDown(with event: NSEvent) {
-        if event.keyCode == 53 {
-            onCancel?()
-        } else {
-            super.keyDown(with: event)
-        }
+    func selectPane(_ pane: SettingsPaneID) {
+        model.selectPane(pane)
     }
 
     func setValues(
-        cornerRadius: CGFloat, tintOpacity: CGFloat,
-        focusWidthMultiplier: CGFloat, focusHeightMultiplier: CGFloat,
-        terminalFontName: String, usageFontName: String, usageFontSize: CGFloat,
-        usageDisplayMode: UsageDisplayMode, usageTextColor: UsageTextColor,
-        panelOrder: PanelOrder, enabledPanels: EnabledPanels
+        deckConfiguration: PanelDeckConfiguration,
+        cornerRadius: CGFloat,
+        tintOpacity: CGFloat,
+        focusWidthMultiplier: CGFloat,
+        focusHeightMultiplier: CGFloat,
+        terminalFontName: String,
+        usageFontName: String,
+        usageFontSize: CGFloat,
+        usageDisplayMode: UsageDisplayMode,
+        usageTextColor: UsageTextColor
     ) {
-        cornerRadiusSlider.doubleValue = Double(cornerRadius)
-        tintOpacitySlider.doubleValue = Double(tintOpacity)
-        focusWidthSlider.doubleValue = Double(focusWidthMultiplier)
-        focusHeightSlider.doubleValue = Double(focusHeightMultiplier)
-        usageFontSizeSlider.doubleValue = Double(usageFontSize)
-        selectFont(terminalFontName, popup: terminalFontPopup)
-        selectFont(usageFontName, popup: usageFontPopup)
-        select(usageDisplayMode, in: usageDisplayModes, popup: usageDisplayPopup)
-        select(usageTextColor, in: usageColors, popup: usageColorPopup)
-        select(panelOrder, in: panelOrders, popup: panelOrderPopup)
-        terminalPanelCheckbox.state = enabledPanels.contains(.terminal) ? .on : .off
-        usagePanelCheckbox.state = enabledPanels.contains(.usage) ? .on : .off
-        updatePanelCheckboxes()
-        updateValueLabels()
+        model.setValues(
+            deckConfiguration: deckConfiguration,
+            cornerRadius: cornerRadius,
+            tintOpacity: tintOpacity,
+            focusWidthMultiplier: focusWidthMultiplier,
+            focusHeightMultiplier: focusHeightMultiplier,
+            terminalFontName: terminalFontName,
+            usageFontName: usageFontName,
+            usageFontSize: usageFontSize,
+            usageDisplayMode: usageDisplayMode,
+            usageTextColor: usageTextColor)
     }
 
-    @objc private func cornerRadiusChanged() {
-        onCornerRadiusChange?(CGFloat(cornerRadiusSlider.doubleValue))
-    }
-
-    @objc private func opacityChanged() {
-        onTintOpacityChange?(CGFloat(tintOpacitySlider.doubleValue))
-    }
-
-    @objc private func focusSizeChanged() {
-        focusWidthSlider.doubleValue = (focusWidthSlider.doubleValue * 4).rounded() / 4
-        focusHeightSlider.doubleValue = (focusHeightSlider.doubleValue * 4).rounded() / 4
-        updateValueLabels()
-        onFocusSizeChange?(
-            CGFloat(focusWidthSlider.doubleValue), CGFloat(focusHeightSlider.doubleValue))
-    }
-
-    @objc private func terminalFontChanged() {
-        guard let fontName = selectedFont(in: terminalFontPopup) else { return }
-        onTerminalFontChange?(fontName)
-    }
-
-    @objc private func usageFontChanged() {
-        guard let fontName = selectedFont(in: usageFontPopup) else { return }
-        onUsageFontChange?(fontName)
-    }
-
-    @objc private func usageFontSizeChanged() {
-        usageFontSizeSlider.doubleValue = (usageFontSizeSlider.doubleValue * 2).rounded() / 2
-        updateValueLabels()
-        onUsageFontSizeChange?(CGFloat(usageFontSizeSlider.doubleValue))
-    }
-
-    @objc private func usageDisplayChanged() {
-        let index = usageDisplayPopup.indexOfSelectedItem
-        guard usageDisplayModes.indices.contains(index) else { return }
-        onUsageDisplayModeChange?(usageDisplayModes[index])
-    }
-
-    @objc private func usageColorChanged() {
-        let index = usageColorPopup.indexOfSelectedItem
-        guard usageColors.indices.contains(index) else { return }
-        onUsageTextColorChange?(usageColors[index])
-    }
-
-    @objc private func panelOrderChanged() {
-        let index = panelOrderPopup.indexOfSelectedItem
-        guard panelOrders.indices.contains(index) else { return }
-        onPanelOrderChange?(panelOrders[index])
-    }
-
-    @objc private func panelVisibilityChanged(_ sender: NSButton) {
-        var enabledPanels: EnabledPanels = []
-        if terminalPanelCheckbox.state == .on { enabledPanels.insert(.terminal) }
-        if usagePanelCheckbox.state == .on { enabledPanels.insert(.usage) }
-        guard !enabledPanels.isEmpty else {
-            sender.state = .on
-            return
-        }
-        updatePanelCheckboxes()
-        onEnabledPanelsChange?(enabledPanels)
-    }
-
-    @objc private func resetTapped() {
-        onReset?()
-    }
-
-    @objc private func closeTapped() {
+    @objc override func cancelOperation(_ sender: Any?) {
         onCancel?()
     }
+}
 
-    private func addSection(_ text: String, at y: CGFloat) -> CGFloat {
-        let label = Self.makeLabel(text, size: 9, weight: .semibold, alpha: 0.38)
-        label.frame = NSRect(x: padding, y: y, width: controlWidth, height: 12)
-        addSubview(label)
-        return y + 12 + 8
-    }
+private struct SettingsRootView: View {
+    @ObservedObject var model: SettingsPanelModel
 
-    private func addLabel(_ text: String, at y: CGFloat) -> CGFloat {
-        let label = Self.makeLabel(text)
-        label.frame = NSRect(x: padding, y: y, width: controlWidth, height: 14)
-        addSubview(label)
-        return y + 18
-    }
+    var body: some View {
+        HStack(spacing: 0) {
+            VStack(spacing: 0) {
+                HStack(spacing: 8) {
+                    Image(systemName: "dock.rectangle")
+                        .foregroundStyle(.secondary)
+                    Text("DockDeck")
+                        .font(.headline)
+                    Spacer()
+                }
+                .padding(.horizontal, 14)
+                .frame(height: 54)
 
-    private func configureSlider(
-        _ slider: NSSlider, min: CGFloat, max: CGFloat, value: CGFloat, action: Selector
-    ) {
-        slider.minValue = Double(min)
-        slider.maxValue = Double(max)
-        slider.doubleValue = Double(value)
-        slider.isContinuous = true
-        slider.target = self
-        slider.action = action
-    }
+                List(SettingsPaneID.allCases, selection: $model.selectedPane) { pane in
+                    Label(pane.title, systemImage: pane.symbolName)
+                        .tag(pane)
+                }
+                .listStyle(.sidebar)
+            }
+            .frame(width: 184)
+            .background(Color(nsColor: .underPageBackgroundColor))
 
-    private func configurePopup(_ popup: NSPopUpButton, action: Selector) {
-        popup.target = self
-        popup.action = action
-    }
+            Divider()
 
-    private func configurePanelCheckbox(_ checkbox: NSButton, enabled: Bool) {
-        checkbox.target = self
-        checkbox.action = #selector(panelVisibilityChanged(_:))
-        checkbox.state = enabled ? .on : .off
-        checkbox.font = NSFont.systemFont(ofSize: 10, weight: .medium)
-        checkbox.toolTip = "At least one panel must remain visible"
-    }
-
-    private func updatePanelCheckboxes() {
-        let terminalEnabled = terminalPanelCheckbox.state == .on
-        let usageEnabled = usagePanelCheckbox.state == .on
-        terminalPanelCheckbox.isEnabled = !terminalEnabled || usageEnabled
-        usagePanelCheckbox.isEnabled = !usageEnabled || terminalEnabled
-    }
-
-    private func configureFontPopup(
-        _ popup: NSPopUpButton, selectedName: String, action: Selector
-    ) {
-        configurePopup(popup, action: action)
-        fontNames.forEach {
-            popup.addItem(withTitle: TerminalTheme.displayName(forFontName: $0))
+            VStack(spacing: 0) {
+                SettingsHeader(pane: model.selectedPane)
+                Divider()
+                selectedPane
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(Color(nsColor: .windowBackgroundColor))
         }
-        selectFont(selectedName, popup: popup)
+        .frame(
+            minWidth: SettingsPanelView.preferredSize.width,
+            minHeight: SettingsPanelView.preferredSize.height)
     }
 
-    private func configureValueLabel(_ label: NSTextField) {
-        label.font = NSFont.systemFont(ofSize: 10, weight: .medium)
-        label.textColor = NSColor.white.withAlphaComponent(0.52)
+    @ViewBuilder private var selectedPane: some View {
+        switch model.selectedPane {
+        case .decks:
+            DecksSettingsView(model: model)
+        case .terminal:
+            TerminalSettingsView(model: model)
+        case .usage:
+            UsageSettingsView(model: model)
+        case .appearance:
+            AppearanceSettingsView(model: model)
+        }
+    }
+}
+
+private struct SettingsHeader: View {
+    let pane: SettingsPaneID
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: pane.symbolName)
+                .font(.system(size: 22, weight: .medium))
+                .foregroundStyle(.secondary)
+                .frame(width: 30)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(pane.title)
+                    .font(.title2.weight(.semibold))
+                Text(pane.subtitle)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+        }
+        .padding(.horizontal, 24)
+        .frame(height: 76)
+    }
+}
+
+private struct DecksSettingsView: View {
+    @ObservedObject var model: SettingsPanelModel
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                HStack(alignment: .top, spacing: 14) {
+                    DeckPreviewCard(side: .left, model: model)
+                    DeckPreviewCard(side: .right, model: model)
+                }
+
+                GroupBox {
+                    VStack(spacing: 0) {
+                        ForEach(Array(model.moduleDefinitions.enumerated()), id: \.element.id) {
+                            index, definition in
+                            if index > 0 { Divider() }
+                            ModuleSettingsRow(definition: definition, model: model)
+                        }
+                    }
+                } label: {
+                    Label("Modules", systemImage: "square.grid.2x2")
+                        .font(.headline)
+                }
+
+                HStack {
+                    Button(action: model.swapDecks) {
+                        Label("Swap Left and Right Decks", systemImage: "arrow.left.arrow.right")
+                    }
+                    .buttonStyle(.bordered)
+                    Spacer()
+                    Text("At least one module stays visible.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .padding(24)
+        }
+    }
+}
+
+private struct DeckPreviewCard: View {
+    let side: PanelSide
+    @ObservedObject var model: SettingsPanelModel
+
+    private var title: String { side == .left ? "Left Deck" : "Right Deck" }
+
+    var body: some View {
+        GroupBox {
+            VStack(spacing: 8) {
+                ForEach(model.moduleDefinitions(on: side)) { definition in
+                    HStack(spacing: 10) {
+                        Image(systemName: definition.symbolName)
+                            .frame(width: 18)
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text(definition.title)
+                                .fontWeight(.medium)
+                            Text(definition.subtitle)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        Image(
+                            systemName: model.isEnabled(definition.id)
+                                ? "checkmark.circle.fill" : "circle.dashed")
+                            .foregroundStyle(
+                                model.isEnabled(definition.id) ? Color.accentColor : .secondary)
+                    }
+                    .padding(10)
+                    .background(
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(Color(nsColor: .controlBackgroundColor)))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8)
+                            .stroke(Color.primary.opacity(0.08)))
+                    .opacity(model.isEnabled(definition.id) ? 1 : 0.55)
+                }
+            }
+            .frame(maxWidth: .infinity, minHeight: 74, alignment: .top)
+        } label: {
+            Label(title, systemImage: "rectangle.stack")
+                .font(.headline)
+        }
+        .frame(maxWidth: .infinity)
+    }
+}
+
+private struct ModuleSettingsRow: View {
+    let definition: PanelModuleDefinition
+    @ObservedObject var model: SettingsPanelModel
+
+    private var sideTitle: String {
+        switch model.side(containing: definition.id) {
+        case .left: "Left"
+        case .right: "Right"
+        case nil: "Unplaced"
+        }
     }
 
-    private func updateValueLabels() {
-        focusWidthLabel.stringValue = String(
-            format: "Click expansion width %.2g×", focusWidthSlider.doubleValue)
-        focusHeightLabel.stringValue = String(
-            format: "Click expansion height %.2g×", focusHeightSlider.doubleValue)
-        usageFontSizeLabel.stringValue = String(
-            format: "Usage font size %.1f pt", usageFontSizeSlider.doubleValue)
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: definition.symbolName)
+                .font(.system(size: 16))
+                .foregroundStyle(.secondary)
+                .frame(width: 22)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(definition.title)
+                Text(definition.subtitle)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+            Text(sideTitle)
+                .font(.caption.weight(.medium))
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 3)
+                .background(Capsule().fill(Color.primary.opacity(0.06)))
+            Toggle(
+                "Show \(definition.title)",
+                isOn: Binding(
+                    get: { model.isEnabled(definition.id) },
+                    set: { model.setEnabled($0, for: definition.id) }))
+                .labelsHidden()
+                .disabled(!model.canDisable(definition.id))
+                .help(
+                    model.canDisable(definition.id)
+                        ? "Show or hide \(definition.title)"
+                        : "DockDeck keeps one module visible so Settings remains accessible")
+        }
+        .padding(.vertical, 10)
+        .padding(.horizontal, 4)
     }
+}
 
-    private func selectedFont(in popup: NSPopUpButton) -> String? {
-        let index = popup.indexOfSelectedItem
-        guard fontNames.indices.contains(index) else { return nil }
-        return fontNames[index]
+private struct TerminalSettingsView: View {
+    @ObservedObject var model: SettingsPanelModel
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                GroupBox {
+                    VStack(spacing: 14) {
+                        SettingsSliderRow(
+                            title: "Width",
+                            valueText: String(format: "%.2f×", model.focusWidthMultiplier),
+                            value: Binding(
+                                get: { Double(model.focusWidthMultiplier) },
+                                set: { model.setFocusWidthMultiplier(CGFloat($0)) }),
+                            range: Double(DockPanelLayout.minimumFocusedWidthMultiplier)
+                                ... Double(DockPanelLayout.maximumFocusedWidthMultiplier),
+                            step: 0.25)
+                        SettingsSliderRow(
+                            title: "Height",
+                            valueText: String(format: "%.2f×", model.focusHeightMultiplier),
+                            value: Binding(
+                                get: { Double(model.focusHeightMultiplier) },
+                                set: { model.setFocusHeightMultiplier(CGFloat($0)) }),
+                            range: Double(DockPanelLayout.minimumFocusedHeightMultiplier)
+                                ... Double(DockPanelLayout.maximumFocusedHeightMultiplier),
+                            step: 0.25)
+                    }
+                    .padding(.top, 4)
+                } label: {
+                    Label("Focused Size", systemImage: "arrow.up.left.and.arrow.down.right")
+                        .font(.headline)
+                }
+
+                GroupBox {
+                    SettingsPickerRow(title: "Font") {
+                        Picker(
+                            "Terminal font",
+                            selection: Binding(
+                                get: { model.terminalFontName },
+                                set: model.setTerminalFontName)
+                        ) {
+                            ForEach(model.fontNames, id: \.self) { Text($0).tag($0) }
+                        }
+                        .labelsHidden()
+                        .frame(width: 230)
+                    }
+                    .padding(.top, 4)
+                } label: {
+                    Label("Text", systemImage: "textformat")
+                        .font(.headline)
+                }
+            }
+            .padding(24)
+        }
     }
+}
 
-    private func selectFont(_ name: String, popup: NSPopUpButton) {
-        guard let index = fontNames.firstIndex(of: name) else { return }
-        popup.selectItem(at: index)
+private struct UsageSettingsView: View {
+    @ObservedObject var model: SettingsPanelModel
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                GroupBox {
+                    SettingsPickerRow(title: "Values") {
+                        Picker(
+                            "Usage values",
+                            selection: Binding(
+                                get: { model.usageDisplayMode },
+                                set: model.setUsageDisplayMode)
+                        ) {
+                            ForEach(UsageDisplayMode.allCases, id: \.self) {
+                                Text($0.title).tag($0)
+                            }
+                        }
+                        .labelsHidden()
+                        .pickerStyle(.segmented)
+                        .frame(width: 230)
+                    }
+                    .padding(.top, 4)
+                } label: {
+                    Label("Display", systemImage: "percent")
+                        .font(.headline)
+                }
+
+                GroupBox {
+                    VStack(spacing: 14) {
+                        SettingsPickerRow(title: "Font") {
+                            Picker(
+                                "Usage font",
+                                selection: Binding(
+                                    get: { model.usageFontName },
+                                    set: model.setUsageFontName)
+                            ) {
+                                ForEach(model.fontNames, id: \.self) { Text($0).tag($0) }
+                            }
+                            .labelsHidden()
+                            .frame(width: 230)
+                        }
+                        SettingsSliderRow(
+                            title: "Size",
+                            valueText: String(format: "%.0f pt", model.usageFontSize),
+                            value: Binding(
+                                get: { Double(model.usageFontSize) },
+                                set: { model.setUsageFontSize(CGFloat($0)) }),
+                            range: Double(PanelSettings.minimumUsageFontSize)
+                                ... Double(PanelSettings.maximumUsageFontSize),
+                            step: 1)
+                        SettingsPickerRow(title: "Color") {
+                            Picker(
+                                "Usage text color",
+                                selection: Binding(
+                                    get: { model.usageTextColor },
+                                    set: model.setUsageTextColor)
+                            ) {
+                                ForEach(UsageTextColor.allCases, id: \.self) {
+                                    Text($0.title).tag($0)
+                                }
+                            }
+                            .labelsHidden()
+                            .frame(width: 230)
+                        }
+                    }
+                    .padding(.top, 4)
+                } label: {
+                    Label("Text", systemImage: "textformat")
+                        .font(.headline)
+                }
+            }
+            .padding(24)
+        }
     }
+}
 
-    private func select<Value: Equatable>(
-        _ value: Value, in values: [Value], popup: NSPopUpButton
-    ) {
-        guard let index = values.firstIndex(of: value) else { return }
-        popup.selectItem(at: index)
+private struct AppearanceSettingsView: View {
+    @ObservedObject var model: SettingsPanelModel
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                GroupBox {
+                    VStack(spacing: 14) {
+                        SettingsSliderRow(
+                            title: "Corner Radius",
+                            valueText: String(format: "%.0f pt", model.cornerRadius),
+                            value: Binding(
+                                get: { Double(model.cornerRadius) },
+                                set: { model.setCornerRadius(CGFloat($0)) }),
+                            range: 0...24,
+                            step: 1)
+                        SettingsSliderRow(
+                            title: "Theme Tint",
+                            valueText: String(format: "%.0f%%", model.tintOpacity * 100),
+                            value: Binding(
+                                get: { Double(model.tintOpacity) },
+                                set: { model.setTintOpacity(CGFloat($0)) }),
+                            range: 0.2...1,
+                            step: 0.01)
+                    }
+                    .padding(.top, 4)
+                } label: {
+                    Label("Panel Surface", systemImage: "circle.lefthalf.filled")
+                        .font(.headline)
+                }
+
+                GroupBox {
+                    HStack {
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text("Reset Settings")
+                            Text("Restore Decks, Terminal, Usage, and Appearance defaults.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        Button("Reset to Defaults") { model.onReset?() }
+                    }
+                    .padding(.vertical, 6)
+                } label: {
+                    Label("Defaults", systemImage: "arrow.counterclockwise")
+                        .font(.headline)
+                }
+            }
+            .padding(24)
+        }
     }
+}
 
-    private static func makeLabel(
-        _ text: String, size: CGFloat = 10, weight: NSFont.Weight = .medium,
-        alpha: CGFloat = 0.52
-    ) -> NSTextField {
-        let label = NSTextField(labelWithString: text)
-        label.font = NSFont.systemFont(ofSize: size, weight: weight)
-        label.textColor = NSColor.white.withAlphaComponent(alpha)
-        return label
+private struct SettingsSliderRow: View {
+    let title: String
+    let valueText: String
+    @Binding var value: Double
+    let range: ClosedRange<Double>
+    let step: Double
+
+    var body: some View {
+        VStack(spacing: 6) {
+            HStack {
+                Text(title)
+                Spacer()
+                Text(valueText)
+                    .foregroundStyle(.secondary)
+                    .monospacedDigit()
+            }
+            Slider(value: $value, in: range, step: step)
+        }
+    }
+}
+
+private struct SettingsPickerRow<Content: View>: View {
+    let title: String
+    @ViewBuilder let content: () -> Content
+
+    var body: some View {
+        HStack {
+            Text(title)
+            Spacer()
+            content()
+        }
     }
 }

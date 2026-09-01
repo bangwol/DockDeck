@@ -25,6 +25,17 @@ swift test
 - Keep bundled license notices synchronized with the revisions in
   `Package.resolved`.
 
+## Settings and modules
+
+- Give every panel module a stable `PanelModuleID` and add its label and symbol
+  to `PanelModuleDefinition`.
+- Keep placement and visibility in `PanelDeckConfiguration`; its versioned
+  storage preserves unknown module IDs for forward compatibility.
+- Put module-specific controls in their own settings pane. Keep shared surface
+  controls under Appearance.
+- Do not expose stacking, drag reordering, or module installation before the
+  panel runtime implements the same behavior.
+
 ## PR guidelines
 
 - **One change per PR.** A PR that bundles a bug fix with an unrelated

@@ -1,6 +1,11 @@
 import Cocoa
 
 extension AppDelegate: NSWindowDelegate {
+    func windowWillClose(_ notification: Notification) {
+        guard let window = notification.object as? NSWindow else { return }
+        settingsPanelDidClose(window)
+    }
+
     func windowDidResize(_ notification: Notification) {
         guard let window = notification.object as? NSWindow, window === panel else { return }
         terminalView.frame = TerminalLayout.contentFrame(

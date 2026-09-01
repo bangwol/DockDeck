@@ -35,6 +35,37 @@ final class PanelAppearanceTests: XCTestCase {
         XCTAssertEqual(decoded.enabled, [clock])
     }
 
+    func testSettingsModelSwapsCompleteDecksWithoutDroppingFutureModules() {
+        let clock = PanelModuleID(rawValue: "clock")
+        let model = makeSettingsModel(
+            configuration: PanelDeckConfiguration(
+                left: [.terminal, clock], right: [.usage],
+                enabled: [.terminal, .usage, clock]))
+        var persistedConfiguration: PanelDeckConfiguration?
+        model.onDeckConfigurationChange = { persistedConfiguration = $0 }
+
+        model.swapDecks()
+
+        XCTAssertEqual(model.deckConfiguration.left, [.usage])
+        XCTAssertEqual(model.deckConfiguration.right, [.terminal, clock])
+        XCTAssertEqual(persistedConfiguration, model.deckConfiguration)
+    }
+
+    func testSettingsModelKeepsTheLastModuleVisible() {
+        let unavailableModule = PanelModuleID(rawValue: "future-module")
+        let model = makeSettingsModel(
+            configuration: PanelDeckConfiguration(
+                left: [.terminal], right: [.usage, unavailableModule],
+                enabled: [.terminal, unavailableModule]))
+        var callbackCount = 0
+        model.onDeckConfigurationChange = { _ in callbackCount += 1 }
+
+        model.setEnabled(false, for: .terminal)
+
+        XCTAssertTrue(model.isEnabled(.terminal))
+        XCTAssertEqual(callbackCount, 0)
+    }
+
     func testShellRestartPolicyStopsARepeatedExitLoop() {
         var policy = ShellRestartPolicy()
         let start = Date(timeIntervalSince1970: 100)
@@ -78,5 +109,23 @@ final class PanelAppearanceTests: XCTestCase {
                 "Settings…", "Show Used Values", "Move Terminal to Right",
                 "Refresh Usage & Layout",
             ])
+    }
+
+    private func makeSettingsModel(
+        configuration: PanelDeckConfiguration
+    ) -> SettingsPanelModel {
+        SettingsPanelModel(
+            selectedPane: .decks,
+            deckConfiguration: configuration,
+            cornerRadius: 10,
+            tintOpacity: 0.6,
+            focusWidthMultiplier: 2,
+            focusHeightMultiplier: 4,
+            fontNames: ["Menlo"],
+            terminalFontName: "Menlo",
+            usageFontName: "Menlo",
+            usageFontSize: 10,
+            usageDisplayMode: .remaining,
+            usageTextColor: .theme)
     }
 }

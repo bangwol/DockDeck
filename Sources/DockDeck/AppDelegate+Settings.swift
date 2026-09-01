@@ -2,14 +2,25 @@ import Cocoa
 
 extension AppDelegate {
     @objc func toggleSettingsPanel(_ sender: Any?) {
+        if let settingsPanel {
+            settingsPanel.makeKeyAndOrderFront(nil)
+            return
+        }
+
         let terminalEnabled = PanelSettings.enabledPanels.contains(.terminal)
-        toggleSettingsPanel(
+        presentSettingsPanel(
+            pane: savedSettingsPane,
             anchor: terminalEnabled ? panel : quotaPanel,
             restoreTerminalFocus: terminalEnabled)
     }
 
     @objc func openUsageSettings(_ sender: Any?) {
-        toggleSettingsPanel(anchor: quotaPanel, restoreTerminalFocus: false)
+        if let settingsPanel {
+            (settingsPanel.contentView as? SettingsPanelView)?.selectPane(.usage)
+            settingsPanel.makeKeyAndOrderFront(nil)
+            return
+        }
+        presentSettingsPanel(pane: .usage, anchor: quotaPanel, restoreTerminalFocus: false)
     }
 
     @objc func toggleUsageDisplayMode(_ sender: Any?) {
@@ -24,13 +35,18 @@ extension AppDelegate {
         applyPanelOrder()
     }
 
-    private func toggleSettingsPanel(anchor: NSWindow, restoreTerminalFocus: Bool) {
-        if settingsPanel != nil {
-            closeSettingsPanel(restoreTerminalFocus: restoreTerminalFocus)
-            return
-        }
+    private var savedSettingsPane: SettingsPaneID {
+        UserDefaults.standard.string(forKey: AppPreferences.settingsPaneKey)
+            .flatMap(SettingsPaneID.init(rawValue:)) ?? .decks
+    }
 
+    private func presentSettingsPanel(
+        pane: SettingsPaneID, anchor: NSWindow, restoreTerminalFocus: Bool
+    ) {
+        UserDefaults.standard.set(pane.rawValue, forKey: AppPreferences.settingsPaneKey)
         let view = SettingsPanelView(
+            selectedPane: pane,
+            deckConfiguration: PanelSettings.deckConfiguration,
             cornerRadius: PanelSettings.cornerRadius,
             tintOpacity: PanelSettings.tintOpacity ?? currentTheme.panelTintColor.alphaComponent,
             focusWidthMultiplier: PanelSettings.focusWidthMultiplier,
@@ -40,10 +56,16 @@ extension AppDelegate {
             selectedUsageFontName: PanelSettings.usageFontName ?? TerminalTheme.defaultFontName,
             usageFontSize: PanelSettings.usageFontSize,
             usageDisplayMode: PanelSettings.usageDisplayMode,
-            usageTextColor: PanelSettings.usageTextColor,
-            panelOrder: PanelSettings.panelOrder,
-            enabledPanels: PanelSettings.enabledPanels)
+            usageTextColor: PanelSettings.usageTextColor)
 
+        view.onPaneChange = { [weak self] pane in
+            UserDefaults.standard.set(pane.rawValue, forKey: AppPreferences.settingsPaneKey)
+            self?.settingsPanel?.title = pane.windowTitle
+        }
+        view.onDeckConfigurationChange = { [weak self] configuration in
+            PanelSettings.deckConfiguration = configuration
+            self?.applyPanelVisibility()
+        }
         view.onCornerRadiusChange = { [weak self] radius in
             PanelSettings.cornerRadius = radius
             self?.applyCornerRadius()
@@ -77,14 +99,6 @@ extension AppDelegate {
             PanelSettings.usageTextColor = color
             self?.quotaPanelController.applySettings()
         }
-        view.onPanelOrderChange = { [weak self] order in
-            PanelSettings.panelOrder = order
-            self?.applyPanelOrder()
-        }
-        view.onEnabledPanelsChange = { [weak self] enabledPanels in
-            PanelSettings.enabledPanels = enabledPanels
-            self?.applyPanelVisibility()
-        }
         view.onReset = { [weak self, weak view] in
             guard let self else { return }
             PanelSettings.resetToDefaults()
@@ -92,8 +106,9 @@ extension AppDelegate {
             self.applyTintOpacity()
             self.applyFont()
             self.quotaPanelController.applySettings()
-            self.applyPanelOrder()
+            self.applyPanelVisibility()
             view?.setValues(
+                deckConfiguration: PanelSettings.deckConfiguration,
                 cornerRadius: PanelSettings.cornerRadius,
                 tintOpacity: self.currentTheme.panelTintColor.alphaComponent,
                 focusWidthMultiplier: PanelSettings.focusWidthMultiplier,
@@ -102,51 +117,64 @@ extension AppDelegate {
                 usageFontName: TerminalTheme.defaultFontName,
                 usageFontSize: PanelSettings.usageFontSize,
                 usageDisplayMode: PanelSettings.usageDisplayMode,
-                usageTextColor: PanelSettings.usageTextColor,
-                panelOrder: PanelSettings.panelOrder,
-                enabledPanels: PanelSettings.enabledPanels)
+                usageTextColor: PanelSettings.usageTextColor)
             self.resizeFocusedTerminalIfNeeded()
         }
         view.onCancel = { [weak self] in
-            self?.closeSettingsPanel(restoreTerminalFocus: restoreTerminalFocus)
+            self?.closeSettingsPanel()
         }
 
         let settingsPanelWindow = KeyablePanel(
             contentRect: NSRect(
-                origin: settingsOrigin(anchor: anchor, size: view.frame.size),
-                size: view.frame.size),
-            styleMask: [.borderless, .nonactivatingPanel],
+                origin: settingsOrigin(anchor: anchor, size: SettingsPanelView.preferredSize),
+                size: SettingsPanelView.preferredSize),
+            styleMask: [.titled, .closable, .nonactivatingPanel],
             backing: .buffered,
-            defer: false
-        )
-        settingsPanelWindow.level = NSWindow.Level(rawValue: Int(kCGDockWindowLevel) + 2)
-        settingsPanelWindow.isOpaque = false
-        settingsPanelWindow.backgroundColor = .clear
+            defer: false)
+        settingsPanelWindow.title = pane.windowTitle
+        settingsPanelWindow.level = .floating
+        settingsPanelWindow.isOpaque = true
+        settingsPanelWindow.backgroundColor = .windowBackgroundColor
         settingsPanelWindow.hidesOnDeactivate = false
-        settingsPanelWindow.collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle]
+        settingsPanelWindow.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        settingsPanelWindow.isReleasedWhenClosed = false
+        settingsPanelWindow.delegate = self
         settingsPanelWindow.contentView = view
+        settingsPanelWindow.standardWindowButton(.miniaturizeButton)?.isEnabled = false
+        settingsPanelWindow.standardWindowButton(.zoomButton)?.isEnabled = false
+        settingsPanelWindow.setAccessibilityLabel("DockDeck Settings")
 
-        settingsPanelWindow.makeKeyAndOrderFront(nil)
-        settingsPanelWindow.makeFirstResponder(view)
+        settingsPanelRestoresTerminalFocus = restoreTerminalFocus
         settingsPanel = settingsPanelWindow
+        settingsPanelWindow.makeKeyAndOrderFront(nil)
     }
 
-    private func closeSettingsPanel(restoreTerminalFocus: Bool) {
-        settingsPanel?.orderOut(nil)
+    private func closeSettingsPanel() {
+        settingsPanel?.close()
+    }
+
+    func settingsPanelDidClose(_ window: NSWindow) {
+        guard window === settingsPanel else { return }
+        let restoreTerminalFocus = settingsPanelRestoresTerminalFocus
         settingsPanel = nil
+        settingsPanelRestoresTerminalFocus = false
+
         guard restoreTerminalFocus, PanelSettings.enabledPanels.contains(.terminal) else { return }
-        panel.makeKeyAndOrderFront(nil)
-        panel.makeFirstResponder(terminalView)
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            self.panel.makeKeyAndOrderFront(nil)
+            self.panel.makeFirstResponder(self.terminalView)
+        }
     }
 
     private func settingsOrigin(anchor: NSWindow, size: NSSize) -> NSPoint {
-        let host = anchor.screen?.frame ?? NSScreen.screens.first?.frame ?? .zero
-        let inset: CGFloat = 8
-        let desiredX = anchor.frame.midX - size.width / 2
-        let x = min(max(desiredX, host.minX + inset), host.maxX - size.width - inset)
-        let desiredY = anchor.frame.maxY + inset
+        let host = anchor.screen?.visibleFrame ?? NSScreen.screens.first?.visibleFrame ?? .zero
+        let inset: CGFloat = 12
+        let x = min(
+            max(host.midX - size.width / 2, host.minX + inset),
+            host.maxX - size.width - inset)
         let y = min(
-            max(desiredY, host.minY + inset),
+            max(host.midY - size.height / 2, host.minY + inset),
             host.maxY - size.height - inset)
         return NSPoint(x: x, y: y)
     }
@@ -175,10 +203,10 @@ extension AppDelegate {
     }
 
     func applyPanelVisibility() {
+        isFrozen = false
         if !PanelSettings.enabledPanels.contains(.terminal) {
             terminalPanelMode = .docked
             expansionScreenID = nil
-            isFrozen = false
             terminalPanelController.setResizable(false)
             if panel.isVisible { panel.orderOut(nil) }
         }
