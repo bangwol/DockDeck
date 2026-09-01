@@ -10,6 +10,7 @@ enum SettingsPaneID: String, CaseIterable, Identifiable {
     case weather
     case schedule
     case clock
+    case battery
     case appearance
 
     var id: Self { self }
@@ -24,6 +25,7 @@ enum SettingsPaneID: String, CaseIterable, Identifiable {
         case .weather: "Weather"
         case .schedule: "Schedule"
         case .clock: "World Clock"
+        case .battery: "Battery"
         case .appearance: "Appearance"
         }
     }
@@ -38,6 +40,7 @@ enum SettingsPaneID: String, CaseIterable, Identifiable {
         case .weather: "Show current conditions for a selected city."
         case .schedule: "Show the current or next calendar event."
         case .clock: "Show local time or another time zone."
+        case .battery: "Show charge, power state, and time remaining."
         case .appearance: "Adjust the shared panel surface."
         }
     }
@@ -52,6 +55,7 @@ enum SettingsPaneID: String, CaseIterable, Identifiable {
         case .weather: "cloud.sun"
         case .schedule: "calendar"
         case .clock: "clock"
+        case .battery: "battery.75percent"
         case .appearance: "paintbrush"
         }
     }
@@ -90,6 +94,9 @@ enum PanelModuleRegistry {
         PanelModuleDefinition(
             id: .clock, title: "World Clock", subtitle: "Local or selected time zone",
             symbolName: "clock", settingsPane: .clock),
+        PanelModuleDefinition(
+            id: .battery, title: "Battery", subtitle: "Charge and power state",
+            symbolName: "battery.75percent", settingsPane: .battery),
     ]
 
     static func definition(for id: PanelModuleID) -> PanelModuleDefinition? {
@@ -141,6 +148,10 @@ struct ClockSettingsState: Equatable {
     var hourFormat: ClockHourFormat
 }
 
+struct BatterySettingsState: Equatable {
+    var refreshInterval: TimeInterval
+}
+
 struct AppearanceSettingsState: Equatable {
     var cornerRadius: CGFloat
     var tintOpacity: CGFloat
@@ -155,6 +166,7 @@ struct SettingsPanelValues: Equatable {
     var weather: WeatherSettingsState
     var schedule: ScheduleSettingsState
     var clock: ClockSettingsState
+    var battery: BatterySettingsState
     var appearance: AppearanceSettingsState
 
     func normalized() -> Self {
@@ -203,6 +215,10 @@ enum ClockSettingsChange {
     case hourFormat(ClockHourFormat)
 }
 
+enum BatterySettingsChange {
+    case refreshInterval(TimeInterval)
+}
+
 enum AppearanceSettingsChange {
     case cornerRadius(CGFloat)
     case tintOpacity(CGFloat)
@@ -217,6 +233,7 @@ enum SettingsPanelChange {
     case weather(WeatherSettingsChange)
     case schedule(ScheduleSettingsChange)
     case clock(ClockSettingsChange)
+    case battery(BatterySettingsChange)
     case appearance(AppearanceSettingsChange)
 }
 
@@ -480,6 +497,14 @@ final class SettingsPanelModel: ObservableObject {
     func setClockHourFormat(_ value: ClockHourFormat) {
         updateValues { $0.clock.hourFormat = value }
         onChange?(.clock(.hourFormat(value)))
+    }
+
+    func setBatteryRefreshInterval(_ value: TimeInterval) {
+        let selected = PanelSettings.batteryRefreshIntervals.min(by: {
+            abs($0 - value) < abs($1 - value)
+        }) ?? PanelSettings.defaultBatteryRefreshInterval
+        updateValues { $0.battery.refreshInterval = selected }
+        onChange?(.battery(.refreshInterval(selected)))
     }
 
     func setValues(_ values: SettingsPanelValues) {

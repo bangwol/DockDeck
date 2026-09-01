@@ -88,6 +88,7 @@ extension AppDelegate {
                 selectedCalendarIDs: PanelSettings.scheduleCalendarIDs,
                 includeAllDay: PanelSettings.scheduleIncludesAllDay,
                 refreshInterval: PanelSettings.scheduleRefreshInterval)
+            self.batteryStore.setRefreshInterval(PanelSettings.batteryRefreshInterval)
             self.applyCornerRadius()
             self.applyTintOpacity()
             self.applyFont()
@@ -154,6 +155,8 @@ extension AppDelegate {
             clock: ClockSettingsState(
                 timeZoneIdentifier: PanelSettings.clockTimeZoneIdentifier,
                 hourFormat: PanelSettings.clockHourFormat),
+            battery: BatterySettingsState(
+                refreshInterval: PanelSettings.batteryRefreshInterval),
             appearance: AppearanceSettingsState(
                 cornerRadius: PanelSettings.cornerRadius,
                 tintOpacity: PanelSettings.tintOpacity
@@ -226,6 +229,9 @@ extension AppDelegate {
         case .clock(.hourFormat(let format)):
             PanelSettings.clockHourFormat = format
             readOnlyDeckPanelController.applySettings()
+        case .battery(.refreshInterval(let interval)):
+            PanelSettings.batteryRefreshInterval = interval
+            batteryStore.setRefreshInterval(interval)
         case .appearance(.cornerRadius(let radius)):
             PanelSettings.cornerRadius = radius
             applyCornerRadius()

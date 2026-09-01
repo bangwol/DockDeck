@@ -164,6 +164,7 @@ final class ScheduleTests: XCTestCase {
                 calendarIDs: [], includeAllDay: false, refreshInterval: 300),
             clock: ClockSettingsState(
                 timeZoneIdentifier: ClockTimeZone.systemIdentifier, hourFormat: .system),
+            battery: BatterySettingsState(refreshInterval: 60),
             appearance: AppearanceSettingsState(cornerRadius: 10, tintOpacity: 0.6))
     }
 }

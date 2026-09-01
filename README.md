@@ -18,7 +18,7 @@
   <sub>Compact terminal and configurable Codex and Claude usage beside the macOS Dock. Open the image for full resolution.</sub>
 </p>
 
-DockDeck uses the space beside a bottom-aligned Dock for two compact developer panels. The terminal stays interactive while a read-only Deck hosts Usage, System Stats, Service Monitor, Weather, Schedule, and World Clock modules; either Deck can be hidden or placed on either side. Both follow the Dock across displays, Spaces, and auto-hide transitions.
+DockDeck uses the space beside a bottom-aligned Dock for two compact developer panels. The terminal stays interactive while a read-only Deck hosts Usage, System Stats, Service Monitor, Weather, Schedule, World Clock, and Battery modules; either Deck can be hidden or placed on either side. Both follow the Dock across displays, Spaces, and auto-hide transitions.
 
 ## Features
 
@@ -29,6 +29,7 @@ DockDeck uses the space beside a bottom-aligned Dock for two compact developer p
 - Current temperature, daily high and low, and conditions for a user-selected city.
 - Current or next macOS Calendar event with a live elapsed-time bar.
 - Local or selected-world-time display with system, 12-hour, and 24-hour formats.
+- Internal battery level, power state, and the system-provided charge or discharge estimate.
 - Dock-aware, symmetric placement across displays, Spaces, and auto-hide transitions.
 - Read-only module Deck with manual module switching; right-click it to select a module or open its settings.
 - A shared sidebar-based Settings window with Deck cards, module detail pages, side placement, and independent module visibility controls.
@@ -80,6 +81,10 @@ DockDeck retains only event title, start and end times, all-day state, and calen
 ## Showing another time zone
 
 World Clock uses the macOS time-zone database and makes no network request. Select the system time zone or an IANA time-zone identifier under **Settings → World Clock**, then choose the system, 12-hour, or 24-hour format. It refreshes at minute boundaries and stops its timer while disabled.
+
+## Checking battery status
+
+Battery reads the internal power source through macOS IOKit and shows charge level, charging state, and the system-provided time estimate when available. It requires no permission or network access. Select a 30-second, 60-second, or 5-minute interval under **Settings → Battery**; sampling stops while the module is disabled. Macs without an internal battery show a neutral unavailable state.
 
 ## Requirements
 
@@ -177,6 +182,7 @@ DockDeck does not read browser cookies, browser credential stores, or private we
 | Weather | Open-Meteo forecast and geocoding APIs | Sends submitted searches and selected coordinates over HTTPS only while used; stores the selected city locally |
 | Schedule | Apple EventKit | Reads selected calendars into memory after explicit permission; never saves, edits, logs, or uploads events |
 | World Clock | macOS time-zone database | Formats time locally and stops its minute timer while disabled |
+| Battery | macOS IOKit | Reads the internal power source locally; does not read battery identifiers or serial numbers |
 
 The Claude cache is written atomically to:
 

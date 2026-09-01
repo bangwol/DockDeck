@@ -52,6 +52,8 @@ swift test
   event content.
 - Keep World Clock local and minute-aligned. Do not add network time services;
   stop its timer when the module is disabled.
+- Keep Battery on documented IOKit power-source fields only. Do not read or
+  persist battery serial numbers, and stop sampling while disabled.
 - Read-only modules share the read-only Deck and must render correctly at the
   compact panel size before they are registered. Keep module switching manual
   and predictable; do not add automatic rotation, drag reordering, or module

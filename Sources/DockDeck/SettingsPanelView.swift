@@ -140,6 +140,8 @@ private struct SettingsRootView: View {
             ScheduleSettingsView(model: model, store: scheduleStore)
         case .clock:
             ClockSettingsView(model: model)
+        case .battery:
+            BatterySettingsView(model: model)
         case .appearance:
             AppearanceSettingsView(model: model)
         }

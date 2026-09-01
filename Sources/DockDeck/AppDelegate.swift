@@ -22,6 +22,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     lazy var weatherStore = WeatherStore()
     lazy var scheduleStore = ScheduleStore()
     lazy var clockStore = ClockStore()
+    lazy var batteryStore = BatteryStore()
     lazy var dockCoordinator = DockCoordinator { [weak self] channel, message in
         self?.debugLog(channel, message)
     }
@@ -111,6 +112,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             weatherStore: weatherStore,
             scheduleStore: scheduleStore,
             clockStore: clockStore,
+            batteryStore: batteryStore,
             menuTarget: self)
         panel.delegate = self
         registerModuleRuntimes()
@@ -218,6 +220,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             .clock,
             start: { [weak self] in self?.clockStore.start() },
             stop: { [weak self] in self?.clockStore.stop() })
+        moduleRuntimeCoordinator.register(
+            .battery,
+            start: { [weak self] in self?.batteryStore.start() },
+            stop: { [weak self] in self?.batteryStore.stop() })
     }
 
     func synchronizeModuleRuntimes() {
