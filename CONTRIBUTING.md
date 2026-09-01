@@ -29,11 +29,16 @@ swift test
 
 - Give every panel module a stable `PanelModuleID` and register its metadata and
   optional settings pane in `PanelModuleRegistry`.
+- Register its work in `ModuleRuntimeCoordinator`. Starting and stopping must be
+  idempotent; a disabled module must not keep a timer, subprocess, sensor, or
+  network request running.
 - Keep placement and visibility in `PanelDeckConfiguration`; its versioned
   storage preserves unknown module IDs for forward compatibility.
 - Keep module state and change events in `SettingsPanelModel`, module-specific
   controls in `SettingsPaneViews`, and window hosting in `SettingsPanelView`.
 - Keep shared surface controls under Appearance.
+- Put provider-level controls in the owning module pane. Usage providers must
+  stop their own polling or subprocess when deselected.
 - Do not expose stacking, drag reordering, or module installation before the
   panel runtime implements the same behavior.
 

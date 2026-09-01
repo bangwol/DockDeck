@@ -23,10 +23,11 @@ DockDeck uses the space beside a bottom-aligned Dock for two compact developer p
 ## Features
 
 - Persistent [SwiftTerm](https://github.com/migueldeicaza/SwiftTerm) login shell with a compact `% ` prompt that does not change user shell files.
-- Remaining or used Codex and Claude capacity from their supported local interfaces; no browser cookies or private web endpoints.
+- Remaining or used Codex and Claude capacity from their supported local interfaces; either provider can be selected independently, with no browser cookies or private web endpoints.
 - Dock-aware, symmetric placement across displays, Spaces, and auto-hide transitions.
 - Read-only usage panel with configurable values, font, size, and color; right-click it for the shared settings menu.
-- A shared sidebar-based Settings window with Deck cards for side placement and independent Terminal and Usage visibility controls.
+- A shared sidebar-based Settings window with Deck cards, module detail pages, side placement, and independent Terminal and Usage visibility controls.
+- Disabled modules stop their background timers and subprocesses instead of merely hiding their panels.
 - Click-to-focus terminal expansion, native edge resizing, and remembered dimensions.
 - Native Liquid Glass on macOS 26, with a translucent fallback and stronger terminal tint on earlier macOS.
 - Manual large-terminal mode plus 20 themes with configurable fonts, tint, corner radius, and panel placement.
