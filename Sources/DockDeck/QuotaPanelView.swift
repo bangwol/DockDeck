@@ -22,7 +22,8 @@ struct QuotaPanelView: View {
                 }
             }
             .padding(.horizontal, compact ? 6 : 8)
-            .padding(.vertical, 4)
+            .padding(.top, 3)
+            .padding(.bottom, 5)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .background(Color.black.opacity(0.001))
@@ -35,7 +36,7 @@ private struct QuotaRow: View {
     let compact: Bool
 
     var body: some View {
-        HStack(spacing: compact ? 3 : 6) {
+        HStack(alignment: .firstTextBaseline, spacing: compact ? 3 : 6) {
             Text(provider.name)
                 .font(.system(size: compact ? 9 : 10, weight: .bold, design: .monospaced))
                 .foregroundStyle(providerColor)
