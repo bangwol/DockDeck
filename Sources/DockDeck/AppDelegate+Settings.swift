@@ -76,6 +76,9 @@ extension AppDelegate {
             self.usageStore.setEnabledProviders(PanelSettings.enabledUsageProviders)
             self.systemStatsStore.setRefreshInterval(
                 PanelSettings.systemStatsRefreshInterval)
+            self.serviceMonitorStore.updateConfiguration(
+                endpoints: PanelSettings.serviceMonitorEndpoints,
+                refreshInterval: PanelSettings.serviceMonitorRefreshInterval)
             self.applyCornerRadius()
             self.applyTintOpacity()
             self.applyFont()
@@ -128,6 +131,9 @@ extension AppDelegate {
                 textColor: PanelSettings.usageTextColor),
             systemStats: SystemStatsSettingsState(
                 refreshInterval: PanelSettings.systemStatsRefreshInterval),
+            serviceMonitor: ServiceMonitorSettingsState(
+                endpoints: PanelSettings.serviceMonitorEndpoints,
+                refreshInterval: PanelSettings.serviceMonitorRefreshInterval),
             appearance: AppearanceSettingsState(
                 cornerRadius: PanelSettings.cornerRadius,
                 tintOpacity: PanelSettings.tintOpacity
@@ -166,6 +172,16 @@ extension AppDelegate {
         case .systemStats(.refreshInterval(let interval)):
             PanelSettings.systemStatsRefreshInterval = interval
             systemStatsStore.setRefreshInterval(interval)
+        case .serviceMonitor(.endpoints(let endpoints)):
+            PanelSettings.serviceMonitorEndpoints = endpoints
+            serviceMonitorStore.updateConfiguration(
+                endpoints: endpoints,
+                refreshInterval: PanelSettings.serviceMonitorRefreshInterval)
+        case .serviceMonitor(.refreshInterval(let interval)):
+            PanelSettings.serviceMonitorRefreshInterval = interval
+            serviceMonitorStore.updateConfiguration(
+                endpoints: PanelSettings.serviceMonitorEndpoints,
+                refreshInterval: interval)
         case .appearance(.cornerRadius(let radius)):
             PanelSettings.cornerRadius = radius
             applyCornerRadius()

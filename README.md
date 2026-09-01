@@ -18,13 +18,14 @@
   <sub>Compact terminal and configurable Codex and Claude usage beside the macOS Dock. Open the image for full resolution.</sub>
 </p>
 
-DockDeck uses the space beside a bottom-aligned Dock for two compact developer panels. The terminal stays interactive while a read-only Deck hosts Usage and System Stats modules; either Deck can be hidden or placed on either side. Both follow the Dock across displays, Spaces, and auto-hide transitions.
+DockDeck uses the space beside a bottom-aligned Dock for two compact developer panels. The terminal stays interactive while a read-only Deck hosts Usage, System Stats, and Service Monitor modules; either Deck can be hidden or placed on either side. Both follow the Dock across displays, Spaces, and auto-hide transitions.
 
 ## Features
 
 - Persistent [SwiftTerm](https://github.com/migueldeicaza/SwiftTerm) login shell with a compact `% ` prompt that does not change user shell files.
 - Remaining or used Codex and Claude capacity from their supported local interfaces; either provider can be selected independently, with no browser cookies or private web endpoints.
 - Local CPU, memory, and disk utilization with a configurable 1–10 second sampling interval.
+- HTTPS service availability and latency checks for up to four user-configured endpoints.
 - Dock-aware, symmetric placement across displays, Spaces, and auto-hide transitions.
 - Read-only module Deck with manual module switching; right-click it to select a module or open its settings.
 - A shared sidebar-based Settings window with Deck cards, module detail pages, side placement, and independent module visibility controls.
@@ -52,6 +53,14 @@ Settings are organized into **Decks**, module-specific pages, and **Appearance**
 ## Reading System Stats
 
 System Stats reports CPU utilization since the previous sample, physical memory in use, and startup-volume disk space in use. It uses local macOS host and file-system APIs, requires no additional permission, and performs no network requests. Enable it under **Settings → Decks**, then right-click the read-only Deck to switch modules.
+
+## Monitoring services
+
+Service Monitor sends a `HEAD` request every 15–120 seconds to up to four URLs. Public endpoints must use HTTPS. Plain HTTP is accepted only for local names and private or loopback addresses; the packaged app declares Apple's narrow `NSAllowsLocalNetworking` exception instead of disabling App Transport Security globally. See Apple's [App Transport Security guidance](https://developer.apple.com/documentation/security/preventing-insecure-network-connections) and [`NSAllowsLocalNetworking` reference](https://developer.apple.com/documentation/bundleresources/information-property-list/nsapptransportsecurity/nsallowslocalnetworking).
+
+Checks use an ephemeral `URLSession` with caches, cookies, and credential storage disabled. DockDeck stores service names and URLs in local preferences, rejects URL user-info and common secret query fields, and does not use response bodies. Do not place secrets in URL paths. Enable and configure the module under **Settings → Decks → Service Monitor**.
+
+On macOS 15 or later, the first local-network check can show Apple's Local Network permission prompt. DockDeck includes a purpose string and waits for the decision; public HTTPS checks do not require this permission. The permission can be changed later under **System Settings → Privacy & Security → Local Network**. See Apple's [local network privacy technote](https://developer.apple.com/documentation/technotes/tn3179-understanding-local-network-privacy).
 
 ## Requirements
 
@@ -145,6 +154,7 @@ DockDeck does not read browser cookies, browser credential stores, or private we
 | Codex | `codex app-server` using `account/rateLimits/read` | Runs the locally installed official Codex CLI as a long-lived subprocess |
 | Claude | Claude Code status-line JSON | Stores only `rate_limits` and an observation timestamp in a local cache |
 | System Stats | macOS host and file-system APIs | Samples CPU, physical memory, and startup-volume capacity locally |
+| Service Monitor | User-configured HTTPS or local HTTP URLs | Sends cookie-free `HEAD` requests; rejects common URL credential fields before local storage |
 
 The Claude cache is written atomically to:
 

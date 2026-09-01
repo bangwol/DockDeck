@@ -18,6 +18,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         self?.debugLog("usage", message)
     }
     lazy var systemStatsStore = SystemStatsStore()
+    lazy var serviceMonitorStore = ServiceMonitorStore()
     lazy var dockCoordinator = DockCoordinator { [weak self] channel, message in
         self?.debugLog(channel, message)
     }
@@ -103,6 +104,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             theme: currentTheme,
             usageStore: usageStore,
             systemStatsStore: systemStatsStore,
+            serviceMonitorStore: serviceMonitorStore,
             menuTarget: self)
         panel.delegate = self
         registerModuleRuntimes()
@@ -194,6 +196,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             .systemStats,
             start: { [weak self] in self?.systemStatsStore.start() },
             stop: { [weak self] in self?.systemStatsStore.stop() })
+        moduleRuntimeCoordinator.register(
+            .serviceMonitor,
+            start: { [weak self] in self?.serviceMonitorStore.start() },
+            stop: { [weak self] in self?.serviceMonitorStore.stop() })
     }
 
     func synchronizeModuleRuntimes() {

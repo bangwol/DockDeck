@@ -129,6 +129,8 @@ private struct SettingsRootView: View {
             UsageSettingsView(model: model)
         case .systemStats:
             SystemStatsSettingsView(model: model)
+        case .serviceMonitor:
+            ServiceMonitorSettingsView(model: model)
         case .appearance:
             AppearanceSettingsView(model: model)
         }

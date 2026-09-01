@@ -14,7 +14,7 @@ final class PanelAppearanceTests: XCTestCase {
         let configuration = PanelDeckConfiguration.legacy(
             order: .terminalRight, enabledPanels: .terminal)
 
-        XCTAssertEqual(configuration.left, [.usage, .systemStats])
+        XCTAssertEqual(configuration.left, [.usage, .systemStats, .serviceMonitor])
         XCTAssertEqual(configuration.right, [.terminal])
         XCTAssertEqual(configuration.enabled, [.terminal])
         XCTAssertEqual(configuration.side(containing: .terminal), .right)
@@ -31,7 +31,7 @@ final class PanelAppearanceTests: XCTestCase {
         let decoded = try JSONDecoder().decode(PanelDeckConfiguration.self, from: data)
 
         XCTAssertEqual(decoded.left, [.terminal, clock])
-        XCTAssertEqual(decoded.right, [.usage, .systemStats])
+        XCTAssertEqual(decoded.right, [.usage, .systemStats, .serviceMonitor])
         XCTAssertEqual(decoded.enabled, [clock])
     }
 
@@ -43,7 +43,7 @@ final class PanelAppearanceTests: XCTestCase {
         ).normalized()
 
         XCTAssertEqual(configuration.left, [.terminal])
-        XCTAssertEqual(configuration.right, [.usage, .systemStats])
+        XCTAssertEqual(configuration.right, [.usage, .systemStats, .serviceMonitor])
     }
 
     func testSettingsModelSwapsCompleteDecksWithoutDroppingFutureModules() {
@@ -61,7 +61,9 @@ final class PanelAppearanceTests: XCTestCase {
 
         model.swapDecks()
 
-        XCTAssertEqual(model.values.deckConfiguration.left, [.usage, .systemStats])
+        XCTAssertEqual(
+            model.values.deckConfiguration.left,
+            [.usage, .systemStats, .serviceMonitor])
         XCTAssertEqual(model.values.deckConfiguration.right, [.terminal, clock])
         XCTAssertEqual(persistedConfiguration, model.values.deckConfiguration)
     }
@@ -88,9 +90,10 @@ final class PanelAppearanceTests: XCTestCase {
         XCTAssertEqual(Set(PanelModuleRegistry.all.map(\.id)).count, PanelModuleRegistry.all.count)
         XCTAssertEqual(
             model.availablePanes,
-            [.decks, .terminal, .usage, .systemStats, .appearance])
+            [.decks, .terminal, .usage, .systemStats, .serviceMonitor, .appearance])
         XCTAssertEqual(model.moduleDefinition(for: .usage)?.id, .usage)
         XCTAssertEqual(model.moduleDefinition(for: .systemStats)?.id, .systemStats)
+        XCTAssertEqual(model.moduleDefinition(for: .serviceMonitor)?.id, .serviceMonitor)
     }
 
     func testModuleRuntimeCoordinatorStartsAndStopsOnlyChangedModules() {
@@ -171,6 +174,19 @@ final class PanelAppearanceTests: XCTestCase {
             ReadOnlyDeckSelection.next(after: .systemStats, enabledModules: modules), .usage)
     }
 
+    func testSettingsModelLimitsServiceMonitorEndpoints() {
+        let model = makeSettingsModel(
+            configuration: .legacy(order: .terminalLeft, enabledPanels: .all))
+
+        for _ in 0...ServiceMonitorEndpoint.maximumCount {
+            model.addServiceMonitorEndpoint()
+        }
+
+        XCTAssertEqual(
+            model.values.serviceMonitor.endpoints.count,
+            ServiceMonitorEndpoint.maximumCount)
+    }
+
     func testSettingsPanesRenderAtPreferredSize() throws {
         let enabled = PanelDeckConfiguration.legacy(
             order: .terminalLeft, enabledPanels: .all)
@@ -194,6 +210,31 @@ final class PanelAppearanceTests: XCTestCase {
             XCTAssertGreaterThan(bitmap.pixelsWide, 0)
             XCTAssertGreaterThan(bitmap.pixelsHigh, 0)
         }
+    }
+
+    func testServiceSettingsRenderMaximumEndpoints() throws {
+        var configuration = PanelDeckConfiguration.legacy(
+            order: .terminalLeft, enabledPanels: .all)
+        configuration.setEnabled(true, for: .serviceMonitor)
+        var values = makeSettingsValues(configuration: configuration)
+        values.serviceMonitor.endpoints = (1...ServiceMonitorEndpoint.maximumCount).map {
+            ServiceMonitorEndpoint(
+                name: "Service \($0)",
+                urlString: "https://service\($0).example.com/health")
+        }
+        let view = SettingsPanelView(
+            selectedPane: .serviceMonitor,
+            values: values,
+            fontNames: ["Menlo", TerminalTheme.systemFontName])
+        view.frame = NSRect(origin: .zero, size: SettingsPanelView.preferredSize)
+        view.layoutSubtreeIfNeeded()
+
+        let bitmap = try XCTUnwrap(view.bitmapImageRepForCachingDisplay(in: view.bounds))
+        view.cacheDisplay(in: view.bounds, to: bitmap)
+
+        XCTAssertEqual(view.frame.size, SettingsPanelView.preferredSize)
+        XCTAssertGreaterThan(bitmap.pixelsWide, 0)
+        XCTAssertGreaterThan(bitmap.pixelsHigh, 0)
     }
 
     func testShellRestartPolicyStopsARepeatedExitLoop() {
@@ -234,6 +275,7 @@ final class PanelAppearanceTests: XCTestCase {
             theme: Theme.theme(id: ""),
             usageStore: UsageStore(),
             systemStatsStore: SystemStatsStore(),
+            serviceMonitorStore: ServiceMonitorStore(),
             menuTarget: NSObject())
         let menu = try XCTUnwrap(controller.panel.contentView?.menu)
 
@@ -271,6 +313,8 @@ final class PanelAppearanceTests: XCTestCase {
                 fontName: "Menlo", fontSize: 10,
                 displayMode: .remaining, textColor: .theme),
             systemStats: SystemStatsSettingsState(refreshInterval: 2),
+            serviceMonitor: ServiceMonitorSettingsState(
+                endpoints: [], refreshInterval: 30),
             appearance: AppearanceSettingsState(
                 cornerRadius: 10, tintOpacity: 0.6))
     }

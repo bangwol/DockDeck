@@ -13,6 +13,7 @@ final class ReadOnlyDeckPanelController: NSObject, NSMenuDelegate {
     private let hostingView: NSHostingView<ReadOnlyDeckPanelView>
     private let usageStore: UsageStore
     private let systemStatsStore: SystemStatsStore
+    private let serviceMonitorStore: ServiceMonitorStore
     private weak var menuTarget: AnyObject?
     private var theme: Theme
 
@@ -21,10 +22,12 @@ final class ReadOnlyDeckPanelController: NSObject, NSMenuDelegate {
         theme: Theme,
         usageStore: UsageStore,
         systemStatsStore: SystemStatsStore,
+        serviceMonitorStore: ServiceMonitorStore,
         menuTarget: AnyObject
     ) {
         self.usageStore = usageStore
         self.systemStatsStore = systemStatsStore
+        self.serviceMonitorStore = serviceMonitorStore
         self.theme = theme
         self.menuTarget = menuTarget
 
@@ -50,6 +53,7 @@ final class ReadOnlyDeckPanelController: NSObject, NSMenuDelegate {
             rootView: ReadOnlyDeckPanelView(
                 usageStore: usageStore,
                 systemStatsStore: systemStatsStore,
+                serviceMonitorStore: serviceMonitorStore,
                 activeModule: PanelSettings.activeReadOnlyModule,
                 theme: theme))
         hostingView.frame = surfaceView.bounds
@@ -87,6 +91,7 @@ final class ReadOnlyDeckPanelController: NSObject, NSMenuDelegate {
         hostingView.rootView = ReadOnlyDeckPanelView(
             usageStore: usageStore,
             systemStatsStore: systemStatsStore,
+            serviceMonitorStore: serviceMonitorStore,
             activeModule: activeModule,
             theme: theme)
     }

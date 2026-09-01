@@ -141,6 +141,13 @@ cat > "$APP_PATH/Contents/Info.plist" <<EOF
     <string>$VERSION</string>
     <key>LSMinimumSystemVersion</key>
     <string>13.0</string>
+    <key>NSAppTransportSecurity</key>
+    <dict>
+        <key>NSAllowsLocalNetworking</key>
+        <true/>
+    </dict>
+    <key>NSLocalNetworkUsageDescription</key>
+    <string>DockDeck checks local service URLs that you add to Service Monitor.</string>
     <key>LSUIElement</key>
     <true/>
 </dict>

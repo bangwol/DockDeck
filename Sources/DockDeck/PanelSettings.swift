@@ -80,8 +80,9 @@ struct PanelModuleID: Hashable, Codable {
     static let terminal = PanelModuleID(rawValue: "terminal")
     static let usage = PanelModuleID(rawValue: "usage")
     static let systemStats = PanelModuleID(rawValue: "system-stats")
+    static let serviceMonitor = PanelModuleID(rawValue: "service-monitor")
 
-    static let readOnlyBuiltIns: [PanelModuleID] = [.usage, .systemStats]
+    static let readOnlyBuiltIns: [PanelModuleID] = [.usage, .systemStats, .serviceMonitor]
 
     init(rawValue: String) {
         self.rawValue = rawValue
@@ -184,6 +185,8 @@ enum PanelSettings {
     static let defaultUsageFontSize: CGFloat = 10
     static let defaultSystemStatsRefreshInterval: TimeInterval = 2
     static let systemStatsRefreshIntervals: [TimeInterval] = [1, 2, 5, 10]
+    static let defaultServiceMonitorRefreshInterval: TimeInterval = 30
+    static let serviceMonitorRefreshIntervals: [TimeInterval] = [15, 30, 60, 120]
 
     private static let cornerRadiusKey = "DockDeck.settings.cornerRadius"
     private static let tintOpacityKey = "DockDeck.settings.tintOpacity"
@@ -198,6 +201,9 @@ enum PanelSettings {
     private static let systemStatsRefreshIntervalKey =
         "DockDeck.settings.systemStatsRefreshInterval"
     private static let activeReadOnlyModuleKey = "DockDeck.settings.activeReadOnlyModule"
+    private static let serviceMonitorEndpointsKey = "DockDeck.settings.serviceMonitorEndpoints"
+    private static let serviceMonitorRefreshIntervalKey =
+        "DockDeck.settings.serviceMonitorRefreshInterval"
     private static let panelOrderKey = "DockDeck.settings.panelOrder"
     private static let enabledPanelsKey = "DockDeck.settings.enabledPanels"
     private static let panelDeckConfigurationKey =
@@ -343,6 +349,41 @@ enum PanelSettings {
         }
     }
 
+    static var serviceMonitorEndpoints: [ServiceMonitorEndpoint] {
+        get {
+            guard
+                let data = UserDefaults.standard.data(forKey: serviceMonitorEndpointsKey),
+                let endpoints = try? JSONDecoder().decode(
+                    [ServiceMonitorEndpoint].self, from: data)
+            else { return [] }
+            return normalizedServiceMonitorEndpoints(endpoints)
+        }
+        set {
+            let endpoints = normalizedServiceMonitorEndpoints(newValue)
+            guard let data = try? JSONEncoder().encode(endpoints) else { return }
+            UserDefaults.standard.set(data, forKey: serviceMonitorEndpointsKey)
+        }
+    }
+
+    static var serviceMonitorRefreshInterval: TimeInterval {
+        get {
+            let defaults = UserDefaults.standard
+            guard defaults.object(forKey: serviceMonitorRefreshIntervalKey) != nil else {
+                return defaultServiceMonitorRefreshInterval
+            }
+            let value = defaults.double(forKey: serviceMonitorRefreshIntervalKey)
+            return serviceMonitorRefreshIntervals.min(by: {
+                abs($0 - value) < abs($1 - value)
+            }) ?? defaultServiceMonitorRefreshInterval
+        }
+        set {
+            let value = serviceMonitorRefreshIntervals.min(by: {
+                abs($0 - newValue) < abs($1 - newValue)
+            }) ?? defaultServiceMonitorRefreshInterval
+            UserDefaults.standard.set(value, forKey: serviceMonitorRefreshIntervalKey)
+        }
+    }
+
     static var enabledPanels: EnabledPanels {
         get {
             var panels: EnabledPanels = []
@@ -433,6 +474,8 @@ enum PanelSettings {
         defaults.removeObject(forKey: enabledUsageProvidersKey)
         defaults.removeObject(forKey: systemStatsRefreshIntervalKey)
         defaults.removeObject(forKey: activeReadOnlyModuleKey)
+        defaults.removeObject(forKey: serviceMonitorEndpointsKey)
+        defaults.removeObject(forKey: serviceMonitorRefreshIntervalKey)
         defaults.removeObject(forKey: panelOrderKey)
         defaults.removeObject(forKey: enabledPanelsKey)
         defaults.removeObject(forKey: panelDeckConfigurationKey)
@@ -467,5 +510,19 @@ enum PanelSettings {
         if configuration.contains(.usage) { enabledPanels.insert(.usage) }
         defaults.set(order.rawValue, forKey: panelOrderKey)
         defaults.set(EnabledPanels.resolved(enabledPanels).rawValue, forKey: enabledPanelsKey)
+    }
+
+    private static func normalizedServiceMonitorEndpoints(
+        _ endpoints: [ServiceMonitorEndpoint]
+    ) -> [ServiceMonitorEndpoint] {
+        var seen: Set<UUID> = []
+        var result: [ServiceMonitorEndpoint] = []
+        for endpoint in endpoints {
+            let endpoint = endpoint.normalizedForStorage()
+            guard seen.insert(endpoint.id).inserted else { continue }
+            result.append(endpoint)
+            if result.count == ServiceMonitorEndpoint.maximumCount { break }
+        }
+        return result
     }
 }

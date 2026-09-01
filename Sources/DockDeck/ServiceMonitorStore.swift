@@ -1,0 +1,389 @@
+import Darwin
+import Foundation
+
+struct ServiceMonitorEndpoint: Codable, Equatable, Identifiable {
+    static let maximumCount = 4
+    static let maximumNameLength = 24
+    static let maximumURLLength = 2_048
+
+    let id: UUID
+    var name: String
+    var urlString: String
+
+    init(id: UUID = UUID(), name: String, urlString: String) {
+        self.id = id
+        self.name = name
+        self.urlString = urlString
+    }
+
+    var displayName: String {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmed.isEmpty { return String(trimmed.prefix(Self.maximumNameLength)) }
+        return ServiceMonitorURLValidator.validatedURL(urlString)?.host ?? "Service"
+    }
+
+    func normalizedForStorage() -> Self {
+        let name = String(
+            name.trimmingCharacters(in: .whitespacesAndNewlines)
+                .prefix(Self.maximumNameLength))
+        var urlString = String(
+            urlString.trimmingCharacters(in: .whitespacesAndNewlines)
+                .prefix(Self.maximumURLLength))
+        if ServiceMonitorURLValidator.containsCredentials(urlString) { urlString = "" }
+        return Self(id: id, name: name, urlString: urlString)
+    }
+}
+
+enum ServiceMonitorURLValidator {
+    private static let credentialQueryNames: Set<String> = [
+        "access_token", "api_key", "apikey", "auth", "authorization", "credential", "key",
+        "password", "passwd", "secret", "sig", "signature", "token",
+    ]
+
+    static func validatedURL(_ value: String) -> URL? {
+        validationMessage(value) == nil
+            ? URLComponents(string: trimmed(value))?.url : nil
+    }
+
+    static func validationMessage(_ value: String) -> String? {
+        let value = trimmed(value)
+        guard !value.isEmpty, value.count <= ServiceMonitorEndpoint.maximumURLLength else {
+            return "Enter an HTTPS URL."
+        }
+        guard let components = URLComponents(string: value), let host = components.host,
+            !host.isEmpty
+        else { return "Enter a complete URL with a host." }
+        guard !containsCredentials(components) else {
+            return "Credentials are not stored in service URLs."
+        }
+        switch components.scheme?.lowercased() {
+        case "https":
+            return components.url == nil ? "Enter a valid HTTPS URL." : nil
+        case "http":
+            return isLocalHost(host)
+                ? (components.url == nil ? "Enter a valid local URL." : nil)
+                : "Public services must use HTTPS."
+        default:
+            return "Only HTTPS and local HTTP URLs are supported."
+        }
+    }
+
+    static func containsCredentials(_ value: String) -> Bool {
+        guard let components = URLComponents(string: trimmed(value)) else { return false }
+        return containsCredentials(components)
+    }
+
+    private static func containsCredentials(_ components: URLComponents) -> Bool {
+        if components.user != nil || components.password != nil { return true }
+        return (components.queryItems ?? []).contains { item in
+            let name = item.name.lowercased().replacingOccurrences(of: "-", with: "_")
+            return credentialQueryNames.contains(name)
+                || name.hasSuffix("_token")
+                || name.hasSuffix("_secret")
+                || name.hasSuffix("_password")
+                || name.hasSuffix("_signature")
+                || name.hasSuffix("_credential")
+        }
+    }
+
+    private static func trimmed(_ value: String) -> String {
+        value.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private static func isLocalHost(_ value: String) -> Bool {
+        let host = value.lowercased().trimmingCharacters(in: CharacterSet(charactersIn: "."))
+        if host == "localhost" || host.hasSuffix(".local") || !host.contains(".") {
+            return true
+        }
+        if isPrivateIPv4(host) { return true }
+        return isPrivateIPv6(host)
+    }
+
+    private static func isPrivateIPv4(_ host: String) -> Bool {
+        var address = in_addr()
+        guard inet_pton(AF_INET, host, &address) == 1 else { return false }
+        let value = UInt32(bigEndian: address.s_addr)
+        let first = value >> 24
+        let second = (value >> 16) & 0xff
+        return first == 10
+            || first == 127
+            || (first == 169 && second == 254)
+            || (first == 172 && (16...31).contains(second))
+            || (first == 192 && second == 168)
+    }
+
+    private static func isPrivateIPv6(_ host: String) -> Bool {
+        var address = in6_addr()
+        guard inet_pton(AF_INET6, host, &address) == 1 else { return false }
+        let bytes = withUnsafeBytes(of: address) { Array($0) }
+        let loopback = bytes.dropLast().allSatisfy { $0 == 0 } && bytes.last == 1
+        let uniqueLocal = bytes.first.map { $0 & 0xfe == 0xfc } ?? false
+        let linkLocal = bytes.count > 1 && bytes[0] == 0xfe && bytes[1] & 0xc0 == 0x80
+        return loopback || uniqueLocal || linkLocal
+    }
+}
+
+enum ServiceMonitorState: Equatable {
+    case idle
+    case checking
+    case up(statusCode: Int, latencyMilliseconds: Int)
+    case down(String)
+
+    var shortLabel: String {
+        switch self {
+        case .idle: "WAIT"
+        case .checking: "…"
+        case .up(_, let latency): "\(latency)ms"
+        case .down: "DOWN"
+        }
+    }
+
+    var detail: String {
+        switch self {
+        case .idle: "Waiting to check"
+        case .checking: "Checking"
+        case .up(let statusCode, let latency):
+            "HTTP \(statusCode) in \(latency) ms"
+        case .down(let reason): reason
+        }
+    }
+}
+
+private final class ServiceMonitorSessionDelegate: NSObject, URLSessionTaskDelegate {
+    func urlSession(
+        _ session: URLSession,
+        task: URLSessionTask,
+        willPerformHTTPRedirection response: HTTPURLResponse,
+        newRequest request: URLRequest,
+        completionHandler: @escaping (URLRequest?) -> Void
+    ) {
+        guard let sourceURL = task.currentRequest?.url, let destinationURL = request.url,
+            ServiceMonitorURLValidator.validatedURL(destinationURL.absoluteString) != nil
+        else {
+            completionHandler(nil)
+            return
+        }
+        let downgradesTLS = sourceURL.scheme?.lowercased() == "https"
+            && destinationURL.scheme?.lowercased() != "https"
+        completionHandler(downgradesTLS ? nil : request)
+    }
+}
+
+struct ServiceMonitorItem: Identifiable, Equatable {
+    let endpoint: ServiceMonitorEndpoint
+    var state: ServiceMonitorState
+
+    var id: UUID { endpoint.id }
+}
+
+final class ServiceMonitorStore: ObservableObject {
+    @Published private(set) var items: [ServiceMonitorItem]
+
+    private var endpoints: [ServiceMonitorEndpoint]
+    private var refreshInterval: TimeInterval
+    private var timer: Timer?
+    private var tasks: [UUID: URLSessionDataTask] = [:]
+    private var delayedRefresh: DispatchWorkItem?
+    private var generation = 0
+    private var isRunning = false
+    private let session: URLSession
+
+    init(
+        endpoints: [ServiceMonitorEndpoint] = PanelSettings.serviceMonitorEndpoints,
+        refreshInterval: TimeInterval = PanelSettings.serviceMonitorRefreshInterval,
+        session: URLSession? = nil
+    ) {
+        let endpoints = Self.limitedUniqueEndpoints(endpoints)
+        self.endpoints = endpoints
+        self.refreshInterval = Self.resolvedRefreshInterval(refreshInterval)
+        items = endpoints.map { ServiceMonitorItem(endpoint: $0, state: .idle) }
+
+        self.session = session ?? Self.makeSession()
+    }
+
+    private static func makeSession() -> URLSession {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
+        configuration.urlCache = nil
+        configuration.httpCookieStorage = nil
+        configuration.httpShouldSetCookies = false
+        configuration.urlCredentialStorage = nil
+        configuration.waitsForConnectivity = true
+        configuration.timeoutIntervalForRequest = 8
+        configuration.timeoutIntervalForResource = 10
+        return URLSession(
+            configuration: configuration,
+            delegate: ServiceMonitorSessionDelegate(),
+            delegateQueue: nil)
+    }
+
+    func start() {
+        guard !isRunning else { return }
+        isRunning = true
+        refresh()
+        scheduleTimer()
+    }
+
+    func stop() {
+        guard isRunning || timer != nil || !tasks.isEmpty else { return }
+        isRunning = false
+        generation += 1
+        timer?.invalidate()
+        timer = nil
+        delayedRefresh?.cancel()
+        delayedRefresh = nil
+        cancelTasks()
+    }
+
+    func updateConfiguration(
+        endpoints: [ServiceMonitorEndpoint], refreshInterval: TimeInterval
+    ) {
+        let endpoints = Self.limitedUniqueEndpoints(endpoints)
+        let previousItems = Dictionary(uniqueKeysWithValues: items.map { ($0.id, $0) })
+        self.endpoints = endpoints
+        self.refreshInterval = Self.resolvedRefreshInterval(refreshInterval)
+        items = endpoints.map {
+            let previous = previousItems[$0.id]
+            let unchanged = previous?.endpoint.urlString == $0.urlString
+            return ServiceMonitorItem(
+                endpoint: $0, state: unchanged ? previous?.state ?? .idle : .idle)
+        }
+        guard isRunning else { return }
+        generation += 1
+        cancelTasks()
+        scheduleTimer()
+        scheduleConfigurationRefresh()
+    }
+
+    func refresh() {
+        guard isRunning else { return }
+        generation += 1
+        let generation = generation
+        delayedRefresh?.cancel()
+        delayedRefresh = nil
+        cancelTasks()
+
+        for endpoint in endpoints {
+            guard let url = ServiceMonitorURLValidator.validatedURL(endpoint.urlString) else {
+                update(endpoint.id, state: .down(
+                    ServiceMonitorURLValidator.validationMessage(endpoint.urlString)
+                        ?? "Invalid URL"))
+                continue
+            }
+            update(endpoint.id, state: .checking)
+            var request = URLRequest(url: url)
+            request.httpMethod = "HEAD"
+            request.cachePolicy = .reloadIgnoringLocalCacheData
+            request.timeoutInterval = 8
+            let startedAt = ProcessInfo.processInfo.systemUptime
+            let task = session.dataTask(with: request) { [weak self] _, response, error in
+                let latency = max(
+                    Int(((ProcessInfo.processInfo.systemUptime - startedAt) * 1_000).rounded()), 0)
+                DispatchQueue.main.async {
+                    self?.complete(
+                        endpointID: endpoint.id,
+                        response: response,
+                        error: error,
+                        latencyMilliseconds: latency,
+                        generation: generation)
+                }
+            }
+            tasks[endpoint.id] = task
+            task.resume()
+        }
+    }
+
+    private func complete(
+        endpointID: UUID,
+        response: URLResponse?,
+        error: Error?,
+        latencyMilliseconds: Int,
+        generation: Int
+    ) {
+        guard isRunning, generation == self.generation else { return }
+        tasks.removeValue(forKey: endpointID)
+        if let error {
+            update(endpointID, state: .down(Self.failureLabel(error)))
+            return
+        }
+        guard let response = response as? HTTPURLResponse else {
+            update(endpointID, state: .down("No HTTP response"))
+            return
+        }
+        if (200..<300).contains(response.statusCode) {
+            update(
+                endpointID,
+                state: .up(
+                    statusCode: response.statusCode,
+                    latencyMilliseconds: latencyMilliseconds))
+        } else {
+            update(endpointID, state: .down("HTTP \(response.statusCode)"))
+        }
+    }
+
+    private func update(_ endpointID: UUID, state: ServiceMonitorState) {
+        guard let index = items.firstIndex(where: { $0.id == endpointID }) else { return }
+        items[index].state = state
+    }
+
+    private func scheduleTimer() {
+        timer?.invalidate()
+        guard isRunning else {
+            timer = nil
+            return
+        }
+        let timer = Timer(timeInterval: refreshInterval, repeats: true) { [weak self] _ in
+            self?.refresh()
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        self.timer = timer
+    }
+
+    private func scheduleConfigurationRefresh() {
+        delayedRefresh?.cancel()
+        let workItem = DispatchWorkItem { [weak self] in self?.refresh() }
+        delayedRefresh = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6, execute: workItem)
+    }
+
+    private func cancelTasks() {
+        tasks.values.forEach { $0.cancel() }
+        tasks.removeAll()
+    }
+
+    private static func failureLabel(_ error: Error) -> String {
+        let error = error as NSError
+        guard error.domain == NSURLErrorDomain else { return "Network error" }
+        switch error.code {
+        case NSURLErrorTimedOut: return "Timed out"
+        case NSURLErrorNotConnectedToInternet, NSURLErrorNetworkConnectionLost:
+            return "Offline"
+        case NSURLErrorSecureConnectionFailed, NSURLErrorServerCertificateUntrusted,
+            NSURLErrorServerCertificateHasBadDate, NSURLErrorServerCertificateHasUnknownRoot,
+            NSURLErrorServerCertificateNotYetValid:
+            return "TLS error"
+        case NSURLErrorCannotFindHost, NSURLErrorDNSLookupFailed: return "Host not found"
+        case NSURLErrorCannotConnectToHost: return "Connection failed"
+        case NSURLErrorCancelled: return "Cancelled"
+        default: return "Network error"
+        }
+    }
+
+    private static func limitedUniqueEndpoints(
+        _ endpoints: [ServiceMonitorEndpoint]
+    ) -> [ServiceMonitorEndpoint] {
+        var seen: Set<UUID> = []
+        var result: [ServiceMonitorEndpoint] = []
+        for endpoint in endpoints where seen.insert(endpoint.id).inserted {
+            result.append(endpoint)
+            if result.count == ServiceMonitorEndpoint.maximumCount { break }
+        }
+        return result
+    }
+
+    private static func resolvedRefreshInterval(_ value: TimeInterval) -> TimeInterval {
+        PanelSettings.serviceMonitorRefreshIntervals.min(by: {
+            abs($0 - value) < abs($1 - value)
+        }) ?? PanelSettings.defaultServiceMonitorRefreshInterval
+    }
+}

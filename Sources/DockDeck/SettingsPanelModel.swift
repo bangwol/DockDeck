@@ -6,6 +6,7 @@ enum SettingsPaneID: String, CaseIterable, Identifiable {
     case terminal
     case usage
     case systemStats
+    case serviceMonitor
     case appearance
 
     var id: Self { self }
@@ -16,6 +17,7 @@ enum SettingsPaneID: String, CaseIterable, Identifiable {
         case .terminal: "Terminal"
         case .usage: "Usage"
         case .systemStats: "System Stats"
+        case .serviceMonitor: "Service Monitor"
         case .appearance: "Appearance"
         }
     }
@@ -26,6 +28,7 @@ enum SettingsPaneID: String, CaseIterable, Identifiable {
         case .terminal: "Control terminal expansion and text."
         case .usage: "Choose how account limits are displayed."
         case .systemStats: "Monitor local CPU, memory, and disk usage."
+        case .serviceMonitor: "Check the availability of your services."
         case .appearance: "Adjust the shared panel surface."
         }
     }
@@ -36,6 +39,7 @@ enum SettingsPaneID: String, CaseIterable, Identifiable {
         case .terminal: "terminal"
         case .usage: "chart.bar"
         case .systemStats: "gauge.with.dots.needle.67percent"
+        case .serviceMonitor: "network"
         case .appearance: "paintbrush"
         }
     }
@@ -62,6 +66,9 @@ enum PanelModuleRegistry {
         PanelModuleDefinition(
             id: .systemStats, title: "System Stats", subtitle: "CPU, memory, and disk",
             symbolName: "gauge.with.dots.needle.67percent", settingsPane: .systemStats),
+        PanelModuleDefinition(
+            id: .serviceMonitor, title: "Service Monitor", subtitle: "HTTPS availability",
+            symbolName: "network", settingsPane: .serviceMonitor),
     ]
 
     static func definition(for id: PanelModuleID) -> PanelModuleDefinition? {
@@ -91,6 +98,11 @@ struct SystemStatsSettingsState: Equatable {
     var refreshInterval: TimeInterval
 }
 
+struct ServiceMonitorSettingsState: Equatable {
+    var endpoints: [ServiceMonitorEndpoint]
+    var refreshInterval: TimeInterval
+}
+
 struct AppearanceSettingsState: Equatable {
     var cornerRadius: CGFloat
     var tintOpacity: CGFloat
@@ -101,6 +113,7 @@ struct SettingsPanelValues: Equatable {
     var terminal: TerminalSettingsState
     var usage: UsageSettingsState
     var systemStats: SystemStatsSettingsState
+    var serviceMonitor: ServiceMonitorSettingsState
     var appearance: AppearanceSettingsState
 
     func normalized() -> Self {
@@ -127,6 +140,11 @@ enum SystemStatsSettingsChange {
     case refreshInterval(TimeInterval)
 }
 
+enum ServiceMonitorSettingsChange {
+    case endpoints([ServiceMonitorEndpoint])
+    case refreshInterval(TimeInterval)
+}
+
 enum AppearanceSettingsChange {
     case cornerRadius(CGFloat)
     case tintOpacity(CGFloat)
@@ -137,6 +155,7 @@ enum SettingsPanelChange {
     case terminal(TerminalSettingsChange)
     case usage(UsageSettingsChange)
     case systemStats(SystemStatsSettingsChange)
+    case serviceMonitor(ServiceMonitorSettingsChange)
     case appearance(AppearanceSettingsChange)
 }
 
@@ -305,6 +324,38 @@ final class SettingsPanelModel: ObservableObject {
         onChange?(.systemStats(.refreshInterval(selected)))
     }
 
+    func addServiceMonitorEndpoint() {
+        guard values.serviceMonitor.endpoints.count < ServiceMonitorEndpoint.maximumCount else {
+            return
+        }
+        var endpoints = values.serviceMonitor.endpoints
+        endpoints.append(
+            ServiceMonitorEndpoint(
+                name: "Service \(endpoints.count + 1)", urlString: "https://"))
+        publishServiceMonitorEndpoints(endpoints)
+    }
+
+    func removeServiceMonitorEndpoint(_ id: UUID) {
+        publishServiceMonitorEndpoints(
+            values.serviceMonitor.endpoints.filter { $0.id != id })
+    }
+
+    func setServiceMonitorEndpointName(_ id: UUID, name: String) {
+        updateServiceMonitorEndpoint(id) { $0.name = name }
+    }
+
+    func setServiceMonitorEndpointURL(_ id: UUID, urlString: String) {
+        updateServiceMonitorEndpoint(id) { $0.urlString = urlString }
+    }
+
+    func setServiceMonitorRefreshInterval(_ value: TimeInterval) {
+        let selected = PanelSettings.serviceMonitorRefreshIntervals.min(by: {
+            abs($0 - value) < abs($1 - value)
+        }) ?? PanelSettings.defaultServiceMonitorRefreshInterval
+        updateValues { $0.serviceMonitor.refreshInterval = selected }
+        onChange?(.serviceMonitor(.refreshInterval(selected)))
+    }
+
     func setValues(_ values: SettingsPanelValues) {
         self.values = values.normalized()
         if !availablePanes.contains(selectedPane) { selectedPane = .decks }
@@ -336,5 +387,20 @@ final class SettingsPanelModel: ObservableObject {
                 .focusSize(
                     width: values.terminal.focusWidthMultiplier,
                     height: values.terminal.focusHeightMultiplier)))
+    }
+
+    private func updateServiceMonitorEndpoint(
+        _ id: UUID, update: (inout ServiceMonitorEndpoint) -> Void
+    ) {
+        var endpoints = values.serviceMonitor.endpoints
+        guard let index = endpoints.firstIndex(where: { $0.id == id }) else { return }
+        update(&endpoints[index])
+        publishServiceMonitorEndpoints(endpoints)
+    }
+
+    private func publishServiceMonitorEndpoints(_ endpoints: [ServiceMonitorEndpoint]) {
+        let endpoints = Array(endpoints.prefix(ServiceMonitorEndpoint.maximumCount))
+        updateValues { $0.serviceMonitor.endpoints = endpoints }
+        onChange?(.serviceMonitor(.endpoints(endpoints)))
     }
 }

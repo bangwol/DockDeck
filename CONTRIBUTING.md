@@ -39,6 +39,9 @@ swift test
 - Keep shared surface controls under Appearance.
 - Put provider-level controls in the owning module pane. Usage providers must
   stop their own polling or subprocess when deselected.
+- Keep Service Monitor probes credential-free and on the ephemeral session.
+  Public endpoints require HTTPS; local HTTP support must stay within the
+  narrow `NSAllowsLocalNetworking` exception.
 - Read-only modules share the read-only Deck and must render correctly at the
   compact panel size before they are registered. Keep module switching manual
   and predictable; do not add automatic rotation, drag reordering, or module

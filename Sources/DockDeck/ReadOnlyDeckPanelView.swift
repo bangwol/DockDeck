@@ -22,6 +22,7 @@ enum ReadOnlyDeckSelection {
 struct ReadOnlyDeckPanelView: View {
     @ObservedObject var usageStore: UsageStore
     @ObservedObject var systemStatsStore: SystemStatsStore
+    @ObservedObject var serviceMonitorStore: ServiceMonitorStore
     let activeModule: PanelModuleID?
     let theme: Theme
 
@@ -31,6 +32,8 @@ struct ReadOnlyDeckPanelView: View {
             QuotaPanelView(store: usageStore, theme: theme, configuration: .current)
         case .systemStats:
             SystemStatsPanelView(store: systemStatsStore, theme: theme)
+        case .serviceMonitor:
+            ServiceMonitorPanelView(store: serviceMonitorStore, theme: theme)
         default:
             EmptyView()
         }

@@ -76,6 +76,9 @@ extension AppDelegate {
         if PanelSettings.enabledReadOnlyModules.contains(.systemStats) {
             systemStatsStore.refresh()
         }
+        if PanelSettings.enabledReadOnlyModules.contains(.serviceMonitor) {
+            serviceMonitorStore.refresh()
+        }
         refreshCoarseCaches()
         startTrackingTimer()
         runEvaluation()
