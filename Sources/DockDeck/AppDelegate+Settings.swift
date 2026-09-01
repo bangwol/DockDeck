@@ -61,7 +61,8 @@ extension AppDelegate {
         let view = SettingsPanelView(
             selectedPane: pane,
             values: currentSettingsValues,
-            fontNames: TerminalTheme.installedFontNames)
+            fontNames: TerminalTheme.installedFontNames,
+            scheduleStore: scheduleStore)
 
         view.onPaneChange = { [weak self] pane in
             UserDefaults.standard.set(pane.rawValue, forKey: AppPreferences.settingsPaneKey)
@@ -83,6 +84,10 @@ extension AppDelegate {
                 location: PanelSettings.weatherLocation,
                 unit: PanelSettings.weatherTemperatureUnit,
                 refreshInterval: PanelSettings.weatherRefreshInterval)
+            self.scheduleStore.updateConfiguration(
+                selectedCalendarIDs: PanelSettings.scheduleCalendarIDs,
+                includeAllDay: PanelSettings.scheduleIncludesAllDay,
+                refreshInterval: PanelSettings.scheduleRefreshInterval)
             self.applyCornerRadius()
             self.applyTintOpacity()
             self.applyFont()
@@ -142,6 +147,10 @@ extension AppDelegate {
                 location: PanelSettings.weatherLocation,
                 temperatureUnit: PanelSettings.weatherTemperatureUnit,
                 refreshInterval: PanelSettings.weatherRefreshInterval),
+            schedule: ScheduleSettingsState(
+                calendarIDs: PanelSettings.scheduleCalendarIDs,
+                includeAllDay: PanelSettings.scheduleIncludesAllDay,
+                refreshInterval: PanelSettings.scheduleRefreshInterval),
             appearance: AppearanceSettingsState(
                 cornerRadius: PanelSettings.cornerRadius,
                 tintOpacity: PanelSettings.tintOpacity
@@ -199,6 +208,15 @@ extension AppDelegate {
         case .weather(.refreshInterval(let interval)):
             PanelSettings.weatherRefreshInterval = interval
             applyWeatherConfiguration()
+        case .schedule(.calendarIDs(let identifiers)):
+            PanelSettings.scheduleCalendarIDs = identifiers
+            applyScheduleConfiguration()
+        case .schedule(.includeAllDay(let includeAllDay)):
+            PanelSettings.scheduleIncludesAllDay = includeAllDay
+            applyScheduleConfiguration()
+        case .schedule(.refreshInterval(let interval)):
+            PanelSettings.scheduleRefreshInterval = interval
+            applyScheduleConfiguration()
         case .appearance(.cornerRadius(let radius)):
             PanelSettings.cornerRadius = radius
             applyCornerRadius()
@@ -213,6 +231,13 @@ extension AppDelegate {
             location: PanelSettings.weatherLocation,
             unit: PanelSettings.weatherTemperatureUnit,
             refreshInterval: PanelSettings.weatherRefreshInterval)
+    }
+
+    private func applyScheduleConfiguration() {
+        scheduleStore.updateConfiguration(
+            selectedCalendarIDs: PanelSettings.scheduleCalendarIDs,
+            includeAllDay: PanelSettings.scheduleIncludesAllDay,
+            refreshInterval: PanelSettings.scheduleRefreshInterval)
     }
 
     private func closeSettingsPanel() {

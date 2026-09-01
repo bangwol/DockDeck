@@ -14,7 +14,8 @@ final class PanelAppearanceTests: XCTestCase {
         let configuration = PanelDeckConfiguration.legacy(
             order: .terminalRight, enabledPanels: .terminal)
 
-        XCTAssertEqual(configuration.left, [.usage, .systemStats, .serviceMonitor, .weather])
+        XCTAssertEqual(
+            configuration.left, [.usage, .systemStats, .serviceMonitor, .weather, .schedule])
         XCTAssertEqual(configuration.right, [.terminal])
         XCTAssertEqual(configuration.enabled, [.terminal])
         XCTAssertEqual(configuration.side(containing: .terminal), .right)
@@ -31,7 +32,8 @@ final class PanelAppearanceTests: XCTestCase {
         let decoded = try JSONDecoder().decode(PanelDeckConfiguration.self, from: data)
 
         XCTAssertEqual(decoded.left, [.terminal, clock])
-        XCTAssertEqual(decoded.right, [.usage, .systemStats, .serviceMonitor, .weather])
+        XCTAssertEqual(
+            decoded.right, [.usage, .systemStats, .serviceMonitor, .weather, .schedule])
         XCTAssertEqual(decoded.enabled, [clock])
     }
 
@@ -43,7 +45,8 @@ final class PanelAppearanceTests: XCTestCase {
         ).normalized()
 
         XCTAssertEqual(configuration.left, [.terminal])
-        XCTAssertEqual(configuration.right, [.usage, .systemStats, .serviceMonitor, .weather])
+        XCTAssertEqual(
+            configuration.right, [.usage, .systemStats, .serviceMonitor, .weather, .schedule])
     }
 
     func testSettingsModelSwapsCompleteDecksWithoutDroppingFutureModules() {
@@ -63,7 +66,7 @@ final class PanelAppearanceTests: XCTestCase {
 
         XCTAssertEqual(
             model.values.deckConfiguration.left,
-            [.usage, .systemStats, .serviceMonitor, .weather])
+            [.usage, .systemStats, .serviceMonitor, .weather, .schedule])
         XCTAssertEqual(model.values.deckConfiguration.right, [.terminal, clock])
         XCTAssertEqual(persistedConfiguration, model.values.deckConfiguration)
     }
@@ -90,11 +93,15 @@ final class PanelAppearanceTests: XCTestCase {
         XCTAssertEqual(Set(PanelModuleRegistry.all.map(\.id)).count, PanelModuleRegistry.all.count)
         XCTAssertEqual(
             model.availablePanes,
-            [.decks, .terminal, .usage, .systemStats, .serviceMonitor, .weather, .appearance])
+            [
+                .decks, .terminal, .usage, .systemStats, .serviceMonitor, .weather, .schedule,
+                .appearance,
+            ])
         XCTAssertEqual(model.moduleDefinition(for: .usage)?.id, .usage)
         XCTAssertEqual(model.moduleDefinition(for: .systemStats)?.id, .systemStats)
         XCTAssertEqual(model.moduleDefinition(for: .serviceMonitor)?.id, .serviceMonitor)
         XCTAssertEqual(model.moduleDefinition(for: .weather)?.id, .weather)
+        XCTAssertEqual(model.moduleDefinition(for: .schedule)?.id, .schedule)
     }
 
     func testModuleRuntimeCoordinatorStartsAndStopsOnlyChangedModules() {
@@ -321,6 +328,7 @@ final class PanelAppearanceTests: XCTestCase {
             systemStatsStore: SystemStatsStore(),
             serviceMonitorStore: ServiceMonitorStore(),
             weatherStore: WeatherStore(),
+            scheduleStore: ScheduleStore(),
             menuTarget: NSObject())
         let menu = try XCTUnwrap(controller.panel.contentView?.menu)
 
@@ -362,6 +370,8 @@ final class PanelAppearanceTests: XCTestCase {
                 endpoints: [], refreshInterval: 30),
             weather: WeatherSettingsState(
                 location: nil, temperatureUnit: .celsius, refreshInterval: 1_800),
+            schedule: ScheduleSettingsState(
+                calendarIDs: [], includeAllDay: false, refreshInterval: 300),
             appearance: AppearanceSettingsState(
                 cornerRadius: 10, tintOpacity: 0.6))
     }

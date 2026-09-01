@@ -24,6 +24,7 @@ struct ReadOnlyDeckPanelView: View {
     @ObservedObject var systemStatsStore: SystemStatsStore
     @ObservedObject var serviceMonitorStore: ServiceMonitorStore
     @ObservedObject var weatherStore: WeatherStore
+    @ObservedObject var scheduleStore: ScheduleStore
     let activeModule: PanelModuleID?
     let theme: Theme
 
@@ -37,6 +38,8 @@ struct ReadOnlyDeckPanelView: View {
             ServiceMonitorPanelView(store: serviceMonitorStore, theme: theme)
         case .weather:
             WeatherPanelView(store: weatherStore, theme: theme)
+        case .schedule:
+            SchedulePanelView(store: scheduleStore, theme: theme)
         default:
             EmptyView()
         }

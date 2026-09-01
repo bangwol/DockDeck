@@ -18,7 +18,7 @@
   <sub>Compact terminal and configurable Codex and Claude usage beside the macOS Dock. Open the image for full resolution.</sub>
 </p>
 
-DockDeck uses the space beside a bottom-aligned Dock for two compact developer panels. The terminal stays interactive while a read-only Deck hosts Usage, System Stats, Service Monitor, and Weather modules; either Deck can be hidden or placed on either side. Both follow the Dock across displays, Spaces, and auto-hide transitions.
+DockDeck uses the space beside a bottom-aligned Dock for two compact developer panels. The terminal stays interactive while a read-only Deck hosts Usage, System Stats, Service Monitor, Weather, and Schedule modules; either Deck can be hidden or placed on either side. Both follow the Dock across displays, Spaces, and auto-hide transitions.
 
 ## Features
 
@@ -27,6 +27,7 @@ DockDeck uses the space beside a bottom-aligned Dock for two compact developer p
 - Local CPU, memory, and disk utilization with a configurable 1–10 second sampling interval.
 - HTTPS service availability and latency checks for up to four user-configured endpoints.
 - Current temperature, daily high and low, and conditions for a user-selected city.
+- Current or next macOS Calendar event with a live elapsed-time bar.
 - Dock-aware, symmetric placement across displays, Spaces, and auto-hide transitions.
 - Read-only module Deck with manual module switching; right-click it to select a module or open its settings.
 - A shared sidebar-based Settings window with Deck cards, module detail pages, side placement, and independent module visibility controls.
@@ -68,6 +69,12 @@ On macOS 15 or later, the first local-network check can show Apple's Local Netwo
 Weather uses the [Open-Meteo Forecast API](https://open-meteo.com/en/docs) and [Geocoding API](https://open-meteo.com/en/docs/geocoding-api). Search for a city under **Settings → Weather**, select one result, and enable the module. DockDeck does not use IP geolocation or request macOS Location permission. It stores the selected city and coordinates in local preferences; search text and coordinates are sent over HTTPS only when searching or while the enabled module refreshes. Requests use an ephemeral session without persistent caches, cookies, or credential storage.
 
 The built-in `api.open-meteo.com` service is keyless and limited to non-commercial use. Its weather and location data are [CC BY 4.0](https://open-meteo.com/en/license), so the compact panel and Settings include the required Open-Meteo attribution link. DockDeck rounds temperatures and maps weather codes to labels and SF Symbols for display. Review [Open-Meteo's terms and privacy details](https://open-meteo.com/en/terms) before enabling the module; commercial distributions need a suitable commercial API arrangement and are not supported by the current keyless provider.
+
+## Reading your schedule
+
+Schedule reads upcoming events through Apple's EventKit framework and shows the current event, elapsed progress, or the next event. Enable **Settings → Decks → Schedule**, then press **Request Access** under **Settings → Schedule**. DockDeck never triggers the system Calendar permission prompt merely by launching or enabling the module. On current macOS releases, Apple requires full Calendar access to fetch events even for a read-only app; DockDeck never calls EventKit's save, edit, or delete APIs. See Apple's [EventKit access guidance](https://developer.apple.com/documentation/eventkit/ekeventstore/requestfullaccesstoevents%28completion%3A%29) and [calendar purpose-string reference](https://developer.apple.com/documentation/bundleresources/information-property-list/nscalendarsfullaccessusagedescription).
+
+DockDeck retains only event title, start and end times, all-day state, and calendar name in memory. It persists only selected calendar identifiers and module settings, does not store or log events, and makes no calendar-related network request. Disabling Schedule stops its timer, removes its EventKit observer, releases the event store, and clears the in-memory event list. Google and other accounts appear only when their calendars are enabled for macOS under **System Settings → Internet Accounts**; signing into a provider in Safari alone does not connect it to EventKit.
 
 ## Requirements
 
@@ -163,6 +170,7 @@ DockDeck does not read browser cookies, browser credential stores, or private we
 | System Stats | macOS host and file-system APIs | Samples CPU, physical memory, and startup-volume capacity locally |
 | Service Monitor | User-configured HTTPS or local HTTP URLs | Sends cookie-free `HEAD` requests; rejects common URL credential fields before local storage |
 | Weather | Open-Meteo forecast and geocoding APIs | Sends submitted searches and selected coordinates over HTTPS only while used; stores the selected city locally |
+| Schedule | Apple EventKit | Reads selected calendars into memory after explicit permission; never saves, edits, logs, or uploads events |
 
 The Claude cache is written atomically to:
 

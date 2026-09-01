@@ -82,6 +82,9 @@ extension AppDelegate {
         if PanelSettings.enabledReadOnlyModules.contains(.weather) {
             weatherStore.refresh()
         }
+        if PanelSettings.enabledReadOnlyModules.contains(.schedule) {
+            scheduleStore.refreshAuthorization()
+        }
         refreshCoarseCaches()
         startTrackingTimer()
         runEvaluation()

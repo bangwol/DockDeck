@@ -88,6 +88,10 @@ cat > "$APP_PATH/Contents/Info.plist" <<EOF
     </dict>
     <key>NSLocalNetworkUsageDescription</key>
     <string>DockDeck checks local service URLs that you add to Service Monitor.</string>
+    <key>NSCalendarsFullAccessUsageDescription</key>
+    <string>DockDeck reads upcoming event titles and times for Schedule. It never changes calendars.</string>
+    <key>NSCalendarsUsageDescription</key>
+    <string>DockDeck reads upcoming event titles and times for Schedule. It never changes calendars.</string>
     <key>LSUIElement</key>
     <true/>
 </dict>

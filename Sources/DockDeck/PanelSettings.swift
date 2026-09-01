@@ -82,9 +82,10 @@ struct PanelModuleID: Hashable, Codable {
     static let systemStats = PanelModuleID(rawValue: "system-stats")
     static let serviceMonitor = PanelModuleID(rawValue: "service-monitor")
     static let weather = PanelModuleID(rawValue: "weather")
+    static let schedule = PanelModuleID(rawValue: "schedule")
 
     static let readOnlyBuiltIns: [PanelModuleID] = [
-        .usage, .systemStats, .serviceMonitor, .weather,
+        .usage, .systemStats, .serviceMonitor, .weather, .schedule,
     ]
 
     init(rawValue: String) {
@@ -192,6 +193,8 @@ enum PanelSettings {
     static let serviceMonitorRefreshIntervals: [TimeInterval] = [15, 30, 60, 120]
     static let defaultWeatherRefreshInterval: TimeInterval = 30 * 60
     static let weatherRefreshIntervals: [TimeInterval] = [15 * 60, 30 * 60, 60 * 60]
+    static let defaultScheduleRefreshInterval: TimeInterval = 5 * 60
+    static let scheduleRefreshIntervals: [TimeInterval] = [60, 5 * 60, 15 * 60]
 
     private static let cornerRadiusKey = "DockDeck.settings.cornerRadius"
     private static let tintOpacityKey = "DockDeck.settings.tintOpacity"
@@ -212,6 +215,9 @@ enum PanelSettings {
     private static let weatherLocationKey = "DockDeck.settings.weatherLocation"
     private static let weatherTemperatureUnitKey = "DockDeck.settings.weatherTemperatureUnit"
     private static let weatherRefreshIntervalKey = "DockDeck.settings.weatherRefreshInterval"
+    private static let scheduleCalendarIDsKey = "DockDeck.settings.scheduleCalendarIDs"
+    private static let scheduleIncludesAllDayKey = "DockDeck.settings.scheduleIncludesAllDay"
+    private static let scheduleRefreshIntervalKey = "DockDeck.settings.scheduleRefreshInterval"
     private static let panelOrderKey = "DockDeck.settings.panelOrder"
     private static let enabledPanelsKey = "DockDeck.settings.enabledPanels"
     private static let panelDeckConfigurationKey =
@@ -437,6 +443,45 @@ enum PanelSettings {
         }
     }
 
+    static var scheduleCalendarIDs: [String] {
+        get {
+            normalizedScheduleCalendarIDs(
+                UserDefaults.standard.stringArray(forKey: scheduleCalendarIDsKey) ?? [])
+        }
+        set {
+            UserDefaults.standard.set(
+                normalizedScheduleCalendarIDs(newValue), forKey: scheduleCalendarIDsKey)
+        }
+    }
+
+    static var scheduleIncludesAllDay: Bool {
+        get {
+            let defaults = UserDefaults.standard
+            guard defaults.object(forKey: scheduleIncludesAllDayKey) != nil else { return false }
+            return defaults.bool(forKey: scheduleIncludesAllDayKey)
+        }
+        set { UserDefaults.standard.set(newValue, forKey: scheduleIncludesAllDayKey) }
+    }
+
+    static var scheduleRefreshInterval: TimeInterval {
+        get {
+            let defaults = UserDefaults.standard
+            guard defaults.object(forKey: scheduleRefreshIntervalKey) != nil else {
+                return defaultScheduleRefreshInterval
+            }
+            let value = defaults.double(forKey: scheduleRefreshIntervalKey)
+            return scheduleRefreshIntervals.min(by: {
+                abs($0 - value) < abs($1 - value)
+            }) ?? defaultScheduleRefreshInterval
+        }
+        set {
+            let value = scheduleRefreshIntervals.min(by: {
+                abs($0 - newValue) < abs($1 - newValue)
+            }) ?? defaultScheduleRefreshInterval
+            UserDefaults.standard.set(value, forKey: scheduleRefreshIntervalKey)
+        }
+    }
+
     static var enabledPanels: EnabledPanels {
         get {
             var panels: EnabledPanels = []
@@ -532,6 +577,9 @@ enum PanelSettings {
         defaults.removeObject(forKey: weatherLocationKey)
         defaults.removeObject(forKey: weatherTemperatureUnitKey)
         defaults.removeObject(forKey: weatherRefreshIntervalKey)
+        defaults.removeObject(forKey: scheduleCalendarIDsKey)
+        defaults.removeObject(forKey: scheduleIncludesAllDayKey)
+        defaults.removeObject(forKey: scheduleRefreshIntervalKey)
         defaults.removeObject(forKey: panelOrderKey)
         defaults.removeObject(forKey: enabledPanelsKey)
         defaults.removeObject(forKey: panelDeckConfigurationKey)
@@ -578,6 +626,19 @@ enum PanelSettings {
             guard seen.insert(endpoint.id).inserted else { continue }
             result.append(endpoint)
             if result.count == ServiceMonitorEndpoint.maximumCount { break }
+        }
+        return result
+    }
+
+    private static func normalizedScheduleCalendarIDs(_ identifiers: [String]) -> [String] {
+        var seen: Set<String> = []
+        var result: [String] = []
+        for value in identifiers {
+            let value = String(
+                value.trimmingCharacters(in: .whitespacesAndNewlines).prefix(512))
+            guard !value.isEmpty, seen.insert(value).inserted else { continue }
+            result.append(value)
+            if result.count == 100 { break }
         }
         return result
     }

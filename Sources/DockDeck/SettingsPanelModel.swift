@@ -8,6 +8,7 @@ enum SettingsPaneID: String, CaseIterable, Identifiable {
     case systemStats
     case serviceMonitor
     case weather
+    case schedule
     case appearance
 
     var id: Self { self }
@@ -20,6 +21,7 @@ enum SettingsPaneID: String, CaseIterable, Identifiable {
         case .systemStats: "System Stats"
         case .serviceMonitor: "Service Monitor"
         case .weather: "Weather"
+        case .schedule: "Schedule"
         case .appearance: "Appearance"
         }
     }
@@ -32,6 +34,7 @@ enum SettingsPaneID: String, CaseIterable, Identifiable {
         case .systemStats: "Monitor local CPU, memory, and disk usage."
         case .serviceMonitor: "Check the availability of your services."
         case .weather: "Show current conditions for a selected city."
+        case .schedule: "Show the current or next calendar event."
         case .appearance: "Adjust the shared panel surface."
         }
     }
@@ -44,6 +47,7 @@ enum SettingsPaneID: String, CaseIterable, Identifiable {
         case .systemStats: "gauge.with.dots.needle.67percent"
         case .serviceMonitor: "network"
         case .weather: "cloud.sun"
+        case .schedule: "calendar"
         case .appearance: "paintbrush"
         }
     }
@@ -76,6 +80,9 @@ enum PanelModuleRegistry {
         PanelModuleDefinition(
             id: .weather, title: "Weather", subtitle: "Selected-city conditions",
             symbolName: "cloud.sun", settingsPane: .weather),
+        PanelModuleDefinition(
+            id: .schedule, title: "Schedule", subtitle: "Current and next event",
+            symbolName: "calendar", settingsPane: .schedule),
     ]
 
     static func definition(for id: PanelModuleID) -> PanelModuleDefinition? {
@@ -116,6 +123,12 @@ struct WeatherSettingsState: Equatable {
     var refreshInterval: TimeInterval
 }
 
+struct ScheduleSettingsState: Equatable {
+    var calendarIDs: [String]
+    var includeAllDay: Bool
+    var refreshInterval: TimeInterval
+}
+
 struct AppearanceSettingsState: Equatable {
     var cornerRadius: CGFloat
     var tintOpacity: CGFloat
@@ -128,6 +141,7 @@ struct SettingsPanelValues: Equatable {
     var systemStats: SystemStatsSettingsState
     var serviceMonitor: ServiceMonitorSettingsState
     var weather: WeatherSettingsState
+    var schedule: ScheduleSettingsState
     var appearance: AppearanceSettingsState
 
     func normalized() -> Self {
@@ -165,6 +179,12 @@ enum WeatherSettingsChange {
     case refreshInterval(TimeInterval)
 }
 
+enum ScheduleSettingsChange {
+    case calendarIDs([String])
+    case includeAllDay(Bool)
+    case refreshInterval(TimeInterval)
+}
+
 enum AppearanceSettingsChange {
     case cornerRadius(CGFloat)
     case tintOpacity(CGFloat)
@@ -177,6 +197,7 @@ enum SettingsPanelChange {
     case systemStats(SystemStatsSettingsChange)
     case serviceMonitor(ServiceMonitorSettingsChange)
     case weather(WeatherSettingsChange)
+    case schedule(ScheduleSettingsChange)
     case appearance(AppearanceSettingsChange)
 }
 
@@ -396,6 +417,41 @@ final class SettingsPanelModel: ObservableObject {
         onChange?(.weather(.refreshInterval(selected)))
     }
 
+    func isScheduleCalendarEnabled(_ id: String, availableIDs: [String]) -> Bool {
+        resolvedScheduleCalendarIDs(availableIDs: availableIDs).contains(id)
+    }
+
+    func canDisableScheduleCalendar(_ id: String, availableIDs: [String]) -> Bool {
+        let selected = resolvedScheduleCalendarIDs(availableIDs: availableIDs)
+        return !selected.contains(id) || selected.count > 1
+    }
+
+    func setScheduleCalendar(_ id: String, enabled: Bool, availableIDs: [String]) {
+        var selected = resolvedScheduleCalendarIDs(availableIDs: availableIDs)
+        if enabled {
+            selected.insert(id)
+        } else {
+            guard selected.count > 1 else { return }
+            selected.remove(id)
+        }
+        let identifiers = availableIDs.filter(selected.contains)
+        updateValues { $0.schedule.calendarIDs = identifiers }
+        onChange?(.schedule(.calendarIDs(identifiers)))
+    }
+
+    func setScheduleIncludesAllDay(_ value: Bool) {
+        updateValues { $0.schedule.includeAllDay = value }
+        onChange?(.schedule(.includeAllDay(value)))
+    }
+
+    func setScheduleRefreshInterval(_ value: TimeInterval) {
+        let selected = PanelSettings.scheduleRefreshIntervals.min(by: {
+            abs($0 - value) < abs($1 - value)
+        }) ?? PanelSettings.defaultScheduleRefreshInterval
+        updateValues { $0.schedule.refreshInterval = selected }
+        onChange?(.schedule(.refreshInterval(selected)))
+    }
+
     func setValues(_ values: SettingsPanelValues) {
         self.values = values.normalized()
         if !availablePanes.contains(selectedPane) { selectedPane = .decks }
@@ -442,5 +498,10 @@ final class SettingsPanelModel: ObservableObject {
         let endpoints = Array(endpoints.prefix(ServiceMonitorEndpoint.maximumCount))
         updateValues { $0.serviceMonitor.endpoints = endpoints }
         onChange?(.serviceMonitor(.endpoints(endpoints)))
+    }
+
+    private func resolvedScheduleCalendarIDs(availableIDs: [String]) -> Set<String> {
+        let stored = Set(values.schedule.calendarIDs)
+        return stored.isEmpty ? Set(availableIDs) : Set(availableIDs.filter(stored.contains))
     }
 }

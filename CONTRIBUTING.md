@@ -46,6 +46,10 @@ swift test
   hosts. Do not add IP geolocation or request Location permission. Preserve
   visible attribution, the non-commercial free-API warning, and disabled-state
   network shutdown.
+- Keep Schedule read-only and permission-on-button only. Fetch EventKit data
+  off the main thread, map only the displayed fields into value types, and
+  release the event store and observer when disabled. Never log or persist
+  event content.
 - Read-only modules share the read-only Deck and must render correctly at the
   compact panel size before they are registered. Keep module switching manual
   and predictable; do not add automatic rotation, drag reordering, or module
