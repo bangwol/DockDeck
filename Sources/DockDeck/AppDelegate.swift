@@ -4,6 +4,8 @@ import CoreGraphics
 import SwiftTerm
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
+    static let accessibilityWarmupDelay: TimeInterval = 3
+
     var terminalPanelController: TerminalPanelController!
     var quotaPanelController: QuotaPanelController!
     lazy var usageStore = UsageStore { [weak self] message in
@@ -111,21 +113,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
         }
 
-        if !accessibilityTrusted {
-            installFallbackHintIfNeeded()
-            updateFallbackHintVisibility()
-        }
-
         terminalPanelController.startShell()
         usageStore.start()
 
         startTrackingTimer()
 
         if !accessibilityTrusted {
-            let promptOptions =
-                [kAXTrustedCheckOptionPrompt.takeUnretainedValue(): true] as CFDictionary
-            let promptDelay: TimeInterval = hasLaunchedBefore ? 0 : 1.2
-            DispatchQueue.main.asyncAfter(deadline: .now() + promptDelay) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + Self.accessibilityWarmupDelay) {
+                [weak self] in
+                guard let self else { return }
+                self.refreshCoarseCaches()
+                guard !self.accessibilityTrusted else { return }
+
+                self.installFallbackHintIfNeeded()
+                self.updateFallbackHintVisibility()
+                guard !hasLaunchedBefore else { return }
+
+                let promptOptions =
+                    [kAXTrustedCheckOptionPrompt.takeUnretainedValue(): true] as CFDictionary
                 _ = AXIsProcessTrustedWithOptions(promptOptions)
             }
         }

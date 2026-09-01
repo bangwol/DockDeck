@@ -82,7 +82,15 @@ This produces a universal, ad-hoc signed `DockDeck.app` and `DockDeck.zip`. It d
 ./scripts/install.sh
 ```
 
-The installer creates a self-signed local code-signing certificate in the login Keychain and registers a per-user LaunchAgent. This keeps the app's Accessibility identity stable across local rebuilds. Review the script before running it.
+The installer registers a per-user LaunchAgent and prefers the sole Apple Development identity in the login Keychain. Its Apple-anchored designated requirement keeps Accessibility approval stable across local rebuilds. No certificate name or account information is written to the repository.
+
+If there is no single Apple Development identity, the installer creates a self-signed local fallback. Current macOS releases may require Accessibility approval again after rebuilding with that fallback. Select a different installed identity explicitly when needed:
+
+```bash
+DOCKDECK_SIGNING_IDENTITY="certificate name or SHA-1 hash" ./scripts/install.sh
+```
+
+Review the script before running it.
 
 To remove the LaunchAgent:
 

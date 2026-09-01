@@ -3,29 +3,22 @@
 # to start at every future login. Safe to re-run (e.g. after a rebuild) —
 # it just rebuilds, repackages, and reloads it.
 #
-# Packages the binary into a minimal .app bundle and code-signs it with a
-# local, self-signed certificate (created on first run, see below), rather
+# Packages the binary into a minimal .app bundle and code-signs it rather
 # than running the raw executable directly. This matters specifically for
 # Accessibility permission (needed to track the Dock's geometry): a process
-# launched by launchd (as this one is, once installed) has no "responsible"
-# parent app to inherit trust from the way a process launched from Terminal
-# does, so it needs its own stable TCC identity.
+# launched by launchd needs its own stable TCC identity.
 #
-# Ad-hoc signing (`codesign --sign -`) is NOT enough for that stability,
-# even with a fixed --identifier: with no real signing authority behind it,
-# TCC still anchors trust to the binary's content hash under the hood, which
-# changes on every rebuild. A certificate-based signature anchors trust to
-# the certificate instead, which stays stable across rebuilds regardless of
-# what changes in the code. It doesn't need to be a paid Apple Developer ID
-# for this to work — a local, self-signed certificate is enough, since the
-# binary only ever runs locally via launchd and is never distributed or
-# downloaded (which is what Gatekeeper's stricter trust-chain checks are
-# actually for).
+# The sole Apple Development identity is preferred because its Apple-anchored
+# designated requirement stays stable across rebuilds. Set
+# DOCKDECK_SIGNING_IDENTITY to select another identity. If neither is
+# available, the installer creates a local self-signed fallback; current
+# macOS releases may require Accessibility approval again after a rebuild
+# when that fallback is used.
 set -euo pipefail
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 LABEL="com.dockdeck.app"
-CERT_NAME="DockDeck Local Signing"
+LOCAL_CERT_NAME="DockDeck Local Signing"
 LOGIN_KEYCHAIN="$HOME/Library/Keychains/login.keychain-db"
 BUILD_DIR="$REPO_DIR/.build/release"
 BIN_PATH="$BUILD_DIR/DockDeck"
@@ -37,8 +30,32 @@ LICENSES_PATH="$APP_PATH/Contents/Resources/Licenses"
 PLIST_PATH="$HOME/Library/LaunchAgents/$LABEL.plist"
 LOG_PATH="$HOME/Library/Logs/DockDeck.log"
 
-if ! security find-certificate -c "$CERT_NAME" "$LOGIN_KEYCHAIN" >/dev/null 2>&1; then
-    echo "Creating local code-signing certificate ($CERT_NAME)..."
+SIGNING_IDENTITY="${DOCKDECK_SIGNING_IDENTITY:-}"
+SIGNING_SOURCE="configured"
+
+if [ -z "$SIGNING_IDENTITY" ]; then
+    AVAILABLE_IDENTITIES="$(security find-identity -v -p codesigning "$LOGIN_KEYCHAIN")"
+    APPLE_DEVELOPMENT_COUNT="$({ printf '%s\n' "$AVAILABLE_IDENTITIES" || true; } \
+        | awk '/"Apple Development:/{count++} END{print count+0}')"
+    APPLE_DEVELOPMENT_IDENTITY="$({ printf '%s\n' "$AVAILABLE_IDENTITIES" || true; } \
+        | awk '/"Apple Development:/{identity=$2; count++} END{if(count==1) print identity}')"
+
+    if [ "$APPLE_DEVELOPMENT_COUNT" -eq 1 ]; then
+        SIGNING_IDENTITY="$APPLE_DEVELOPMENT_IDENTITY"
+        SIGNING_SOURCE="apple-development"
+    else
+        SIGNING_IDENTITY="$LOCAL_CERT_NAME"
+        SIGNING_SOURCE="local"
+        if [ "$APPLE_DEVELOPMENT_COUNT" -gt 1 ]; then
+            echo "Multiple Apple Development identities found."
+            echo "Set DOCKDECK_SIGNING_IDENTITY to select one explicitly."
+        fi
+    fi
+fi
+
+if [ "$SIGNING_SOURCE" = "local" ] \
+    && ! security find-certificate -c "$LOCAL_CERT_NAME" "$LOGIN_KEYCHAIN" >/dev/null 2>&1; then
+    echo "Creating local code-signing certificate ($LOCAL_CERT_NAME)..."
     echo "macOS will likely ask for your login password once, to confirm"
     echo "trusting this new certificate for code signing."
     CERT_DIR="$(mktemp -d)"
@@ -46,7 +63,7 @@ if ! security find-certificate -c "$CERT_NAME" "$LOGIN_KEYCHAIN" >/dev/null 2>&1
     CERT_PASSWORD="$(openssl rand -hex 32)"
 
     openssl req -x509 -newkey rsa:2048 -keyout "$CERT_DIR/key.pem" -out "$CERT_DIR/cert.pem" \
-        -days 3650 -nodes -subj "/CN=$CERT_NAME" \
+        -days 3650 -nodes -subj "/CN=$LOCAL_CERT_NAME" \
         -addext "keyUsage=digitalSignature" \
         -addext "extendedKeyUsage=codeSigning" \
         -addext "basicConstraints=critical,CA:false"
@@ -70,6 +87,14 @@ if ! security find-certificate -c "$CERT_NAME" "$LOGIN_KEYCHAIN" >/dev/null 2>&1
         -k "$LOGIN_KEYCHAIN" "$CERT_DIR/cert.pem"
 
     echo "Certificate created and trusted for code signing."
+fi
+
+if [ "$SIGNING_SOURCE" = "apple-development" ]; then
+    echo "Using the available Apple Development signing identity."
+elif [ "$SIGNING_SOURCE" = "configured" ]; then
+    echo "Using DOCKDECK_SIGNING_IDENTITY."
+else
+    echo "Using the local self-signed fallback."
 fi
 
 echo "Building release binary..."
@@ -105,7 +130,7 @@ cat > "$APP_PATH/Contents/Info.plist" <<EOF
 </plist>
 EOF
 
-codesign --force --deep --sign "$CERT_NAME" --identifier "$LABEL" "$APP_PATH"
+codesign --force --deep --sign "$SIGNING_IDENTITY" --identifier "$LABEL" "$APP_PATH"
 
 mkdir -p "$HOME/Library/LaunchAgents"
 
@@ -137,7 +162,7 @@ echo "Installed and started."
 echo
 echo "If the panel isn't tracking the Dock, check System Settings ->"
 echo "Privacy & Security -> Accessibility for a \"DockDeck\" entry and"
-echo "make sure it's enabled — it should now persist across rebuilds."
+echo "make sure it's enabled."
 echo
 echo "Turn off (stops it now, and skips it at future logins):"
 echo "  launchctl unload $PLIST_PATH"
