@@ -162,6 +162,8 @@ final class ScheduleTests: XCTestCase {
                 location: nil, temperatureUnit: .celsius, refreshInterval: 1_800),
             schedule: ScheduleSettingsState(
                 calendarIDs: [], includeAllDay: false, refreshInterval: 300),
+            clock: ClockSettingsState(
+                timeZoneIdentifier: ClockTimeZone.systemIdentifier, hourFormat: .system),
             appearance: AppearanceSettingsState(cornerRadius: 10, tintOpacity: 0.6))
     }
 }

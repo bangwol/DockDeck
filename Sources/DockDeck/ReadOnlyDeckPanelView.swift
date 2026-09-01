@@ -25,6 +25,7 @@ struct ReadOnlyDeckPanelView: View {
     @ObservedObject var serviceMonitorStore: ServiceMonitorStore
     @ObservedObject var weatherStore: WeatherStore
     @ObservedObject var scheduleStore: ScheduleStore
+    @ObservedObject var clockStore: ClockStore
     let activeModule: PanelModuleID?
     let theme: Theme
 
@@ -40,6 +41,12 @@ struct ReadOnlyDeckPanelView: View {
             WeatherPanelView(store: weatherStore, theme: theme)
         case .schedule:
             SchedulePanelView(store: scheduleStore, theme: theme)
+        case .clock:
+            ClockPanelView(
+                store: clockStore,
+                theme: theme,
+                timeZoneIdentifier: PanelSettings.clockTimeZoneIdentifier,
+                hourFormat: PanelSettings.clockHourFormat)
         default:
             EmptyView()
         }

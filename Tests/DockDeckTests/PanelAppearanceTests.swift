@@ -15,26 +15,28 @@ final class PanelAppearanceTests: XCTestCase {
             order: .terminalRight, enabledPanels: .terminal)
 
         XCTAssertEqual(
-            configuration.left, [.usage, .systemStats, .serviceMonitor, .weather, .schedule])
+            configuration.left,
+            [.usage, .systemStats, .serviceMonitor, .weather, .schedule, .clock])
         XCTAssertEqual(configuration.right, [.terminal])
         XCTAssertEqual(configuration.enabled, [.terminal])
         XCTAssertEqual(configuration.side(containing: .terminal), .right)
     }
 
     func testDeckConfigurationKeepsFutureModulesWhileRemovingDuplicates() throws {
-        let clock = PanelModuleID(rawValue: "clock")
+        let futureModule = PanelModuleID(rawValue: "future-clock")
         let configuration = PanelDeckConfiguration(
-            left: [.terminal, clock, .terminal],
-            right: [.usage, clock],
-            enabled: [clock, clock]
+            left: [.terminal, futureModule, .terminal],
+            right: [.usage, futureModule],
+            enabled: [futureModule, futureModule]
         ).normalized()
         let data = try JSONEncoder().encode(configuration)
         let decoded = try JSONDecoder().decode(PanelDeckConfiguration.self, from: data)
 
-        XCTAssertEqual(decoded.left, [.terminal, clock])
+        XCTAssertEqual(decoded.left, [.terminal, futureModule])
         XCTAssertEqual(
-            decoded.right, [.usage, .systemStats, .serviceMonitor, .weather, .schedule])
-        XCTAssertEqual(decoded.enabled, [clock])
+            decoded.right,
+            [.usage, .systemStats, .serviceMonitor, .weather, .schedule, .clock])
+        XCTAssertEqual(decoded.enabled, [futureModule])
     }
 
     func testDeckConfigurationKeepsReadOnlyModulesOppositeTerminal() {
@@ -46,15 +48,16 @@ final class PanelAppearanceTests: XCTestCase {
 
         XCTAssertEqual(configuration.left, [.terminal])
         XCTAssertEqual(
-            configuration.right, [.usage, .systemStats, .serviceMonitor, .weather, .schedule])
+            configuration.right,
+            [.usage, .systemStats, .serviceMonitor, .weather, .schedule, .clock])
     }
 
     func testSettingsModelSwapsCompleteDecksWithoutDroppingFutureModules() {
-        let clock = PanelModuleID(rawValue: "clock")
+        let futureModule = PanelModuleID(rawValue: "future-clock")
         let model = makeSettingsModel(
             configuration: PanelDeckConfiguration(
-                left: [.terminal, clock], right: [.usage],
-                enabled: [.terminal, .usage, clock]))
+                left: [.terminal, futureModule], right: [.usage],
+                enabled: [.terminal, .usage, futureModule]))
         var persistedConfiguration: PanelDeckConfiguration?
         model.onChange = {
             if case .deck(let configuration) = $0 {
@@ -66,8 +69,8 @@ final class PanelAppearanceTests: XCTestCase {
 
         XCTAssertEqual(
             model.values.deckConfiguration.left,
-            [.usage, .systemStats, .serviceMonitor, .weather, .schedule])
-        XCTAssertEqual(model.values.deckConfiguration.right, [.terminal, clock])
+            [.usage, .systemStats, .serviceMonitor, .weather, .schedule, .clock])
+        XCTAssertEqual(model.values.deckConfiguration.right, [.terminal, futureModule])
         XCTAssertEqual(persistedConfiguration, model.values.deckConfiguration)
     }
 
@@ -95,13 +98,14 @@ final class PanelAppearanceTests: XCTestCase {
             model.availablePanes,
             [
                 .decks, .terminal, .usage, .systemStats, .serviceMonitor, .weather, .schedule,
-                .appearance,
+                .clock, .appearance,
             ])
         XCTAssertEqual(model.moduleDefinition(for: .usage)?.id, .usage)
         XCTAssertEqual(model.moduleDefinition(for: .systemStats)?.id, .systemStats)
         XCTAssertEqual(model.moduleDefinition(for: .serviceMonitor)?.id, .serviceMonitor)
         XCTAssertEqual(model.moduleDefinition(for: .weather)?.id, .weather)
         XCTAssertEqual(model.moduleDefinition(for: .schedule)?.id, .schedule)
+        XCTAssertEqual(model.moduleDefinition(for: .clock)?.id, .clock)
     }
 
     func testModuleRuntimeCoordinatorStartsAndStopsOnlyChangedModules() {
@@ -329,6 +333,7 @@ final class PanelAppearanceTests: XCTestCase {
             serviceMonitorStore: ServiceMonitorStore(),
             weatherStore: WeatherStore(),
             scheduleStore: ScheduleStore(),
+            clockStore: ClockStore(),
             menuTarget: NSObject())
         let menu = try XCTUnwrap(controller.panel.contentView?.menu)
 
@@ -372,6 +377,8 @@ final class PanelAppearanceTests: XCTestCase {
                 location: nil, temperatureUnit: .celsius, refreshInterval: 1_800),
             schedule: ScheduleSettingsState(
                 calendarIDs: [], includeAllDay: false, refreshInterval: 300),
+            clock: ClockSettingsState(
+                timeZoneIdentifier: ClockTimeZone.systemIdentifier, hourFormat: .system),
             appearance: AppearanceSettingsState(
                 cornerRadius: 10, tintOpacity: 0.6))
     }

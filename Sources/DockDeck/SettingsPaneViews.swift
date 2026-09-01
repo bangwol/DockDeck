@@ -580,7 +580,7 @@ private struct SettingsSliderRow: View {
     }
 }
 
-private struct SettingsPickerRow<Content: View>: View {
+struct SettingsPickerRow<Content: View>: View {
     let title: String
     @ViewBuilder let content: () -> Content
 

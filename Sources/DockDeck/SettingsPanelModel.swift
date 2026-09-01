@@ -9,6 +9,7 @@ enum SettingsPaneID: String, CaseIterable, Identifiable {
     case serviceMonitor
     case weather
     case schedule
+    case clock
     case appearance
 
     var id: Self { self }
@@ -22,6 +23,7 @@ enum SettingsPaneID: String, CaseIterable, Identifiable {
         case .serviceMonitor: "Service Monitor"
         case .weather: "Weather"
         case .schedule: "Schedule"
+        case .clock: "World Clock"
         case .appearance: "Appearance"
         }
     }
@@ -35,6 +37,7 @@ enum SettingsPaneID: String, CaseIterable, Identifiable {
         case .serviceMonitor: "Check the availability of your services."
         case .weather: "Show current conditions for a selected city."
         case .schedule: "Show the current or next calendar event."
+        case .clock: "Show local time or another time zone."
         case .appearance: "Adjust the shared panel surface."
         }
     }
@@ -48,6 +51,7 @@ enum SettingsPaneID: String, CaseIterable, Identifiable {
         case .serviceMonitor: "network"
         case .weather: "cloud.sun"
         case .schedule: "calendar"
+        case .clock: "clock"
         case .appearance: "paintbrush"
         }
     }
@@ -83,6 +87,9 @@ enum PanelModuleRegistry {
         PanelModuleDefinition(
             id: .schedule, title: "Schedule", subtitle: "Current and next event",
             symbolName: "calendar", settingsPane: .schedule),
+        PanelModuleDefinition(
+            id: .clock, title: "World Clock", subtitle: "Local or selected time zone",
+            symbolName: "clock", settingsPane: .clock),
     ]
 
     static func definition(for id: PanelModuleID) -> PanelModuleDefinition? {
@@ -129,6 +136,11 @@ struct ScheduleSettingsState: Equatable {
     var refreshInterval: TimeInterval
 }
 
+struct ClockSettingsState: Equatable {
+    var timeZoneIdentifier: String
+    var hourFormat: ClockHourFormat
+}
+
 struct AppearanceSettingsState: Equatable {
     var cornerRadius: CGFloat
     var tintOpacity: CGFloat
@@ -142,6 +154,7 @@ struct SettingsPanelValues: Equatable {
     var serviceMonitor: ServiceMonitorSettingsState
     var weather: WeatherSettingsState
     var schedule: ScheduleSettingsState
+    var clock: ClockSettingsState
     var appearance: AppearanceSettingsState
 
     func normalized() -> Self {
@@ -185,6 +198,11 @@ enum ScheduleSettingsChange {
     case refreshInterval(TimeInterval)
 }
 
+enum ClockSettingsChange {
+    case timeZoneIdentifier(String)
+    case hourFormat(ClockHourFormat)
+}
+
 enum AppearanceSettingsChange {
     case cornerRadius(CGFloat)
     case tintOpacity(CGFloat)
@@ -198,6 +216,7 @@ enum SettingsPanelChange {
     case serviceMonitor(ServiceMonitorSettingsChange)
     case weather(WeatherSettingsChange)
     case schedule(ScheduleSettingsChange)
+    case clock(ClockSettingsChange)
     case appearance(AppearanceSettingsChange)
 }
 
@@ -450,6 +469,17 @@ final class SettingsPanelModel: ObservableObject {
         }) ?? PanelSettings.defaultScheduleRefreshInterval
         updateValues { $0.schedule.refreshInterval = selected }
         onChange?(.schedule(.refreshInterval(selected)))
+    }
+
+    func setClockTimeZoneIdentifier(_ value: String) {
+        let identifier = ClockTimeZone.normalized(identifier: value)
+        updateValues { $0.clock.timeZoneIdentifier = identifier }
+        onChange?(.clock(.timeZoneIdentifier(identifier)))
+    }
+
+    func setClockHourFormat(_ value: ClockHourFormat) {
+        updateValues { $0.clock.hourFormat = value }
+        onChange?(.clock(.hourFormat(value)))
     }
 
     func setValues(_ values: SettingsPanelValues) {

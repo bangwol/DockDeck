@@ -83,9 +83,10 @@ struct PanelModuleID: Hashable, Codable {
     static let serviceMonitor = PanelModuleID(rawValue: "service-monitor")
     static let weather = PanelModuleID(rawValue: "weather")
     static let schedule = PanelModuleID(rawValue: "schedule")
+    static let clock = PanelModuleID(rawValue: "clock")
 
     static let readOnlyBuiltIns: [PanelModuleID] = [
-        .usage, .systemStats, .serviceMonitor, .weather, .schedule,
+        .usage, .systemStats, .serviceMonitor, .weather, .schedule, .clock,
     ]
 
     init(rawValue: String) {
@@ -218,6 +219,9 @@ enum PanelSettings {
     private static let scheduleCalendarIDsKey = "DockDeck.settings.scheduleCalendarIDs"
     private static let scheduleIncludesAllDayKey = "DockDeck.settings.scheduleIncludesAllDay"
     private static let scheduleRefreshIntervalKey = "DockDeck.settings.scheduleRefreshInterval"
+    private static let clockTimeZoneIdentifierKey =
+        "DockDeck.settings.clockTimeZoneIdentifier"
+    private static let clockHourFormatKey = "DockDeck.settings.clockHourFormat"
     private static let panelOrderKey = "DockDeck.settings.panelOrder"
     private static let enabledPanelsKey = "DockDeck.settings.enabledPanels"
     private static let panelDeckConfigurationKey =
@@ -482,6 +486,27 @@ enum PanelSettings {
         }
     }
 
+    static var clockTimeZoneIdentifier: String {
+        get {
+            ClockTimeZone.normalized(
+                identifier: UserDefaults.standard.string(forKey: clockTimeZoneIdentifierKey)
+                    ?? ClockTimeZone.systemIdentifier)
+        }
+        set {
+            UserDefaults.standard.set(
+                ClockTimeZone.normalized(identifier: newValue),
+                forKey: clockTimeZoneIdentifierKey)
+        }
+    }
+
+    static var clockHourFormat: ClockHourFormat {
+        get {
+            UserDefaults.standard.string(forKey: clockHourFormatKey)
+                .flatMap(ClockHourFormat.init(rawValue:)) ?? .system
+        }
+        set { UserDefaults.standard.set(newValue.rawValue, forKey: clockHourFormatKey) }
+    }
+
     static var enabledPanels: EnabledPanels {
         get {
             var panels: EnabledPanels = []
@@ -580,6 +605,8 @@ enum PanelSettings {
         defaults.removeObject(forKey: scheduleCalendarIDsKey)
         defaults.removeObject(forKey: scheduleIncludesAllDayKey)
         defaults.removeObject(forKey: scheduleRefreshIntervalKey)
+        defaults.removeObject(forKey: clockTimeZoneIdentifierKey)
+        defaults.removeObject(forKey: clockHourFormatKey)
         defaults.removeObject(forKey: panelOrderKey)
         defaults.removeObject(forKey: enabledPanelsKey)
         defaults.removeObject(forKey: panelDeckConfigurationKey)

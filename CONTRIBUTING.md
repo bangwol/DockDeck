@@ -50,6 +50,8 @@ swift test
   off the main thread, map only the displayed fields into value types, and
   release the event store and observer when disabled. Never log or persist
   event content.
+- Keep World Clock local and minute-aligned. Do not add network time services;
+  stop its timer when the module is disabled.
 - Read-only modules share the read-only Deck and must render correctly at the
   compact panel size before they are registered. Keep module switching manual
   and predictable; do not add automatic rotation, drag reordering, or module

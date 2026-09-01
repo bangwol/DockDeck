@@ -151,6 +151,9 @@ extension AppDelegate {
                 calendarIDs: PanelSettings.scheduleCalendarIDs,
                 includeAllDay: PanelSettings.scheduleIncludesAllDay,
                 refreshInterval: PanelSettings.scheduleRefreshInterval),
+            clock: ClockSettingsState(
+                timeZoneIdentifier: PanelSettings.clockTimeZoneIdentifier,
+                hourFormat: PanelSettings.clockHourFormat),
             appearance: AppearanceSettingsState(
                 cornerRadius: PanelSettings.cornerRadius,
                 tintOpacity: PanelSettings.tintOpacity
@@ -217,6 +220,12 @@ extension AppDelegate {
         case .schedule(.refreshInterval(let interval)):
             PanelSettings.scheduleRefreshInterval = interval
             applyScheduleConfiguration()
+        case .clock(.timeZoneIdentifier(let identifier)):
+            PanelSettings.clockTimeZoneIdentifier = identifier
+            readOnlyDeckPanelController.applySettings()
+        case .clock(.hourFormat(let format)):
+            PanelSettings.clockHourFormat = format
+            readOnlyDeckPanelController.applySettings()
         case .appearance(.cornerRadius(let radius)):
             PanelSettings.cornerRadius = radius
             applyCornerRadius()

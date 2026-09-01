@@ -138,6 +138,8 @@ private struct SettingsRootView: View {
             WeatherSettingsView(model: model)
         case .schedule:
             ScheduleSettingsView(model: model, store: scheduleStore)
+        case .clock:
+            ClockSettingsView(model: model)
         case .appearance:
             AppearanceSettingsView(model: model)
         }
