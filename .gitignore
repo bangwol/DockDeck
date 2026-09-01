@@ -1,0 +1,36 @@
+# Build output
+.build/
+.build-arm64/
+.build-x86_64/
+build/
+dist/
+DockDeck.zip
+
+# Environment and local secrets
+.env
+.env.*
+!.env.example
+.envrc
+.direnv/
+*.log
+
+# Editor and Apple tool state
+.DS_Store
+.idea/
+.fleet/
+.vscode/
+.zed/
+.swiftpm/
+DerivedData/
+xcuserdata/
+*.xcuserstate
+.xcode.env.local
+
+# Local AI and MCP tooling
+.claude/
+.codex/
+.agents/
+.cursor/
+.mcp.json
+AGENTS.local.md
+CLAUDE.local.md
