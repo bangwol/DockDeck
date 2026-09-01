@@ -14,10 +14,15 @@ APP_BIN_PATH="$APP_PATH/Contents/MacOS/DockDeck"
 APP_BRIDGE_PATH="$APP_PATH/Contents/Resources/bin/dockdeck-claude-bridge"
 LICENSES_PATH="$APP_PATH/Contents/Resources/Licenses"
 VERSION="$(tr -d '[:space:]' < "$REPO_DIR/VERSION")"
-ZIP_NAME="DockDeck-$VERSION-macos-universal.zip"
+SIGNING_IDENTITY="${DOCKDECK_SIGNING_IDENTITY:--}"
+
+if [ "$SIGNING_IDENTITY" = "-" ]; then
+    ZIP_NAME="DockDeck-$VERSION-macos-universal-unsigned.zip"
+else
+    ZIP_NAME="DockDeck-$VERSION-macos-universal.zip"
+fi
 ZIP_PATH="$REPO_DIR/$ZIP_NAME"
 CHECKSUM_PATH="$ZIP_PATH.sha256"
-SIGNING_IDENTITY="${DOCKDECK_SIGNING_IDENTITY:--}"
 
 if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
     echo "VERSION must contain three numeric components (for example, 0.1.0)." >&2
@@ -85,10 +90,13 @@ plutil -lint "$APP_PATH/Contents/Info.plist" >/dev/null
 
 if [ "$SIGNING_IDENTITY" = "-" ]; then
     echo "Ad-hoc signing $APP_PATH..."
-    codesign --force --deep --options runtime --sign - --identifier "$LABEL" "$APP_PATH"
+    codesign --force --options runtime --sign - "$APP_BRIDGE_PATH"
+    codesign --force --options runtime --sign - --identifier "$LABEL" "$APP_PATH"
 else
     echo "Signing $APP_PATH with the configured identity..."
-    codesign --force --deep --options runtime --timestamp \
+    codesign --force --options runtime --timestamp --sign "$SIGNING_IDENTITY" \
+        "$APP_BRIDGE_PATH"
+    codesign --force --options runtime --timestamp \
         --sign "$SIGNING_IDENTITY" --identifier "$LABEL" "$APP_PATH"
 fi
 
@@ -97,7 +105,12 @@ lipo "$APP_BIN_PATH" -verify_arch arm64 x86_64
 lipo "$APP_BRIDGE_PATH" -verify_arch arm64 x86_64
 
 echo "Zipping..."
-rm -f "$REPO_DIR/DockDeck.zip" "$ZIP_PATH" "$CHECKSUM_PATH"
+rm -f \
+    "$REPO_DIR/DockDeck.zip" \
+    "$REPO_DIR/DockDeck-$VERSION-macos-universal.zip" \
+    "$REPO_DIR/DockDeck-$VERSION-macos-universal.zip.sha256" \
+    "$REPO_DIR/DockDeck-$VERSION-macos-universal-unsigned.zip" \
+    "$REPO_DIR/DockDeck-$VERSION-macos-universal-unsigned.zip.sha256"
 ditto -c -k --keepParent --norsrc --noextattr --noqtn --noacl "$APP_PATH" "$ZIP_PATH"
 
 VERIFY_DIR="$(mktemp -d)"

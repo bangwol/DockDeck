@@ -84,10 +84,10 @@ if [ "$SIGNING_SOURCE" = "local" ] \
         -inkey "$CERT_DIR/key.pem" -in "$CERT_DIR/cert.pem" \
         -passout "pass:$CERT_PASSWORD"
 
-    # -T grants codesign key access without a keychain-unlock prompt on
-    # every future run.
+    # Restrict private-key access to codesign. Do not use security import's
+    # -A option, which grants every local application direct key access.
     security import "$CERT_DIR/cert.p12" -k "$LOGIN_KEYCHAIN" \
-        -P "$CERT_PASSWORD" -T /usr/bin/codesign -A
+        -P "$CERT_PASSWORD" -T /usr/bin/codesign
     unset CERT_PASSWORD
 
     # No -d: this trusts the cert for the *user's* login keychain only,
@@ -148,7 +148,8 @@ cat > "$APP_PATH/Contents/Info.plist" <<EOF
 EOF
 
 plutil -lint "$APP_PATH/Contents/Info.plist" >/dev/null
-codesign --force --deep --options runtime --sign "$SIGNING_IDENTITY" \
+codesign --force --options runtime --sign "$SIGNING_IDENTITY" "$APP_BRIDGE_PATH"
+codesign --force --options runtime --sign "$SIGNING_IDENTITY" \
     --identifier "$LABEL" "$APP_PATH"
 
 launchctl unload "$PLIST_PATH" 2>/dev/null || true

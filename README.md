@@ -49,6 +49,16 @@ Click the terminal to expand it. Drag any edge to resize it; DockDeck restores t
 
 Without Accessibility permission, DockDeck remains usable in fixed fallback positions. Only a bottom-aligned Dock is tracked precisely; side-aligned Docks use the fallback layout.
 
+## Preview distribution
+
+DockDeck does not yet publish a Developer ID-signed and notarized stable binary. Until that is available, installing from source with `./scripts/install.sh` is the recommended preview path.
+
+GitHub preview releases may include an explicitly labeled `unsigned` ZIP for technical evaluation. It is ad-hoc signed, so macOS requires manual approval in **System Settings → Privacy & Security → Open Anyway**, and an update may require Accessibility approval again. Preview artifacts built by GitHub Actions include a SHA-256 file and build-provenance attestation:
+
+```bash
+gh attestation verify DockDeck-*-unsigned.zip -R bangwol/DockDeck
+```
+
 ## Reading the usage panel
 
 Every percentage and filled bar represents capacity **remaining**, not capacity used. For example, `22%` means 22% remains and 78% has been used.
@@ -104,7 +114,7 @@ The uninstall script removes the login item only. It leaves the installed app, l
 ./scripts/package.sh
 ```
 
-This produces a universal, ad-hoc signed `DockDeck.app`, a versioned ZIP such as `DockDeck-0.1.0-macos-universal.zip`, and its SHA-256 file without changing login items or the Keychain. Use these artifacts for local QA. Test the ZIP in a fresh macOS account or another Mac so its ad-hoc Accessibility identity does not conflict with the source-installed app.
+This produces a universal, ad-hoc signed `DockDeck.app`, a versioned ZIP such as `DockDeck-0.1.0-macos-universal-unsigned.zip`, and its SHA-256 file without changing login items or the Keychain. Use these artifacts for local QA. Test the ZIP in a fresh macOS account or another Mac so its ad-hoc Accessibility identity does not conflict with the source-installed app.
 
 Public binary distribution requires [Developer ID signing](https://developer.apple.com/support/developer-id/) and [notarization](https://developer.apple.com/documentation/security/notarizing-macos-software-before-distribution). A signing identity can be selected for a release candidate, but the result must still be notarized before publication:
 
@@ -225,6 +235,10 @@ test -f "$HOME/Library/Application Support/DockDeck/claude-rate-limits.json" \
 ```
 
 If the cache is missing, confirm the Claude Code version and run `/status` inside Claude Code to verify that user settings were loaded.
+
+## Security
+
+Report suspected vulnerabilities through [GitHub private vulnerability reporting](https://github.com/bangwol/DockDeck/security/advisories/new), not a public issue. See [SECURITY.md](SECURITY.md) for the supported channels and reporting details.
 
 ## Project lineage
 
