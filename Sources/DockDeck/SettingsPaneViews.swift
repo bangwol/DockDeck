@@ -1,0 +1,366 @@
+import Cocoa
+import SwiftUI
+
+struct DecksSettingsView: View {
+    @ObservedObject var model: SettingsPanelModel
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                HStack(alignment: .top, spacing: 14) {
+                    DeckPreviewCard(side: .left, model: model)
+                    DeckPreviewCard(side: .right, model: model)
+                }
+
+                GroupBox {
+                    VStack(spacing: 0) {
+                        ForEach(Array(model.moduleDefinitions.enumerated()), id: \.element.id) {
+                            index, definition in
+                            if index > 0 { Divider() }
+                            ModuleSettingsRow(definition: definition, model: model)
+                        }
+                    }
+                } label: {
+                    Label("Modules", systemImage: "square.grid.2x2")
+                        .font(.headline)
+                }
+
+                HStack {
+                    Button(action: model.swapDecks) {
+                        Label("Swap Left and Right Decks", systemImage: "arrow.left.arrow.right")
+                    }
+                    .buttonStyle(.bordered)
+                    Spacer()
+                    Text("At least one module stays visible.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .padding(24)
+        }
+    }
+}
+
+struct TerminalSettingsView: View {
+    @ObservedObject var model: SettingsPanelModel
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                GroupBox {
+                    VStack(spacing: 14) {
+                        SettingsSliderRow(
+                            title: "Width",
+                            valueText: String(
+                                format: "%.2f×", model.values.terminal.focusWidthMultiplier),
+                            value: Binding(
+                                get: {
+                                    Double(model.values.terminal.focusWidthMultiplier)
+                                },
+                                set: { model.setFocusWidthMultiplier(CGFloat($0)) }),
+                            range: Double(DockPanelLayout.minimumFocusedWidthMultiplier)
+                                ... Double(DockPanelLayout.maximumFocusedWidthMultiplier),
+                            step: 0.25)
+                        SettingsSliderRow(
+                            title: "Height",
+                            valueText: String(
+                                format: "%.2f×", model.values.terminal.focusHeightMultiplier),
+                            value: Binding(
+                                get: {
+                                    Double(model.values.terminal.focusHeightMultiplier)
+                                },
+                                set: { model.setFocusHeightMultiplier(CGFloat($0)) }),
+                            range: Double(DockPanelLayout.minimumFocusedHeightMultiplier)
+                                ... Double(DockPanelLayout.maximumFocusedHeightMultiplier),
+                            step: 0.25)
+                    }
+                    .padding(.top, 4)
+                } label: {
+                    Label("Focused Size", systemImage: "arrow.up.left.and.arrow.down.right")
+                        .font(.headline)
+                }
+
+                GroupBox {
+                    SettingsPickerRow(title: "Font") {
+                        Picker(
+                            "Terminal font",
+                            selection: Binding(
+                                get: { model.values.terminal.fontName },
+                                set: model.setTerminalFontName)
+                        ) {
+                            ForEach(model.fontNames, id: \.self) { Text($0).tag($0) }
+                        }
+                        .labelsHidden()
+                        .frame(width: 230)
+                    }
+                    .padding(.top, 4)
+                } label: {
+                    Label("Text", systemImage: "textformat")
+                        .font(.headline)
+                }
+            }
+            .padding(24)
+        }
+    }
+}
+
+struct UsageSettingsView: View {
+    @ObservedObject var model: SettingsPanelModel
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                GroupBox {
+                    SettingsPickerRow(title: "Values") {
+                        Picker(
+                            "Usage values",
+                            selection: Binding(
+                                get: { model.values.usage.displayMode },
+                                set: model.setUsageDisplayMode)
+                        ) {
+                            ForEach(UsageDisplayMode.allCases, id: \.self) {
+                                Text($0.title).tag($0)
+                            }
+                        }
+                        .labelsHidden()
+                        .pickerStyle(.segmented)
+                        .frame(width: 230)
+                    }
+                    .padding(.top, 4)
+                } label: {
+                    Label("Display", systemImage: "percent")
+                        .font(.headline)
+                }
+
+                GroupBox {
+                    VStack(spacing: 14) {
+                        SettingsPickerRow(title: "Font") {
+                            Picker(
+                                "Usage font",
+                                selection: Binding(
+                                    get: { model.values.usage.fontName },
+                                    set: model.setUsageFontName)
+                            ) {
+                                ForEach(model.fontNames, id: \.self) { Text($0).tag($0) }
+                            }
+                            .labelsHidden()
+                            .frame(width: 230)
+                        }
+                        SettingsSliderRow(
+                            title: "Size",
+                            valueText: String(
+                                format: "%.0f pt", model.values.usage.fontSize),
+                            value: Binding(
+                                get: { Double(model.values.usage.fontSize) },
+                                set: { model.setUsageFontSize(CGFloat($0)) }),
+                            range: Double(PanelSettings.minimumUsageFontSize)
+                                ... Double(PanelSettings.maximumUsageFontSize),
+                            step: 1)
+                        SettingsPickerRow(title: "Color") {
+                            Picker(
+                                "Usage text color",
+                                selection: Binding(
+                                    get: { model.values.usage.textColor },
+                                    set: model.setUsageTextColor)
+                            ) {
+                                ForEach(UsageTextColor.allCases, id: \.self) {
+                                    Text($0.title).tag($0)
+                                }
+                            }
+                            .labelsHidden()
+                            .frame(width: 230)
+                        }
+                    }
+                    .padding(.top, 4)
+                } label: {
+                    Label("Text", systemImage: "textformat")
+                        .font(.headline)
+                }
+            }
+            .padding(24)
+        }
+    }
+}
+
+struct AppearanceSettingsView: View {
+    @ObservedObject var model: SettingsPanelModel
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                GroupBox {
+                    VStack(spacing: 14) {
+                        SettingsSliderRow(
+                            title: "Corner Radius",
+                            valueText: String(
+                                format: "%.0f pt", model.values.appearance.cornerRadius),
+                            value: Binding(
+                                get: { Double(model.values.appearance.cornerRadius) },
+                                set: { model.setCornerRadius(CGFloat($0)) }),
+                            range: 0...24,
+                            step: 1)
+                        SettingsSliderRow(
+                            title: "Theme Tint",
+                            valueText: String(
+                                format: "%.0f%%", model.values.appearance.tintOpacity * 100),
+                            value: Binding(
+                                get: { Double(model.values.appearance.tintOpacity) },
+                                set: { model.setTintOpacity(CGFloat($0)) }),
+                            range: 0.2...1,
+                            step: 0.01)
+                    }
+                    .padding(.top, 4)
+                } label: {
+                    Label("Panel Surface", systemImage: "circle.lefthalf.filled")
+                        .font(.headline)
+                }
+
+                GroupBox {
+                    HStack {
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text("Reset Settings")
+                            Text("Restore Decks, Terminal, Usage, and Appearance defaults.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        Button("Reset to Defaults") { model.onReset?() }
+                    }
+                    .padding(.vertical, 6)
+                } label: {
+                    Label("Defaults", systemImage: "arrow.counterclockwise")
+                        .font(.headline)
+                }
+            }
+            .padding(24)
+        }
+    }
+}
+
+private struct DeckPreviewCard: View {
+    let side: PanelSide
+    @ObservedObject var model: SettingsPanelModel
+
+    private var title: String { side == .left ? "Left Deck" : "Right Deck" }
+
+    var body: some View {
+        GroupBox {
+            VStack(spacing: 8) {
+                ForEach(model.moduleDefinitions(on: side)) { definition in
+                    HStack(spacing: 10) {
+                        Image(systemName: definition.symbolName)
+                            .frame(width: 18)
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text(definition.title)
+                                .fontWeight(.medium)
+                            Text(definition.subtitle)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        Image(
+                            systemName: model.isEnabled(definition.id)
+                                ? "checkmark.circle.fill" : "circle.dashed")
+                            .foregroundStyle(
+                                model.isEnabled(definition.id) ? Color.accentColor : .secondary)
+                    }
+                    .padding(10)
+                    .background(
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(Color(nsColor: .controlBackgroundColor)))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8)
+                            .stroke(Color.primary.opacity(0.08)))
+                    .opacity(model.isEnabled(definition.id) ? 1 : 0.55)
+                }
+            }
+            .frame(maxWidth: .infinity, minHeight: 74, alignment: .top)
+        } label: {
+            Label(title, systemImage: "rectangle.stack")
+                .font(.headline)
+        }
+        .frame(maxWidth: .infinity)
+    }
+}
+
+private struct ModuleSettingsRow: View {
+    let definition: PanelModuleDefinition
+    @ObservedObject var model: SettingsPanelModel
+
+    private var sideTitle: String {
+        switch model.side(containing: definition.id) {
+        case .left: "Left"
+        case .right: "Right"
+        case nil: "Unplaced"
+        }
+    }
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: definition.symbolName)
+                .font(.system(size: 16))
+                .foregroundStyle(.secondary)
+                .frame(width: 22)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(definition.title)
+                Text(definition.subtitle)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+            Text(sideTitle)
+                .font(.caption.weight(.medium))
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 3)
+                .background(Capsule().fill(Color.primary.opacity(0.06)))
+            Toggle(
+                "Show \(definition.title)",
+                isOn: Binding(
+                    get: { model.isEnabled(definition.id) },
+                    set: { model.setEnabled($0, for: definition.id) }))
+                .labelsHidden()
+                .disabled(!model.canDisable(definition.id))
+                .help(
+                    model.canDisable(definition.id)
+                        ? "Show or hide \(definition.title)"
+                        : "DockDeck keeps one module visible so Settings remains accessible")
+        }
+        .padding(.vertical, 10)
+        .padding(.horizontal, 4)
+    }
+}
+
+private struct SettingsSliderRow: View {
+    let title: String
+    let valueText: String
+    @Binding var value: Double
+    let range: ClosedRange<Double>
+    let step: Double
+
+    var body: some View {
+        VStack(spacing: 6) {
+            HStack {
+                Text(title)
+                Spacer()
+                Text(valueText)
+                    .foregroundStyle(.secondary)
+                    .monospacedDigit()
+            }
+            Slider(value: $value, in: range, step: step)
+        }
+    }
+}
+
+private struct SettingsPickerRow<Content: View>: View {
+    let title: String
+    @ViewBuilder let content: () -> Content
+
+    var body: some View {
+        HStack {
+            Text(title)
+            Spacer()
+            content()
+        }
+    }
+}

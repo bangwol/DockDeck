@@ -27,12 +27,13 @@ swift test
 
 ## Settings and modules
 
-- Give every panel module a stable `PanelModuleID` and add its label and symbol
-  to `PanelModuleDefinition`.
+- Give every panel module a stable `PanelModuleID` and register its metadata and
+  optional settings pane in `PanelModuleRegistry`.
 - Keep placement and visibility in `PanelDeckConfiguration`; its versioned
   storage preserves unknown module IDs for forward compatibility.
-- Put module-specific controls in their own settings pane. Keep shared surface
-  controls under Appearance.
+- Keep module state and change events in `SettingsPanelModel`, module-specific
+  controls in `SettingsPaneViews`, and window hosting in `SettingsPanelView`.
+- Keep shared surface controls under Appearance.
 - Do not expose stacking, drag reordering, or module installation before the
   panel runtime implements the same behavior.
 

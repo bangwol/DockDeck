@@ -46,58 +46,15 @@ extension AppDelegate {
         UserDefaults.standard.set(pane.rawValue, forKey: AppPreferences.settingsPaneKey)
         let view = SettingsPanelView(
             selectedPane: pane,
-            deckConfiguration: PanelSettings.deckConfiguration,
-            cornerRadius: PanelSettings.cornerRadius,
-            tintOpacity: PanelSettings.tintOpacity ?? currentTheme.panelTintColor.alphaComponent,
-            focusWidthMultiplier: PanelSettings.focusWidthMultiplier,
-            focusHeightMultiplier: PanelSettings.focusHeightMultiplier,
-            fontNames: TerminalTheme.installedFontNames,
-            selectedTerminalFontName: PanelSettings.fontName ?? TerminalTheme.defaultFontName,
-            selectedUsageFontName: PanelSettings.usageFontName ?? TerminalTheme.defaultFontName,
-            usageFontSize: PanelSettings.usageFontSize,
-            usageDisplayMode: PanelSettings.usageDisplayMode,
-            usageTextColor: PanelSettings.usageTextColor)
+            values: currentSettingsValues,
+            fontNames: TerminalTheme.installedFontNames)
 
         view.onPaneChange = { [weak self] pane in
             UserDefaults.standard.set(pane.rawValue, forKey: AppPreferences.settingsPaneKey)
             self?.settingsPanel?.title = pane.windowTitle
         }
-        view.onDeckConfigurationChange = { [weak self] configuration in
-            PanelSettings.deckConfiguration = configuration
-            self?.applyPanelVisibility()
-        }
-        view.onCornerRadiusChange = { [weak self] radius in
-            PanelSettings.cornerRadius = radius
-            self?.applyCornerRadius()
-        }
-        view.onTintOpacityChange = { [weak self] opacity in
-            PanelSettings.tintOpacity = opacity
-            self?.applyTintOpacity()
-        }
-        view.onTerminalFontChange = { [weak self] name in
-            PanelSettings.fontName = name
-            self?.applyFont()
-        }
-        view.onFocusSizeChange = { [weak self] width, height in
-            PanelSettings.focusWidthMultiplier = width
-            PanelSettings.focusHeightMultiplier = height
-            self?.resizeFocusedTerminalIfNeeded()
-        }
-        view.onUsageDisplayModeChange = { [weak self] mode in
-            PanelSettings.usageDisplayMode = mode
-            self?.quotaPanelController.applySettings()
-        }
-        view.onUsageFontChange = { [weak self] name in
-            PanelSettings.usageFontName = name
-            self?.quotaPanelController.applySettings()
-        }
-        view.onUsageFontSizeChange = { [weak self] size in
-            PanelSettings.usageFontSize = size
-            self?.quotaPanelController.applySettings()
-        }
-        view.onUsageTextColorChange = { [weak self] color in
-            PanelSettings.usageTextColor = color
-            self?.quotaPanelController.applySettings()
+        view.onChange = { [weak self] change in
+            self?.applySettingsChange(change)
         }
         view.onReset = { [weak self, weak view] in
             guard let self else { return }
@@ -107,17 +64,7 @@ extension AppDelegate {
             self.applyFont()
             self.quotaPanelController.applySettings()
             self.applyPanelVisibility()
-            view?.setValues(
-                deckConfiguration: PanelSettings.deckConfiguration,
-                cornerRadius: PanelSettings.cornerRadius,
-                tintOpacity: self.currentTheme.panelTintColor.alphaComponent,
-                focusWidthMultiplier: PanelSettings.focusWidthMultiplier,
-                focusHeightMultiplier: PanelSettings.focusHeightMultiplier,
-                terminalFontName: TerminalTheme.defaultFontName,
-                usageFontName: TerminalTheme.defaultFontName,
-                usageFontSize: PanelSettings.usageFontSize,
-                usageDisplayMode: PanelSettings.usageDisplayMode,
-                usageTextColor: PanelSettings.usageTextColor)
+            view?.setValues(self.currentSettingsValues)
             self.resizeFocusedTerminalIfNeeded()
         }
         view.onCancel = { [weak self] in
@@ -147,6 +94,57 @@ extension AppDelegate {
         settingsPanelRestoresTerminalFocus = restoreTerminalFocus
         settingsPanel = settingsPanelWindow
         settingsPanelWindow.makeKeyAndOrderFront(nil)
+    }
+
+    private var currentSettingsValues: SettingsPanelValues {
+        SettingsPanelValues(
+            deckConfiguration: PanelSettings.deckConfiguration,
+            terminal: TerminalSettingsState(
+                focusWidthMultiplier: PanelSettings.focusWidthMultiplier,
+                focusHeightMultiplier: PanelSettings.focusHeightMultiplier,
+                fontName: PanelSettings.fontName ?? TerminalTheme.defaultFontName),
+            usage: UsageSettingsState(
+                fontName: PanelSettings.usageFontName ?? TerminalTheme.defaultFontName,
+                fontSize: PanelSettings.usageFontSize,
+                displayMode: PanelSettings.usageDisplayMode,
+                textColor: PanelSettings.usageTextColor),
+            appearance: AppearanceSettingsState(
+                cornerRadius: PanelSettings.cornerRadius,
+                tintOpacity: PanelSettings.tintOpacity
+                    ?? currentTheme.panelTintColor.alphaComponent))
+    }
+
+    private func applySettingsChange(_ change: SettingsPanelChange) {
+        switch change {
+        case .deck(let configuration):
+            PanelSettings.deckConfiguration = configuration
+            applyPanelVisibility()
+        case .terminal(.focusSize(let width, let height)):
+            PanelSettings.focusWidthMultiplier = width
+            PanelSettings.focusHeightMultiplier = height
+            resizeFocusedTerminalIfNeeded()
+        case .terminal(.font(let name)):
+            PanelSettings.fontName = name
+            applyFont()
+        case .usage(.displayMode(let mode)):
+            PanelSettings.usageDisplayMode = mode
+            quotaPanelController.applySettings()
+        case .usage(.font(let name)):
+            PanelSettings.usageFontName = name
+            quotaPanelController.applySettings()
+        case .usage(.fontSize(let size)):
+            PanelSettings.usageFontSize = size
+            quotaPanelController.applySettings()
+        case .usage(.textColor(let color)):
+            PanelSettings.usageTextColor = color
+            quotaPanelController.applySettings()
+        case .appearance(.cornerRadius(let radius)):
+            PanelSettings.cornerRadius = radius
+            applyCornerRadius()
+        case .appearance(.tintOpacity(let opacity)):
+            PanelSettings.tintOpacity = opacity
+            applyTintOpacity()
+        }
     }
 
     private func closeSettingsPanel() {

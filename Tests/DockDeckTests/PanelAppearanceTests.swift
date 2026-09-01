@@ -42,13 +42,17 @@ final class PanelAppearanceTests: XCTestCase {
                 left: [.terminal, clock], right: [.usage],
                 enabled: [.terminal, .usage, clock]))
         var persistedConfiguration: PanelDeckConfiguration?
-        model.onDeckConfigurationChange = { persistedConfiguration = $0 }
+        model.onChange = {
+            if case .deck(let configuration) = $0 {
+                persistedConfiguration = configuration
+            }
+        }
 
         model.swapDecks()
 
-        XCTAssertEqual(model.deckConfiguration.left, [.usage])
-        XCTAssertEqual(model.deckConfiguration.right, [.terminal, clock])
-        XCTAssertEqual(persistedConfiguration, model.deckConfiguration)
+        XCTAssertEqual(model.values.deckConfiguration.left, [.usage])
+        XCTAssertEqual(model.values.deckConfiguration.right, [.terminal, clock])
+        XCTAssertEqual(persistedConfiguration, model.values.deckConfiguration)
     }
 
     func testSettingsModelKeepsTheLastModuleVisible() {
@@ -58,12 +62,34 @@ final class PanelAppearanceTests: XCTestCase {
                 left: [.terminal], right: [.usage, unavailableModule],
                 enabled: [.terminal, unavailableModule]))
         var callbackCount = 0
-        model.onDeckConfigurationChange = { _ in callbackCount += 1 }
+        model.onChange = { _ in callbackCount += 1 }
 
         model.setEnabled(false, for: .terminal)
 
         XCTAssertTrue(model.isEnabled(.terminal))
         XCTAssertEqual(callbackCount, 0)
+    }
+
+    func testModuleRegistryBuildsSettingsSidebarWithoutDuplicateIDs() {
+        let model = makeSettingsModel(
+            configuration: .legacy(order: .terminalLeft, enabledPanels: .all))
+
+        XCTAssertEqual(Set(PanelModuleRegistry.all.map(\.id)).count, PanelModuleRegistry.all.count)
+        XCTAssertEqual(model.availablePanes, [.decks, .terminal, .usage, .appearance])
+    }
+
+    func testSettingsModelEmitsModuleScopedChanges() {
+        let model = makeSettingsModel(
+            configuration: .legacy(order: .terminalLeft, enabledPanels: .all))
+        var emittedSize: CGFloat?
+        model.onChange = {
+            if case .usage(.fontSize(let size)) = $0 { emittedSize = size }
+        }
+
+        model.setUsageFontSize(12.4)
+
+        XCTAssertEqual(model.values.usage.fontSize, 12)
+        XCTAssertEqual(emittedSize, 12)
     }
 
     func testShellRestartPolicyStopsARepeatedExitLoop() {
@@ -116,16 +142,16 @@ final class PanelAppearanceTests: XCTestCase {
     ) -> SettingsPanelModel {
         SettingsPanelModel(
             selectedPane: .decks,
-            deckConfiguration: configuration,
-            cornerRadius: 10,
-            tintOpacity: 0.6,
-            focusWidthMultiplier: 2,
-            focusHeightMultiplier: 4,
-            fontNames: ["Menlo"],
-            terminalFontName: "Menlo",
-            usageFontName: "Menlo",
-            usageFontSize: 10,
-            usageDisplayMode: .remaining,
-            usageTextColor: .theme)
+            values: SettingsPanelValues(
+                deckConfiguration: configuration,
+                terminal: TerminalSettingsState(
+                    focusWidthMultiplier: 2, focusHeightMultiplier: 4,
+                    fontName: "Menlo"),
+                usage: UsageSettingsState(
+                    fontName: "Menlo", fontSize: 10,
+                    displayMode: .remaining, textColor: .theme),
+                appearance: AppearanceSettingsState(
+                    cornerRadius: 10, tintOpacity: 0.6)),
+            fontNames: ["Menlo"])
     }
 }
