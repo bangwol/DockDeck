@@ -165,6 +165,11 @@ final class CodexAppServerProvider {
     private var nextRequestID = 1
     private var active = false
 
+    private static var clientVersion: String {
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
+            ?? "development"
+    }
+
     init(executableURL: URL? = nil) {
         configuredExecutableURL = executableURL
     }
@@ -255,7 +260,7 @@ final class CodexAppServerProvider {
                     "clientInfo": [
                         "name": "dockdeck",
                         "title": "DockDeck",
-                        "version": "0.1.0",
+                        "version": Self.clientVersion,
                     ]
                 ],
             ])

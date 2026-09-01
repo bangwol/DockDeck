@@ -6,8 +6,11 @@ extension AppDelegate {
 
         let appMenuItem = NSMenuItem()
         mainMenu.addItem(appMenuItem)
-        let appMenu = NSMenu()
+        let appMenu = NSMenu(title: "DockDeck")
         appMenuItem.submenu = appMenu
+        appMenu.addItem(
+            withTitle: "About DockDeck", action: #selector(showAbout(_:)), keyEquivalent: "")
+        appMenu.addItem(.separator())
         appMenu.addItem(
             withTitle: "Toggle Expanded", action: #selector(toggleExpanded(_:)), keyEquivalent: "e"
         )
@@ -75,5 +78,10 @@ extension AppDelegate {
         refreshCoarseCaches()
         startTrackingTimer()
         runEvaluation()
+    }
+
+    @objc func showAbout(_ sender: Any?) {
+        NSApp.activate(ignoringOtherApps: true)
+        NSApp.orderFrontStandardAboutPanel(sender)
     }
 }

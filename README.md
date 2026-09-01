@@ -34,7 +34,7 @@ Keyboard shortcuts:
 | --- | --- |
 | `⌘E` | Toggle the manual large terminal mode |
 | `⌘T` | Open the theme picker |
-| `⌘R` | Refresh usage data |
+| `⌘R` | Refresh usage data and Dock layout |
 | `⌘Q` | Quit DockDeck |
 
 Click the terminal to expand it. Drag any edge to resize it; DockDeck restores those proportions the next time it expands. The terminal menu's **Settings…** panel provides the same controls. `⌘E` toggles a separate, fixed 75% large-terminal mode.
@@ -102,10 +102,15 @@ The uninstall script removes the login item only. It leaves the installed app, l
 
 ```bash
 ./scripts/package.sh
-open .build/release-dist/DockDeck.app
 ```
 
-This produces a universal, ad-hoc signed `DockDeck.app` and `DockDeck.zip` without changing login items or the Keychain. Public distribution requires Developer ID signing and notarization.
+This produces a universal, ad-hoc signed `DockDeck.app`, a versioned ZIP such as `DockDeck-0.1.0-macos-universal.zip`, and its SHA-256 file without changing login items or the Keychain. Use these artifacts for local QA. Test the ZIP in a fresh macOS account or another Mac so its ad-hoc Accessibility identity does not conflict with the source-installed app.
+
+Public binary distribution requires [Developer ID signing](https://developer.apple.com/support/developer-id/) and [notarization](https://developer.apple.com/documentation/security/notarizing-macos-software-before-distribution). A signing identity can be selected for a release candidate, but the result must still be notarized before publication:
+
+```bash
+DOCKDECK_SIGNING_IDENTITY="Developer ID Application: Example" ./scripts/package.sh
+```
 
 ## Usage data and privacy
 

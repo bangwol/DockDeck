@@ -1,28 +1,8 @@
 #!/bin/bash
-# Builds a local release .app bundle and zip.
-#
-# Unlike scripts/install.sh, this does NOT touch LaunchAgents, the login
-# keychain, or a local signing certificate -- it ad-hoc signs
-# (`codesign --sign -`) instead. install.sh's cert-based signing exists
-# specifically so a launchd-launched process keeps a stable TCC identity
-# for Accessibility across rebuilds; a downloaded .app is launched
-# interactively (Finder/`open`), which doesn't have that requirement, so
-# plain ad-hoc signing is sufficient for local development. Public
-# distribution still requires Developer ID signing and notarization.
-# No entitlements file is applied, matching install.sh: DockDeck is
-# unsandboxed and needs no entitlements either way.
-#
-# Builds into its own .build/release-dist/, deliberately NOT
-# install.sh's .build/release/ -- that path is also where the
-# LaunchAgent's ProgramArguments points. The two used to collide: running
-# this script after install.sh clobbered the cert-signed
-# .build/release/DockDeck.app with an ad-hoc-signed one, silently
-# breaking Accessibility trust for the already-installed, launchd-run
-# instance (confirmed by hand: `codesign -dvvv` on the clobbered bundle
-# showed `flags=0x2(adhoc)` and a cdhash-pinned designated requirement,
-# not the certificate's). Separate output directories make that
-# collision structurally impossible instead of relying on remembering
-# not to run the two scripts against the same tree.
+# Builds a universal release-candidate app and versioned zip.
+# The default ad-hoc signature is suitable only for local QA. Set
+# DOCKDECK_SIGNING_IDENTITY to create a Developer ID-signed candidate;
+# public distribution still requires notarization.
 set -euo pipefail
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -33,7 +13,16 @@ APP_PATH="$REPO_DIR/.build/release-dist/DockDeck.app"
 APP_BIN_PATH="$APP_PATH/Contents/MacOS/DockDeck"
 APP_BRIDGE_PATH="$APP_PATH/Contents/Resources/bin/dockdeck-claude-bridge"
 LICENSES_PATH="$APP_PATH/Contents/Resources/Licenses"
-ZIP_PATH="$REPO_DIR/DockDeck.zip"
+VERSION="$(tr -d '[:space:]' < "$REPO_DIR/VERSION")"
+ZIP_NAME="DockDeck-$VERSION-macos-universal.zip"
+ZIP_PATH="$REPO_DIR/$ZIP_NAME"
+CHECKSUM_PATH="$ZIP_PATH.sha256"
+SIGNING_IDENTITY="${DOCKDECK_SIGNING_IDENTITY:--}"
+
+if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+    echo "VERSION must contain three numeric components (for example, 0.1.0)." >&2
+    exit 1
+fi
 
 # Two single-arch builds + lipo, not `swift build --arch arm64 --arch
 # x86_64` in one invocation: that form hands the universal-binary step to
@@ -78,20 +67,45 @@ cat > "$APP_PATH/Contents/Info.plist" <<EOF
     <string>AppIcon</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
+    <key>CFBundleInfoDictionaryVersion</key>
+    <string>6.0</string>
+    <key>CFBundleShortVersionString</key>
+    <string>$VERSION</string>
+    <key>CFBundleVersion</key>
+    <string>$VERSION</string>
+    <key>LSMinimumSystemVersion</key>
+    <string>13.0</string>
     <key>LSUIElement</key>
     <true/>
 </dict>
 </plist>
 EOF
 
-echo "Ad-hoc signing $APP_PATH..."
-codesign --force --deep --sign - --identifier "$LABEL" "$APP_PATH"
+plutil -lint "$APP_PATH/Contents/Info.plist" >/dev/null
+
+if [ "$SIGNING_IDENTITY" = "-" ]; then
+    echo "Ad-hoc signing $APP_PATH..."
+    codesign --force --deep --options runtime --sign - --identifier "$LABEL" "$APP_PATH"
+else
+    echo "Signing $APP_PATH with the configured identity..."
+    codesign --force --deep --options runtime --timestamp \
+        --sign "$SIGNING_IDENTITY" --identifier "$LABEL" "$APP_PATH"
+fi
+
+codesign --verify --deep --strict "$APP_PATH"
+lipo "$APP_BIN_PATH" -verify_arch arm64 x86_64
+lipo "$APP_BRIDGE_PATH" -verify_arch arm64 x86_64
 
 echo "Zipping..."
-rm -f "$ZIP_PATH"
-# ditto, not zip: preserves the code signature's extended attributes,
-# which a plain `zip` can silently drop.
-ditto -c -k --keepParent "$APP_PATH" "$ZIP_PATH"
+rm -f "$REPO_DIR/DockDeck.zip" "$ZIP_PATH" "$CHECKSUM_PATH"
+ditto -c -k --keepParent --norsrc --noextattr --noqtn --noacl "$APP_PATH" "$ZIP_PATH"
+
+VERIFY_DIR="$(mktemp -d)"
+trap 'rm -rf "$VERIFY_DIR"' EXIT
+ditto -x -k "$ZIP_PATH" "$VERIFY_DIR"
+codesign --verify --deep --strict "$VERIFY_DIR/DockDeck.app"
+(cd "$REPO_DIR" && shasum -a 256 "$ZIP_NAME" > "$ZIP_NAME.sha256")
 
 echo
 echo "Done: $ZIP_PATH"
+echo "SHA-256: $CHECKSUM_PATH"

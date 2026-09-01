@@ -20,9 +20,13 @@ extension AppDelegate {
                 action: #selector(toggleSettingsPanel(_:)), keyEquivalent: ""))
         menu.addItem(
             NSMenuItem(
-                title: "Refresh Usage",
+                title: "Refresh Usage & Layout",
                 action: #selector(refreshUsage(_:)), keyEquivalent: "r"))
         menu.addItem(.separator())
+        menu.addItem(
+            NSMenuItem(
+                title: "About DockDeck",
+                action: #selector(showAbout(_:)), keyEquivalent: ""))
         menu.addItem(
             NSMenuItem(
                 title: "Quit DockDeck",

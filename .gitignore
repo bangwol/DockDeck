@@ -5,6 +5,8 @@
 build/
 dist/
 DockDeck.zip
+DockDeck-*.zip
+DockDeck-*.zip.sha256
 
 # Environment and local secrets
 .env

@@ -32,6 +32,12 @@ INSTALLED_APP_BIN_PATH="$INSTALLED_APP_PATH/Contents/MacOS/DockDeck"
 PLIST_PATH="$HOME/Library/LaunchAgents/$LABEL.plist"
 LOG_PATH="$HOME/Library/Logs/DockDeck.log"
 LSREGISTER="/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister"
+VERSION="$(tr -d '[:space:]' < "$REPO_DIR/VERSION")"
+
+if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+    echo "VERSION must contain three numeric components (for example, 0.1.0)." >&2
+    exit 1
+fi
 
 SIGNING_IDENTITY="${DOCKDECK_SIGNING_IDENTITY:-}"
 SIGNING_SOURCE="configured"
@@ -127,13 +133,23 @@ cat > "$APP_PATH/Contents/Info.plist" <<EOF
     <string>AppIcon</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
+    <key>CFBundleInfoDictionaryVersion</key>
+    <string>6.0</string>
+    <key>CFBundleShortVersionString</key>
+    <string>$VERSION</string>
+    <key>CFBundleVersion</key>
+    <string>$VERSION</string>
+    <key>LSMinimumSystemVersion</key>
+    <string>13.0</string>
     <key>LSUIElement</key>
     <true/>
 </dict>
 </plist>
 EOF
 
-codesign --force --deep --sign "$SIGNING_IDENTITY" --identifier "$LABEL" "$APP_PATH"
+plutil -lint "$APP_PATH/Contents/Info.plist" >/dev/null
+codesign --force --deep --options runtime --sign "$SIGNING_IDENTITY" \
+    --identifier "$LABEL" "$APP_PATH"
 
 launchctl unload "$PLIST_PATH" 2>/dev/null || true
 mkdir -p "$HOME/Applications"
@@ -184,4 +200,4 @@ echo
 echo "Turn back on:"
 echo "  launchctl load $PLIST_PATH"
 echo
-echo "Uninstall entirely: scripts/uninstall.sh"
+echo "Remove the login item: scripts/uninstall.sh"
