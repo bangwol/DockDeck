@@ -23,10 +23,14 @@ enum ClaudeRateLimitParser {
     struct RateLimits: Decodable {
         let fiveHour: Window?
         let sevenDay: Window?
+        let sevenDayFable: Window?
+        let fable: Window?
 
         enum CodingKeys: String, CodingKey {
             case fiveHour = "five_hour"
             case sevenDay = "seven_day"
+            case sevenDayFable = "seven_day_fable"
+            case fable
         }
     }
 
@@ -55,16 +59,19 @@ enum ClaudeRateLimitParser {
                 "Claude bridge cache has no rate_limits object")
         }
 
-        let candidates: [(Int, Window?)] = [
-            (5 * 60, rateLimits.fiveHour),
-            (7 * 24 * 60, rateLimits.sevenDay),
+        let candidates: [(Int, String?, Window?)] = [
+            (5 * 60, nil, rateLimits.fiveHour),
+            (7 * 24 * 60, nil, rateLimits.sevenDay),
+            // ponytail: replace these aliases when Anthropic documents a Fable status-line key.
+            (0, "FBL", rateLimits.sevenDayFable ?? rateLimits.fable),
         ]
-        let windows = candidates.compactMap { duration, window -> UsageWindow? in
+        let windows = candidates.compactMap { duration, label, window -> UsageWindow? in
             guard let window, let usedPercentage = window.usedPercentage else { return nil }
             return UsageWindow(
                 durationMinutes: duration,
                 usedPercent: min(max(usedPercentage, 0), 100),
-                resetsAt: window.resetsAt.map(Date.init(timeIntervalSince1970:)))
+                resetsAt: window.resetsAt.map(Date.init(timeIntervalSince1970:)),
+                customLabel: label)
         }
         guard !windows.isEmpty else {
             throw UsageProviderError.invalidResponse("Claude returned no quota windows")

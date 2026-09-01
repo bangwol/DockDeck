@@ -23,13 +23,16 @@ The terminal stays interactive on the left. The read-only usage panel stays on t
 ## Features
 
 - A persistent login shell powered by [SwiftTerm](https://github.com/migueldeicaza/SwiftTerm).
-- Live Codex quota data through the official `codex app-server` protocol.
-- Claude quota data from Claude Code's official status-line payload.
+- Remaining Codex quota through the official `codex app-server` protocol.
+- Remaining Claude quota from Claude Code's official status-line payload.
 - Dock-aware positioning, multi-display tracking, and auto-hide behavior.
 - Matching left and right panel widths derived from the smaller side of the Dock.
 - A non-interactive usage panel that cannot steal keyboard focus.
 - A compact `% ` prompt inside DockDeck without changing the user's shell files.
-- Automatic 2× width / 4× height terminal expansion when the terminal is clicked.
+- Automatic terminal expansion when clicked, with remembered size controls.
+- Native edge resizing while click-expanded; the last width and height are restored next time.
+- Native Liquid Glass on macOS 26, with a translucent visual-effect fallback on earlier macOS.
+- Stronger terminal tint while expanded for readable text over any desktop.
 - Manual large terminal mode and built-in appearance controls.
 - Twenty terminal themes with configurable font, tint, and corner radius.
 
@@ -42,15 +45,29 @@ Keyboard shortcuts:
 | `⌘R` | Refresh usage data |
 | `⌘Q` | Quit DockDeck |
 
+Click the terminal to enter its focused size. Drag any window edge to resize it; DockDeck stores the resulting width and height ratios and restores them on the next click. The terminal menu's **Settings…** panel provides the same width and height controls. `⌘E` remains a separate, fixed 75% large-terminal mode.
+
 ## Requirements
 
 - macOS 13 or later
 - Swift 5.9 or later
 - Accessibility permission for precise Dock tracking
 - [Codex CLI](https://github.com/openai/codex) signed in locally for Codex usage data
-- Claude Code with the optional bridge configured for Claude usage data
+- Claude Code `2.1.251` or later with the optional bridge configured for Claude usage data
 
 Without Accessibility permission, DockDeck remains usable in fixed fallback positions. Only a bottom-aligned Dock is tracked precisely; side-aligned Docks use the fallback layout.
+
+## Reading the usage panel
+
+`CODEX` and `CLAUDE` are always written in full. Every percentage and filled bar represents capacity **remaining**, not capacity used. For example, `22%` means 22% remains and 78% has been used.
+
+Codex displays whichever 5-hour and weekly windows the signed-in plan currently returns. A Plus response with both windows shows both; a Pro-or-higher response with only the weekly window shows only `7d`. DockDeck uses the returned window durations instead of hard-coding plan names. See OpenAI's [Codex plan guide](https://help.openai.com/en/articles/11369540-using-codex-with-your-chatgpt-plan/).
+
+Claude displays its 5-hour and weekly windows. `FBL` is added when Claude Code supplies a separate Fable window as `seven_day_fable` or `fable`. Anthropic documents [Fable's plan-specific allowance](https://support.claude.com/en/articles/15424964-claude-fable-5-on-your-plan), but its current status-line reference guarantees only the 5-hour and weekly fields. DockDeck therefore hides unavailable Fable data instead of estimating it.
+
+- More than 50% remaining: normal theme color
+- 20–50% remaining: orange
+- Less than 20% remaining: red
 
 ## Build from source
 
@@ -124,35 +141,101 @@ DockDeck also writes a small zsh startup hook to
 changes only the DockDeck terminal prompt. The directory uses `0700` permissions and the hook
 uses `0600` permissions.
 
-## Configure the Claude bridge
+## Configure Claude Code
 
-DockDeck never edits `~/.claude/settings.json` automatically. Check for an existing `statusLine` entry before changing it.
+Claude quota data reaches DockDeck through Claude Code's supported `statusLine` JSON input. See Anthropic's [Claude Code installation guide](https://code.claude.com/docs/en/installation), [status-line reference](https://code.claude.com/docs/en/statusline), and [settings reference](https://code.claude.com/docs/en/settings).
 
-If DockDeck is installed at `/Applications/DockDeck.app`, a minimal configuration is:
+### 1. Install or update Claude Code
+
+On macOS with Homebrew:
+
+```bash
+brew install --cask claude-code
+```
+
+For an existing Homebrew installation:
+
+```bash
+brew upgrade --cask claude-code
+```
+
+Native installations can update themselves:
+
+```bash
+claude update
+```
+
+Confirm that the installed version is `2.1.251` or later, then start Claude Code once and complete sign-in:
+
+```bash
+claude --version
+claude
+```
+
+Claude Code added `rate_limits` to status-line input in `2.1.251`. The field appears only for supported Claude.ai subscriptions and only after the first API response in a session.
+
+### 2. Locate the DockDeck bridge
+
+After running `./scripts/install.sh` from the repository, the bridge is inside the generated app bundle:
+
+```bash
+cd /path/to/DockDeck
+BRIDGE_PATH="$(pwd)/.build/release/DockDeck.app/Contents/Resources/bin/dockdeck-claude-bridge"
+test -x "$BRIDGE_PATH" && printf '%s\n' "$BRIDGE_PATH"
+```
+
+If DockDeck is copied to `/Applications`, use `/Applications/DockDeck.app/Contents/Resources/bin/dockdeck-claude-bridge` instead.
+
+### 3. Add the status line
+
+DockDeck never edits `~/.claude/settings.json` automatically. Preserve its existing keys and check for an existing `statusLine` before adding this entry:
 
 ```json
 {
   "statusLine": {
     "type": "command",
-    "command": "\"/Applications/DockDeck.app/Contents/Resources/bin/dockdeck-claude-bridge\"",
+    "command": "\"/absolute/path/to/DockDeck/.build/release/DockDeck.app/Contents/Resources/bin/dockdeck-claude-bridge\"",
     "refreshInterval": 60
   }
 }
 ```
 
-To preserve an existing status-line command, pass its output through the bridge:
+Use the absolute path printed in step 2. `~` and shell variables are intentionally avoided inside the JSON command so paths containing spaces remain unambiguous.
+
+To preserve an existing executable status-line script, pass the same JSON input through it:
 
 ```json
 {
   "statusLine": {
     "type": "command",
-    "command": "\"/Applications/DockDeck.app/Contents/Resources/bin/dockdeck-claude-bridge\" --passthrough-shell 'YOUR EXISTING COMMAND'",
+    "command": "\"/absolute/path/to/dockdeck-claude-bridge\" -- /absolute/path/to/existing-statusline",
     "refreshInterval": 60
   }
 }
 ```
 
-Use the actual absolute path if the app is installed elsewhere.
+For an existing inline shell command, use `--passthrough-shell`:
+
+```json
+{
+  "statusLine": {
+    "type": "command",
+    "command": "\"/absolute/path/to/dockdeck-claude-bridge\" --passthrough-shell 'YOUR EXISTING COMMAND'",
+    "refreshInterval": 60
+  }
+}
+```
+
+### 4. Verify the bridge
+
+Start a new `claude` session and send one request. The right panel updates within 60 seconds, or immediately after `⌘R`. Verify that the privacy-filtered cache exists:
+
+```bash
+test -f "$HOME/Library/Application Support/DockDeck/claude-rate-limits.json" \
+  && echo "Claude bridge ready"
+```
+
+If the cache is missing, confirm the Claude Code version and run `/status` inside Claude Code to verify that user settings were loaded.
 
 ## Project lineage
 

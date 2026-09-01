@@ -35,13 +35,23 @@ final class ClaudeBridgeTests: XCTestCase {
             {
               "rate_limits": {
                 "five_hour": { "used_percentage": 35.4 },
-                "seven_day": { "used_percentage": 48.1 }
+                "seven_day": { "used_percentage": 48.1 },
+                "fable": { "used_percentage": 62.8 }
               }
             }
             """#.utf8)
 
         XCTAssertEqual(
             ClaudeBridgePayload.statusLine(from: input),
-            "Claude 5h 35% · 7d 48%")
+            "Claude 5h 65% left · 7d 52% left · FBL 37% left")
+    }
+
+    func testStatusLineClampsRemainingQuota() {
+        let input = Data(
+            #"{"rate_limits":{"five_hour":{"used_percentage":110},"seven_day":{"used_percentage":-5}}}"#.utf8)
+
+        XCTAssertEqual(
+            ClaudeBridgePayload.statusLine(from: input),
+            "Claude 5h 0% left · 7d 100% left")
     }
 }

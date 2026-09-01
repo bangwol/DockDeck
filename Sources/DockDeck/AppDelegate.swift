@@ -18,7 +18,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     var panel: KeyablePanel { terminalPanelController.panel }
     var quotaPanel: NSPanel { quotaPanelController.panel }
     var terminalView: LocalProcessTerminalView { terminalPanelController.terminalView }
-    var tintView: NSView { terminalPanelController.tintView }
     var menuButton: NSButton { terminalPanelController.menuButton }
     var trackingTimer: Timer!
     var terminalLocalMouseMonitor: Any?
@@ -86,6 +85,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             initialFrame: initialQuotaFrame,
             theme: currentTheme,
             store: usageStore)
+        panel.delegate = self
 
         if case .concealed? = initialPresence {
             debugLog("visibility", "launching concealed (auto-hiding Dock is off screen)")

@@ -13,6 +13,8 @@ extension AppDelegate {
         let view = SettingsPanelView(
             cornerRadius: PanelSettings.cornerRadius,
             tintOpacity: PanelSettings.tintOpacity ?? currentTheme.panelTintColor.alphaComponent,
+            focusWidthMultiplier: PanelSettings.focusWidthMultiplier,
+            focusHeightMultiplier: PanelSettings.focusHeightMultiplier,
             fontNames: TerminalTheme.installedFontNames,
             selectedFontName: PanelSettings.fontName ?? TerminalTheme.defaultFontName)
 
@@ -28,6 +30,11 @@ extension AppDelegate {
             PanelSettings.fontName = name
             self?.applyFont()
         }
+        view.onFocusSizeChange = { [weak self] width, height in
+            PanelSettings.focusWidthMultiplier = width
+            PanelSettings.focusHeightMultiplier = height
+            self?.resizeFocusedTerminalIfNeeded()
+        }
         view.onReset = { [weak self, weak view] in
             guard let self else { return }
             PanelSettings.resetToDefaults()
@@ -37,7 +44,10 @@ extension AppDelegate {
             view?.setValues(
                 cornerRadius: PanelSettings.cornerRadius,
                 tintOpacity: self.currentTheme.panelTintColor.alphaComponent,
+                focusWidthMultiplier: PanelSettings.focusWidthMultiplier,
+                focusHeightMultiplier: PanelSettings.focusHeightMultiplier,
                 fontName: TerminalTheme.defaultFontName)
+            self.resizeFocusedTerminalIfNeeded()
         }
         view.onCancel = { [weak self] in self?.toggleSettingsPanel(nil) }
 
@@ -63,13 +73,12 @@ extension AppDelegate {
     }
 
     func applyCornerRadius() {
-        (panel.contentView as? NSVisualEffectView)?.layer?.cornerRadius = PanelSettings.cornerRadius
+        terminalPanelController.applyCornerRadius()
         quotaPanelController.applyCornerRadius()
     }
 
     func applyTintOpacity() {
-        tintView.layer?.backgroundColor =
-            currentTheme.tintColor(opacity: PanelSettings.tintOpacity).cgColor
+        applyTerminalAppearance()
         quotaPanelController.applyTheme(currentTheme)
     }
 

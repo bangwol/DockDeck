@@ -67,6 +67,17 @@ final class DockPanelLayoutTests: XCTestCase {
         XCTAssertEqual(focused, host)
     }
 
+    func testFocusedTerminalUsesConfiguredMultipliers() {
+        let host = NSRect(x: 0, y: 0, width: 1800, height: 1169)
+        let collapsed = NSRect(x: 0, y: 0, width: 214, height: 65)
+
+        let focused = DockPanelLayout.focusedTerminalFrame(
+            collapsed: collapsed, hostFrame: host,
+            widthMultiplier: 3, heightMultiplier: 6)
+
+        XCTAssertEqual(focused, NSRect(x: 0, y: 0, width: 642, height: 390))
+    }
+
     func testFallbackPanelsUseMatchingWidths() {
         let host = NSRect(x: 0, y: 0, width: 1800, height: 1169)
 

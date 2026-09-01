@@ -22,14 +22,19 @@ enum ClaudeBridgePayload {
         else {
             return "Claude usage pending"
         }
-        let fields: [(String, String)] = [("5h", "five_hour"), ("7d", "seven_day")]
+        let fields: [(String, String)] = [
+            ("5h", "five_hour"), ("7d", "seven_day"),
+            // ponytail: replace these aliases when Anthropic documents a Fable status-line key.
+            ("FBL", rateLimits["seven_day_fable"] == nil ? "fable" : "seven_day_fable"),
+        ]
         let segments = fields.compactMap { label, key -> String? in
             guard let window = rateLimits[key] as? [String: Any],
                 let percentage = window["used_percentage"] as? NSNumber
             else {
                 return nil
             }
-            return "\(label) \(Int(percentage.doubleValue.rounded()))%"
+            let remaining = min(max(100 - percentage.doubleValue, 0), 100)
+            return "\(label) \(Int(remaining.rounded()))% left"
         }
         return segments.isEmpty ? "Claude usage pending" : "Claude " + segments.joined(separator: " · ")
     }

@@ -16,7 +16,7 @@ enum UsageFreshness: Equatable {
         case .stale: "STALE"
         case .signIn: "SIGN IN"
         case .unavailable: "OFFLINE"
-        case .setupClaude: "SET UP CLAUDE"
+        case .setupClaude: "SET UP"
         }
     }
 }
@@ -25,10 +25,22 @@ struct UsageWindow: Identifiable, Equatable {
     let durationMinutes: Int
     let usedPercent: Double
     let resetsAt: Date?
+    let customLabel: String?
 
-    var id: Int { durationMinutes }
+    init(
+        durationMinutes: Int, usedPercent: Double, resetsAt: Date?, customLabel: String? = nil
+    ) {
+        self.durationMinutes = durationMinutes
+        self.usedPercent = usedPercent
+        self.resetsAt = resetsAt
+        self.customLabel = customLabel
+    }
+
+    var id: String { customLabel.map { "custom:\($0)" } ?? "duration:\(durationMinutes)" }
+    var remainingPercent: Double { min(max(100 - usedPercent, 0), 100) }
 
     var label: String {
+        if let customLabel { return customLabel }
         if durationMinutes % (24 * 60) == 0 {
             return "\(durationMinutes / (24 * 60))d"
         }
@@ -48,7 +60,6 @@ struct UsageProviderSnapshot: Equatable {
 struct ProviderUsage: Identifiable, Equatable {
     let id: String
     let name: String
-    let shortName: String
     let windows: [UsageWindow]
     let freshness: UsageFreshness
     let detail: String?
@@ -66,7 +77,7 @@ enum UsageProviderError: LocalizedError {
         case .executableNotFound:
             "Codex CLI executable not found"
         case .bridgeNotInstalled:
-            "Claude status-line bridge cache not found"
+            "Claude Code 2.1.251+ status-line bridge cache not found"
         case .authenticationRequired(let message), .invalidResponse(let message),
             .transport(let message):
             message
@@ -77,10 +88,10 @@ enum UsageProviderError: LocalizedError {
 final class UsageStore: ObservableObject {
     @Published private(set) var providers: [ProviderUsage] = [
         ProviderUsage(
-            id: "codex", name: "CODEX", shortName: "C", windows: [],
+            id: "codex", name: "CODEX", windows: [],
             freshness: .loading, detail: nil),
         ProviderUsage(
-            id: "claude", name: "CLAUDE", shortName: "A", windows: [],
+            id: "claude", name: "CLAUDE", windows: [],
             freshness: .loading, detail: nil),
     ]
 
@@ -150,7 +161,6 @@ final class UsageStore: ObservableObject {
             providers[index] = ProviderUsage(
                 id: previous.id,
                 name: previous.name,
-                shortName: previous.shortName,
                 windows: snapshot.windows,
                 freshness: snapshot.freshness,
                 detail: snapshot.detail)
@@ -167,14 +177,13 @@ final class UsageStore: ObservableObject {
             providers[index] = ProviderUsage(
                 id: previous.id,
                 name: previous.name,
-                shortName: previous.shortName,
                 windows: previous.windows,
                 freshness: freshness,
                 detail: error.localizedDescription)
         }
         let current = providers[index]
         let windows = current.windows.map {
-            "\($0.label)=\(Int($0.usedPercent.rounded()))%"
+            "\($0.label)=\(Int($0.remainingPercent.rounded()))% remaining"
         }.joined(separator: ",")
         logger("\(providerID) \(current.freshness) \(windows)")
     }

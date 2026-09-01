@@ -3,7 +3,7 @@ import Cocoa
 extension AppDelegate {
     func applyTheme(_ theme: Theme, persist: Bool) {
         currentTheme = theme
-        tintView.layer?.backgroundColor = theme.tintColor(opacity: PanelSettings.tintOpacity).cgColor
+        applyTerminalAppearance()
         terminalView.nativeForegroundColor = theme.foregroundColor
         terminalView.installColors(theme.ansiPalette)
         menuButton.contentTintColor = theme.chromeTintColor
@@ -12,6 +12,12 @@ extension AppDelegate {
         if persist {
             UserDefaults.standard.set(theme.id, forKey: AppPreferences.themeIDKey)
         }
+    }
+
+    func applyTerminalAppearance() {
+        let presentation: PanelPresentation =
+            (isExpanded || isFocusExpanded) ? .readable : .compact
+        terminalPanelController.applyAppearance(currentTheme, presentation: presentation)
     }
 
     @objc func toggleThemePicker(_ sender: Any?) {

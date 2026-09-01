@@ -9,7 +9,7 @@ enum PanelBuilder {
     static func makePanel(
         initialFrame: NSRect, theme: Theme, menuTarget: AnyObject, menuAction: Selector
     ) -> (
-        panel: KeyablePanel, terminal: LocalProcessTerminalView, tintView: NSView,
+        panel: KeyablePanel, terminal: LocalProcessTerminalView, surfaceView: PanelSurfaceView,
         menuButton: NSButton
     ) {
         let panel = KeyablePanel(
@@ -30,43 +30,29 @@ enum PanelBuilder {
         ]
         panel.hidesOnDeactivate = false
 
-        let effectView = NSVisualEffectView(frame: NSRect(origin: .zero, size: panel.frame.size))
-        effectView.autoresizingMask = [.width, .height]
-        effectView.material = .menu
-        effectView.blendingMode = .behindWindow
-        effectView.state = .active
-        effectView.wantsLayer = true
-        effectView.layer?.cornerRadius = PanelSettings.cornerRadius
-        effectView.layer?.masksToBounds = true
-        effectView.layer?.borderWidth = 1
-        effectView.layer?.borderColor = NSColor.white.withAlphaComponent(0.2).cgColor
-
-        let tintView = NSView(frame: effectView.bounds)
-        tintView.autoresizingMask = [.width, .height]
-        tintView.wantsLayer = true
-        tintView.layer?.backgroundColor = theme.tintColor(opacity: PanelSettings.tintOpacity).cgColor
-        effectView.addSubview(tintView)
+        let surfaceView = PanelSurfaceView(
+            frame: NSRect(origin: .zero, size: panel.frame.size), theme: theme)
 
         let font = TerminalTheme.font(named: PanelSettings.fontName)
         let terminal = LocalProcessTerminalView(
-            frame: TerminalLayout.contentFrame(in: effectView.bounds, font: font))
+            frame: TerminalLayout.contentFrame(in: surfaceView.bounds, font: font))
         terminal.autoresizingMask = [.width]
         terminal.font = font
         terminal.nativeBackgroundColor = .clear
         terminal.nativeForegroundColor = theme.foregroundColor
         terminal.layer?.backgroundColor = NSColor.clear.cgColor
         terminal.installColors(theme.ansiPalette)
-        terminal.toolTip = "Click to expand · ⌘E full size · ⌘T theme · ⌘Q quit"
+        terminal.toolTip = "Click to expand · drag edges to resize · ⌘E full size · ⌘T theme"
 
-        effectView.addSubview(terminal)
+        surfaceView.contentContainer.addSubview(terminal)
 
         let menuButton = NSButton(
             image: NSImage(
                 systemSymbolName: "ellipsis.circle", accessibilityDescription: "Menu")!,
             target: menuTarget, action: menuAction)
         menuButton.frame = NSRect(
-            x: effectView.bounds.width - menuButtonSize - menuButtonInset,
-            y: effectView.bounds.height - menuButtonSize - menuButtonInset,
+            x: surfaceView.bounds.width - menuButtonSize - menuButtonInset,
+            y: surfaceView.bounds.height - menuButtonSize - menuButtonInset,
             width: menuButtonSize, height: menuButtonSize)
         menuButton.autoresizingMask = [.minXMargin, .minYMargin]
         menuButton.isBordered = false
@@ -74,10 +60,10 @@ enum PanelBuilder {
         menuButton.contentTintColor = theme.chromeTintColor
         (menuButton.cell as? NSButtonCell)?.imageScaling = .scaleProportionallyDown
         menuButton.toolTip = "Menu"
-        effectView.addSubview(menuButton)
+        surfaceView.contentContainer.addSubview(menuButton)
 
-        panel.contentView = effectView
+        panel.contentView = surfaceView
 
-        return (panel, terminal, tintView, menuButton)
+        return (panel, terminal, surfaceView, menuButton)
     }
 }

@@ -12,6 +12,10 @@ enum DockPanelLayout {
     static let fallbackHeight: CGFloat = 64
     static let focusedWidthMultiplier: CGFloat = 2
     static let focusedHeightMultiplier: CGFloat = 4
+    static let minimumFocusedWidthMultiplier: CGFloat = 1.25
+    static let maximumFocusedWidthMultiplier: CGFloat = 4
+    static let minimumFocusedHeightMultiplier: CGFloat = 2
+    static let maximumFocusedHeightMultiplier: CGFloat = 8
     static let dockBottomCorrection: CGFloat = 5
     static let dockTopCorrection: CGFloat = 5
 
@@ -55,9 +59,17 @@ enum DockPanelLayout {
         return DockPanelFrames(terminal: terminal, quota: quota)
     }
 
-    static func focusedTerminalFrame(collapsed: NSRect, hostFrame: NSRect) -> NSRect {
-        let width = min(collapsed.width * focusedWidthMultiplier, hostFrame.width)
-        let height = min(collapsed.height * focusedHeightMultiplier, hostFrame.height)
+    static func focusedTerminalFrame(
+        collapsed: NSRect, hostFrame: NSRect,
+        widthMultiplier: CGFloat = focusedWidthMultiplier,
+        heightMultiplier: CGFloat = focusedHeightMultiplier
+    ) -> NSRect {
+        let safeWidthMultiplier = min(
+            max(widthMultiplier, minimumFocusedWidthMultiplier), maximumFocusedWidthMultiplier)
+        let safeHeightMultiplier = min(
+            max(heightMultiplier, minimumFocusedHeightMultiplier), maximumFocusedHeightMultiplier)
+        let width = min(collapsed.width * safeWidthMultiplier, hostFrame.width)
+        let height = min(collapsed.height * safeHeightMultiplier, hostFrame.height)
         let x = min(max(collapsed.minX, hostFrame.minX), hostFrame.maxX - width)
         let y = min(max(collapsed.minY, hostFrame.minY), hostFrame.maxY - height)
         return NSRect(x: x, y: y, width: width, height: height)

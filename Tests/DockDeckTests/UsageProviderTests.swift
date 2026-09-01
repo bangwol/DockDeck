@@ -4,6 +4,15 @@ import XCTest
 @testable import DockDeck
 
 final class UsageProviderTests: XCTestCase {
+    func testUsageWindowCalculatesRemainingPercentage() {
+        XCTAssertEqual(
+            UsageWindow(durationMinutes: 300, usedPercent: 22, resetsAt: nil).remainingPercent,
+            78)
+        XCTAssertEqual(
+            UsageWindow(durationMinutes: 300, usedPercent: 120, resetsAt: nil).remainingPercent,
+            0)
+    }
+
     func testCodexLaunchEnvironmentIncludesExecutableDirectory() {
         let executable = URL(fileURLWithPath: "/opt/codex/bin/codex")
 
@@ -110,6 +119,10 @@ final class UsageProviderTests: XCTestCase {
                 "seven_day": {
                   "used_percentage": 48,
                   "resets_at": 4000
+                },
+                "seven_day_fable": {
+                  "used_percentage": 62,
+                  "resets_at": 5000
                 }
               }
             }
@@ -119,8 +132,8 @@ final class UsageProviderTests: XCTestCase {
             from: data, modificationDate: nil, now: now)
 
         XCTAssertEqual(snapshot.freshness, .live)
-        XCTAssertEqual(snapshot.windows.map(\.label), ["5h", "7d"])
-        XCTAssertEqual(snapshot.windows.map(\.usedPercent), [35, 48])
+        XCTAssertEqual(snapshot.windows.map(\.label), ["5h", "7d", "FBL"])
+        XCTAssertEqual(snapshot.windows.map(\.usedPercent), [35, 48, 62])
     }
 
     func testClaudeParserMarksExpiredWindowStale() throws {

@@ -6,14 +6,23 @@ struct QuotaPanelView: View {
 
     var body: some View {
         GeometryReader { proxy in
-            let compact = proxy.size.width < 300
-            VStack(spacing: 2) {
+            let compact = proxy.size.width < 240
+            VStack(spacing: compact ? 1 : 2) {
+                HStack {
+                    Spacer(minLength: 0)
+                    Text("REMAINING")
+                        .font(.system(size: 7, weight: .semibold, design: .monospaced))
+                        .foregroundStyle(Color(theme.foregroundColor).opacity(0.55))
+                }
+                .frame(height: 8)
+
                 ForEach(store.providers) { provider in
                     QuotaRow(provider: provider, theme: theme, compact: compact)
+                        .frame(maxHeight: .infinity)
                 }
             }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 5)
+            .padding(.horizontal, compact ? 6 : 8)
+            .padding(.vertical, 4)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .background(Color.black.opacity(0.001))
@@ -26,24 +35,27 @@ private struct QuotaRow: View {
     let compact: Bool
 
     var body: some View {
-        HStack(spacing: compact ? 4 : 7) {
-            Text(compact ? provider.shortName : provider.name)
-                .font(.system(size: compact ? 10 : 9, weight: .bold, design: .monospaced))
-                .foregroundStyle(Color(theme.foregroundColor))
-                .frame(width: compact ? 12 : 46, alignment: .leading)
+        HStack(spacing: compact ? 3 : 6) {
+            Text(provider.name)
+                .font(.system(size: compact ? 9 : 10, weight: .bold, design: .monospaced))
+                .foregroundStyle(providerColor)
+                .frame(width: compact ? 42 : 52, alignment: .leading)
 
-            ForEach(Array(provider.windows.prefix(2))) { window in
-                WindowMeter(window: window, theme: theme, compact: compact)
-            }
-
-            Spacer(minLength: 0)
-
-            if let label = provider.freshness.label {
+            if provider.windows.isEmpty {
+                let label = provider.freshness.label ?? "WAITING"
                 Text(label)
-                    .font(.system(size: 8, weight: .semibold, design: .monospaced))
-                    .foregroundStyle(
-                        provider.freshness == .loading
-                            ? Color(nsColor: .secondaryLabelColor) : Color.orange)
+                    .font(.system(size: compact ? 8 : 9, weight: .semibold, design: .monospaced))
+                    .foregroundStyle(providerColor)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            } else {
+                let dense = provider.windows.count > 2
+                ForEach(Array(provider.windows.prefix(3))) { window in
+                    WindowMeter(
+                        window: window, theme: theme, compact: compact, dense: dense)
+                        .frame(maxWidth: .infinity)
+                }
             }
         }
         .help(provider.detail ?? provider.freshness.label ?? provider.name)
@@ -52,10 +64,24 @@ private struct QuotaRow: View {
     }
 
     private var accessibilityLabel: String {
+        guard !provider.windows.isEmpty else {
+            return "\(provider.name), \(provider.freshness.label ?? "waiting")"
+        }
         let windows = provider.windows.map {
-            "\($0.label) \(Int($0.usedPercent.rounded())) percent used"
+            "\($0.label) \(Int($0.remainingPercent.rounded())) percent remaining"
         }.joined(separator: ", ")
         return "\(provider.name), \(windows)"
+    }
+
+    private var providerColor: Color {
+        switch provider.freshness {
+        case .live:
+            Color(theme.foregroundColor)
+        case .loading:
+            Color(nsColor: .secondaryLabelColor)
+        case .stale, .signIn, .unavailable, .setupClaude:
+            .orange
+        }
     }
 }
 
@@ -63,16 +89,23 @@ private struct WindowMeter: View {
     let window: UsageWindow
     let theme: Theme
     let compact: Bool
+    let dense: Bool
 
     var body: some View {
         VStack(spacing: 1) {
-            HStack(spacing: 2) {
+            HStack(spacing: dense ? 1 : 2) {
                 Text(window.label)
                     .foregroundStyle(Color(theme.foregroundColor).opacity(0.7))
-                Text("\(Int(window.usedPercent.rounded()))%")
+                Text("\(Int(window.remainingPercent.rounded()))%")
                     .foregroundStyle(meterColor)
             }
-            .font(.system(size: compact ? 9 : 10, weight: .medium, design: .monospaced))
+            .font(
+                .system(
+                    size: dense ? 7 : (compact ? 8 : 10),
+                    weight: .medium, design: .monospaced)
+            )
+            .lineLimit(1)
+            .minimumScaleFactor(0.7)
 
             GeometryReader { proxy in
                 ZStack(alignment: .leading) {
@@ -81,24 +114,24 @@ private struct WindowMeter: View {
                         .fill(meterColor)
                         .frame(
                             width: proxy.size.width
-                                * min(max(window.usedPercent / 100, 0), 1))
+                                * min(max(window.remainingPercent / 100, 0), 1))
                 }
             }
-            .frame(height: 2)
+            .frame(height: compact ? 2 : 3)
         }
-        .frame(width: compact ? 48 : 64)
-        .help(resetHelp)
+        .help("\(Int(window.remainingPercent.rounded()))% remaining · \(resetHelp)")
     }
 
     private var meterColor: Color {
-        let remaining = 100 - window.usedPercent
+        let remaining = window.remainingPercent
         if remaining < 20 { return .red }
         if remaining <= 50 { return .orange }
         return Color(theme.foregroundColor)
     }
 
     private var resetHelp: String {
-        guard let resetsAt = window.resetsAt else { return "Reset time unavailable" }
-        return "Resets \(resetsAt.formatted(date: .abbreviated, time: .shortened))"
+        let prefix = window.customLabel == "FBL" ? "Fable weekly limit" : window.label
+        guard let resetsAt = window.resetsAt else { return "\(prefix) reset time unavailable" }
+        return "\(prefix) resets \(resetsAt.formatted(date: .abbreviated, time: .shortened))"
     }
 }

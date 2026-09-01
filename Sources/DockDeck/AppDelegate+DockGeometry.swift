@@ -10,14 +10,14 @@ extension AppDelegate {
     }
 
     func terminalFrame(for presence: DockPresence) -> NSRect? {
+        if panel.inLiveResize { return panel.frame }
         if isExpanded {
             let screen = expansionScreenID.flatMap(screen(for:)) ?? presence.host
             return expandedFrame(on: screen)
         }
         let collapsed = collapsedFrames(for: presence).terminal
         guard isFocusExpanded, let collapsed else { return collapsed }
-        return DockPanelLayout.focusedTerminalFrame(
-            collapsed: collapsed, hostFrame: presence.host.frame)
+        return focusedTerminalFrame(collapsed: collapsed, hostFrame: presence.host.frame)
     }
 
     func collapsedFrames(for presence: DockPresence) -> DockPanelFrames {
@@ -47,14 +47,15 @@ extension AppDelegate {
     func expandTerminalForFocus() {
         guard !isExpanded, !isFocusExpanded else { return }
         isFocusExpanded = true
+        applyTerminalAppearance()
         refreshCoarseCaches()
         let presence = resolveDockPresence()
         let screen = expansionScreen(fallingBackTo: presence?.host)
         let collapsed = collapsedFrame ?? presence.flatMap { collapsedFrames(for: $0).terminal }
         if let screen, let collapsed {
+            setFocusedTerminalResizable(collapsed: collapsed, hostFrame: screen.frame)
             showTerminal(
-                DockPanelLayout.focusedTerminalFrame(
-                    collapsed: collapsed, hostFrame: screen.frame),
+                focusedTerminalFrame(collapsed: collapsed, hostFrame: screen.frame),
                 animated: true)
         }
         updateFallbackHintVisibility()
@@ -67,6 +68,8 @@ extension AppDelegate {
     func collapseTerminalAfterFocus() {
         guard isFocusExpanded, !isExpanded else { return }
         isFocusExpanded = false
+        terminalPanelController.setResizable(false)
+        applyTerminalAppearance()
         refreshCoarseCaches()
         let presence = resolveDockPresence()
         if let target = collapseTarget(for: presence) {
@@ -75,5 +78,40 @@ extension AppDelegate {
             panel.orderOut(nil)
         }
         updateFallbackHintVisibility()
+    }
+
+    func resizeFocusedTerminalIfNeeded() {
+        guard isFocusExpanded, !isExpanded else { return }
+        refreshCoarseCaches()
+        let presence = resolveDockPresence()
+        let screen = expansionScreen(fallingBackTo: presence?.host)
+        let collapsed = collapsedFrame ?? presence.flatMap { collapsedFrames(for: $0).terminal }
+        guard let screen, let collapsed else { return }
+        setFocusedTerminalResizable(collapsed: collapsed, hostFrame: screen.frame)
+        showTerminal(
+            focusedTerminalFrame(collapsed: collapsed, hostFrame: screen.frame), animated: true)
+    }
+
+    private func focusedTerminalFrame(collapsed: NSRect, hostFrame: NSRect) -> NSRect {
+        DockPanelLayout.focusedTerminalFrame(
+            collapsed: collapsed,
+            hostFrame: hostFrame,
+            widthMultiplier: PanelSettings.focusWidthMultiplier,
+            heightMultiplier: PanelSettings.focusHeightMultiplier)
+    }
+
+    private func setFocusedTerminalResizable(collapsed: NSRect, hostFrame: NSRect) {
+        let minimum = DockPanelLayout.focusedTerminalFrame(
+            collapsed: collapsed,
+            hostFrame: hostFrame,
+            widthMultiplier: DockPanelLayout.minimumFocusedWidthMultiplier,
+            heightMultiplier: DockPanelLayout.minimumFocusedHeightMultiplier)
+        let maximum = DockPanelLayout.focusedTerminalFrame(
+            collapsed: collapsed,
+            hostFrame: hostFrame,
+            widthMultiplier: DockPanelLayout.maximumFocusedWidthMultiplier,
+            heightMultiplier: DockPanelLayout.maximumFocusedHeightMultiplier)
+        terminalPanelController.setResizable(
+            true, minSize: minimum.size, maxSize: maximum.size)
     }
 }

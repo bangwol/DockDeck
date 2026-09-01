@@ -8,16 +8,25 @@ final class SettingsPanelView: NSView {
 
     private let cornerRadiusSlider = NSSlider()
     private let tintOpacitySlider = NSSlider()
+    private let focusWidthSlider = NSSlider()
+    private let focusHeightSlider = NSSlider()
+    private let focusWidthLabel = NSTextField(labelWithString: "")
+    private let focusHeightLabel = NSTextField(labelWithString: "")
     private let fontPopup = NSPopUpButton(frame: .zero, pullsDown: false)
     private let fontNames: [String]
 
     var onCornerRadiusChange: ((CGFloat) -> Void)?
     var onTintOpacityChange: ((CGFloat) -> Void)?
+    var onFocusSizeChange: ((CGFloat, CGFloat) -> Void)?
     var onFontChange: ((String) -> Void)?
     var onReset: (() -> Void)?
     var onCancel: (() -> Void)?
 
-    init(cornerRadius: CGFloat, tintOpacity: CGFloat, fontNames: [String], selectedFontName: String) {
+    init(
+        cornerRadius: CGFloat, tintOpacity: CGFloat,
+        focusWidthMultiplier: CGFloat, focusHeightMultiplier: CGFloat,
+        fontNames: [String], selectedFontName: String
+    ) {
         self.fontNames = fontNames
         let width = controlWidth + padding * 2
 
@@ -64,7 +73,7 @@ final class SettingsPanelView: NSView {
         addSubview(cornerRadiusSlider)
         y += 20 + rowGap
 
-        let opacityLabel = Self.makeLabel("Background opacity")
+        let opacityLabel = Self.makeLabel("Theme tint")
         opacityLabel.frame = NSRect(x: padding, y: y, width: controlWidth, height: 14)
         addSubview(opacityLabel)
         y += 14 + 4
@@ -78,6 +87,38 @@ final class SettingsPanelView: NSView {
         tintOpacitySlider.frame = NSRect(x: padding, y: y, width: controlWidth, height: 20)
         addSubview(tintOpacitySlider)
         y += 20 + rowGap
+
+        configureFocusLabel(focusWidthLabel)
+        focusWidthLabel.frame = NSRect(x: padding, y: y, width: controlWidth, height: 14)
+        addSubview(focusWidthLabel)
+        y += 14 + 4
+
+        focusWidthSlider.minValue = Double(DockPanelLayout.minimumFocusedWidthMultiplier)
+        focusWidthSlider.maxValue = Double(DockPanelLayout.maximumFocusedWidthMultiplier)
+        focusWidthSlider.doubleValue = Double(focusWidthMultiplier)
+        focusWidthSlider.isContinuous = true
+        focusWidthSlider.target = self
+        focusWidthSlider.action = #selector(focusSizeChanged)
+        focusWidthSlider.frame = NSRect(x: padding, y: y, width: controlWidth, height: 20)
+        addSubview(focusWidthSlider)
+        y += 20 + rowGap
+
+        configureFocusLabel(focusHeightLabel)
+        focusHeightLabel.frame = NSRect(x: padding, y: y, width: controlWidth, height: 14)
+        addSubview(focusHeightLabel)
+        y += 14 + 4
+
+        focusHeightSlider.minValue = Double(DockPanelLayout.minimumFocusedHeightMultiplier)
+        focusHeightSlider.maxValue = Double(DockPanelLayout.maximumFocusedHeightMultiplier)
+        focusHeightSlider.doubleValue = Double(focusHeightMultiplier)
+        focusHeightSlider.isContinuous = true
+        focusHeightSlider.target = self
+        focusHeightSlider.action = #selector(focusSizeChanged)
+        focusHeightSlider.frame = NSRect(x: padding, y: y, width: controlWidth, height: 20)
+        addSubview(focusHeightSlider)
+        y += 20 + rowGap
+
+        updateFocusLabels()
 
         let fontLabel = Self.makeLabel("Font")
         fontLabel.frame = NSRect(x: padding, y: y, width: controlWidth, height: 14)
@@ -123,9 +164,16 @@ final class SettingsPanelView: NSView {
         }
     }
 
-    func setValues(cornerRadius: CGFloat, tintOpacity: CGFloat, fontName: String) {
+    func setValues(
+        cornerRadius: CGFloat, tintOpacity: CGFloat,
+        focusWidthMultiplier: CGFloat, focusHeightMultiplier: CGFloat,
+        fontName: String
+    ) {
         cornerRadiusSlider.doubleValue = Double(cornerRadius)
         tintOpacitySlider.doubleValue = Double(tintOpacity)
+        focusWidthSlider.doubleValue = Double(focusWidthMultiplier)
+        focusHeightSlider.doubleValue = Double(focusHeightMultiplier)
+        updateFocusLabels()
         if let index = fontNames.firstIndex(of: fontName) {
             fontPopup.selectItem(at: index)
         }
@@ -137,6 +185,14 @@ final class SettingsPanelView: NSView {
 
     @objc private func opacityChanged() {
         onTintOpacityChange?(CGFloat(tintOpacitySlider.doubleValue))
+    }
+
+    @objc private func focusSizeChanged() {
+        focusWidthSlider.doubleValue = (focusWidthSlider.doubleValue * 4).rounded() / 4
+        focusHeightSlider.doubleValue = (focusHeightSlider.doubleValue * 4).rounded() / 4
+        updateFocusLabels()
+        onFocusSizeChange?(
+            CGFloat(focusWidthSlider.doubleValue), CGFloat(focusHeightSlider.doubleValue))
     }
 
     @objc private func fontChanged() {
@@ -160,5 +216,17 @@ final class SettingsPanelView: NSView {
         label.font = NSFont.systemFont(ofSize: size, weight: weight)
         label.textColor = NSColor.white.withAlphaComponent(alpha)
         return label
+    }
+
+    private func configureFocusLabel(_ label: NSTextField) {
+        label.font = NSFont.systemFont(ofSize: 10, weight: .medium)
+        label.textColor = NSColor.white.withAlphaComponent(0.5)
+    }
+
+    private func updateFocusLabels() {
+        focusWidthLabel.stringValue = String(
+            format: "Click expansion width %.2g×", focusWidthSlider.doubleValue)
+        focusHeightLabel.stringValue = String(
+            format: "Click expansion height %.2g×", focusHeightSlider.doubleValue)
     }
 }

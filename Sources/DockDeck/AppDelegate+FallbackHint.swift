@@ -4,13 +4,13 @@ extension AppDelegate {
     static let fallbackHintOverlap: CGFloat = 6
     static let fallbackHintWidth: CGFloat = 300
     static let fallbackHintMessage = """
-        This is DockDeck — a terminal and usage deck that live beside your Dock on every desktop.
+        DockDeck needs Accessibility permission only to read the Dock's position and size.
 
-        It needs Accessibility permission to track the Dock's position and size, nothing else. macOS will ask in a moment.
+        System Settings → Privacy & Security → Accessibility → DockDeck.
 
-        ⌘E expands it. ⌘T opens themes. ⌘Q quits.
+        If DockDeck is already enabled after a rebuild, turn it off and on once.
 
-        Not glued to Dock? Remove DockDeck in System Settings → Accessibility, then re-add it.
+        ⌘E expands · ⌘T themes · ⌘Q quits
         """
 
     func installFallbackHintIfNeeded() {

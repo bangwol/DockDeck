@@ -55,6 +55,8 @@ extension AppDelegate {
                 showTerminal(expandedFrame(on: screen), animated: true)
             }
         }
+        terminalPanelController.setResizable(false)
+        applyTerminalAppearance()
         if let presence, case .concealed = presence {
             hideQuota()
         } else if let presence, let frame = quotaFrame(for: presence) {
