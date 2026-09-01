@@ -8,7 +8,7 @@ extension AppDelegate {
 
         menu.addItem(
             NSMenuItem(
-                title: isExpanded ? "Collapse" : "Expand",
+                title: isExpanded ? "Return Terminal to Dock" : "Open Large Terminal",
                 action: #selector(toggleExpanded(_:)), keyEquivalent: "e"))
         menu.addItem(
             NSMenuItem(

@@ -74,6 +74,105 @@ struct EnabledPanels: OptionSet {
     }
 }
 
+struct PanelModuleID: Hashable, Codable {
+    let rawValue: String
+
+    static let terminal = PanelModuleID(rawValue: "terminal")
+    static let usage = PanelModuleID(rawValue: "usage")
+
+    init(rawValue: String) {
+        self.rawValue = rawValue
+    }
+
+    init(from decoder: Decoder) throws {
+        rawValue = try decoder.singleValueContainer().decode(String.self)
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(rawValue)
+    }
+}
+
+enum PanelSide: String, Codable {
+    case left
+    case right
+}
+
+struct PanelDeckConfiguration: Codable, Equatable {
+    var left: [PanelModuleID]
+    var right: [PanelModuleID]
+    var enabled: [PanelModuleID]
+
+    static func legacy(order: PanelOrder, enabledPanels: EnabledPanels) -> Self {
+        let left: [PanelModuleID] = order == .terminalLeft ? [.terminal] : [.usage]
+        let right: [PanelModuleID] = order == .terminalLeft ? [.usage] : [.terminal]
+        var enabled: [PanelModuleID] = []
+        if enabledPanels.contains(.terminal) { enabled.append(.terminal) }
+        if enabledPanels.contains(.usage) { enabled.append(.usage) }
+        return Self(left: left, right: right, enabled: enabled).normalized()
+    }
+
+    func side(containing module: PanelModuleID) -> PanelSide? {
+        if left.contains(module) { return .left }
+        if right.contains(module) { return .right }
+        return nil
+    }
+
+    func contains(_ module: PanelModuleID) -> Bool {
+        enabled.contains(module)
+    }
+
+    mutating func move(_ module: PanelModuleID, to side: PanelSide) {
+        left.removeAll { $0 == module }
+        right.removeAll { $0 == module }
+        switch side {
+        case .left: left.append(module)
+        case .right: right.append(module)
+        }
+    }
+
+    mutating func setEnabled(_ value: Bool, for module: PanelModuleID) {
+        enabled.removeAll { $0 == module }
+        if value { enabled.append(module) }
+    }
+
+    func normalized() -> Self {
+        var seen: Set<PanelModuleID> = []
+        var left = uniqueModules(self.left, seen: &seen)
+        var right = uniqueModules(self.right, seen: &seen)
+
+        if !seen.contains(.terminal) {
+            left.append(.terminal)
+            seen.insert(.terminal)
+        }
+        if !seen.contains(.usage) {
+            right.append(.usage)
+            seen.insert(.usage)
+        }
+
+        var enabledSeen: Set<PanelModuleID> = []
+        var enabled = uniqueModules(self.enabled, seen: &enabledSeen)
+        for module in enabled where !seen.contains(module) {
+            right.append(module)
+            seen.insert(module)
+        }
+        if enabled.isEmpty {
+            enabled = [.terminal, .usage]
+        }
+
+        return Self(left: left, right: right, enabled: enabled)
+    }
+
+    private func uniqueModules(
+        _ modules: [PanelModuleID], seen: inout Set<PanelModuleID>
+    ) -> [PanelModuleID] {
+        modules.filter { module in
+            !module.rawValue.isEmpty && seen.insert(module).inserted
+        }
+    }
+}
+
 enum PanelSettings {
     static let minimumUsageFontSize: CGFloat = 8
     static let maximumUsageFontSize: CGFloat = 14
@@ -90,6 +189,8 @@ enum PanelSettings {
     private static let usageTextColorKey = "DockDeck.settings.usageTextColor"
     private static let panelOrderKey = "DockDeck.settings.panelOrder"
     private static let enabledPanelsKey = "DockDeck.settings.enabledPanels"
+    private static let panelDeckConfigurationKey =
+        "DockDeck.settings.panelDeckConfiguration.v1"
 
     static var cornerRadius: CGFloat {
         get {
@@ -159,22 +260,57 @@ enum PanelSettings {
 
     static var panelOrder: PanelOrder {
         get {
-            UserDefaults.standard.string(forKey: panelOrderKey)
-                .flatMap(PanelOrder.init(rawValue:)) ?? .terminalLeft
+            deckConfiguration.side(containing: .terminal) == .right
+                ? .terminalRight : .terminalLeft
         }
-        set { UserDefaults.standard.set(newValue.rawValue, forKey: panelOrderKey) }
+        set {
+            var configuration = deckConfiguration
+            configuration.move(
+                .terminal, to: newValue == .terminalLeft ? .left : .right)
+            configuration.move(
+                .usage, to: newValue == .terminalLeft ? .right : .left)
+            deckConfiguration = configuration
+        }
     }
 
     static var enabledPanels: EnabledPanels {
         get {
-            let defaults = UserDefaults.standard
-            guard defaults.object(forKey: enabledPanelsKey) != nil else { return .all }
-            return .resolved(EnabledPanels(rawValue: defaults.integer(forKey: enabledPanelsKey)))
+            var panels: EnabledPanels = []
+            if deckConfiguration.contains(.terminal) { panels.insert(.terminal) }
+            if deckConfiguration.contains(.usage) { panels.insert(.usage) }
+            return panels
         }
         set {
-            UserDefaults.standard.set(
-                EnabledPanels.resolved(newValue).rawValue, forKey: enabledPanelsKey)
+            let resolved = EnabledPanels.resolved(newValue)
+            var configuration = deckConfiguration
+            configuration.setEnabled(resolved.contains(.terminal), for: .terminal)
+            configuration.setEnabled(resolved.contains(.usage), for: .usage)
+            deckConfiguration = configuration
         }
+    }
+
+    static var deckConfiguration: PanelDeckConfiguration {
+        get {
+            let defaults = UserDefaults.standard
+            if let data = defaults.data(forKey: panelDeckConfigurationKey),
+                let configuration = try? JSONDecoder().decode(
+                    PanelDeckConfiguration.self, from: data)
+            {
+                return configuration.normalized()
+            }
+            return legacyDeckConfiguration(defaults: defaults)
+        }
+        set { persistDeckConfiguration(newValue.normalized(), defaults: .standard) }
+    }
+
+    static func migratePanelDeckIfNeeded() {
+        let defaults = UserDefaults.standard
+        guard
+            defaults.data(forKey: panelDeckConfigurationKey).flatMap({
+                try? JSONDecoder().decode(PanelDeckConfiguration.self, from: $0)
+            }) == nil
+        else { return }
+        persistDeckConfiguration(legacyDeckConfiguration(defaults: defaults), defaults: defaults)
     }
 
     static var focusWidthMultiplier: CGFloat {
@@ -226,5 +362,37 @@ enum PanelSettings {
         defaults.removeObject(forKey: usageTextColorKey)
         defaults.removeObject(forKey: panelOrderKey)
         defaults.removeObject(forKey: enabledPanelsKey)
+        defaults.removeObject(forKey: panelDeckConfigurationKey)
+    }
+
+    private static func legacyDeckConfiguration(
+        defaults: UserDefaults
+    ) -> PanelDeckConfiguration {
+        let order = defaults.string(forKey: panelOrderKey)
+            .flatMap(PanelOrder.init(rawValue:)) ?? .terminalLeft
+        let enabledPanels: EnabledPanels
+        if defaults.object(forKey: enabledPanelsKey) == nil {
+            enabledPanels = .all
+        } else {
+            enabledPanels = .resolved(
+                EnabledPanels(rawValue: defaults.integer(forKey: enabledPanelsKey)))
+        }
+        return .legacy(order: order, enabledPanels: enabledPanels)
+    }
+
+    private static func persistDeckConfiguration(
+        _ configuration: PanelDeckConfiguration, defaults: UserDefaults
+    ) {
+        let configuration = configuration.normalized()
+        guard let data = try? JSONEncoder().encode(configuration) else { return }
+        defaults.set(data, forKey: panelDeckConfigurationKey)
+
+        let order: PanelOrder = configuration.side(containing: .terminal) == .right
+            ? .terminalRight : .terminalLeft
+        var enabledPanels: EnabledPanels = []
+        if configuration.contains(.terminal) { enabledPanels.insert(.terminal) }
+        if configuration.contains(.usage) { enabledPanels.insert(.usage) }
+        defaults.set(order.rawValue, forKey: panelOrderKey)
+        defaults.set(EnabledPanels.resolved(enabledPanels).rawValue, forKey: enabledPanelsKey)
     }
 }

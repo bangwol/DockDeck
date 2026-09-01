@@ -46,7 +46,7 @@ extension AppDelegate {
 
     func expandTerminalForFocus() {
         guard !isExpanded, !isFocusExpanded else { return }
-        isFocusExpanded = true
+        terminalPanelMode = .focused
         applyTerminalAppearance()
         refreshCoarseCaches()
         let presence = resolveDockPresence()
@@ -65,18 +65,41 @@ extension AppDelegate {
         collapseTerminalAfterFocus()
     }
 
+    @objc func workspaceApplicationDidActivate(_ notification: Notification) {
+        guard
+            let application = notification.userInfo?[NSWorkspace.applicationUserInfoKey]
+                as? NSRunningApplication,
+            application.bundleIdentifier != Bundle.main.bundleIdentifier
+        else { return }
+        collapseTerminalAfterFocus()
+    }
+
     func collapseTerminalAfterFocus() {
-        guard isFocusExpanded, !isExpanded else { return }
-        isFocusExpanded = false
+        guard terminalPanelMode != .docked else { return }
+        returnTerminalToDock()
+    }
+
+    func returnTerminalToDock(animated: Bool = true) {
+        guard terminalPanelMode != .docked else { return }
+        terminalPanelMode = .docked
+        expansionScreenID = nil
         terminalPanelController.setResizable(false)
         applyTerminalAppearance()
         refreshCoarseCaches()
         let presence = resolveDockPresence()
         if let target = collapseTarget(for: presence) {
-            showTerminal(target, animated: true)
+            showTerminal(target, animated: animated)
         } else {
             panel.orderOut(nil)
         }
+        if let presence, case .concealed = presence {
+            hideQuota()
+        } else if let presence, let frame = quotaFrame(for: presence) {
+            showQuota(frame)
+        } else {
+            hideQuota()
+        }
+        debugLog("expand", "returned terminal to Dock")
         updateFallbackHintVisibility()
     }
 

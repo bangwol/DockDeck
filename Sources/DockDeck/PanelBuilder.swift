@@ -42,7 +42,8 @@ enum PanelBuilder {
         terminal.nativeForegroundColor = theme.foregroundColor
         terminal.layer?.backgroundColor = NSColor.clear.cgColor
         terminal.installColors(theme.ansiPalette)
-        terminal.toolTip = "Click to expand · drag edges to resize · ⌘E full size · ⌘T theme"
+        terminal.toolTip =
+            "Click to expand · click elsewhere to return · ⌘E large terminal · ⌘T theme"
 
         surfaceView.contentContainer.addSubview(terminal)
 

@@ -176,8 +176,8 @@ extension AppDelegate {
 
     func applyPanelVisibility() {
         if !PanelSettings.enabledPanels.contains(.terminal) {
-            isExpanded = false
-            isFocusExpanded = false
+            terminalPanelMode = .docked
+            expansionScreenID = nil
             isFrozen = false
             terminalPanelController.setResizable(false)
             if panel.isVisible { panel.orderOut(nil) }

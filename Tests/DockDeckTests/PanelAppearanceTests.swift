@@ -10,6 +10,49 @@ final class PanelAppearanceTests: XCTestCase {
         XCTAssertEqual(EnabledPanels.resolved([]), .all)
     }
 
+    func testDeckConfigurationAdaptsExistingPlacementAndVisibility() {
+        let configuration = PanelDeckConfiguration.legacy(
+            order: .terminalRight, enabledPanels: .terminal)
+
+        XCTAssertEqual(configuration.left, [.usage])
+        XCTAssertEqual(configuration.right, [.terminal])
+        XCTAssertEqual(configuration.enabled, [.terminal])
+        XCTAssertEqual(configuration.side(containing: .terminal), .right)
+    }
+
+    func testDeckConfigurationKeepsFutureModulesWhileRemovingDuplicates() throws {
+        let clock = PanelModuleID(rawValue: "clock")
+        let configuration = PanelDeckConfiguration(
+            left: [.terminal, clock, .terminal],
+            right: [.usage, clock],
+            enabled: [clock, clock]
+        ).normalized()
+        let data = try JSONEncoder().encode(configuration)
+        let decoded = try JSONDecoder().decode(PanelDeckConfiguration.self, from: data)
+
+        XCTAssertEqual(decoded.left, [.terminal, clock])
+        XCTAssertEqual(decoded.right, [.usage])
+        XCTAssertEqual(decoded.enabled, [clock])
+    }
+
+    func testShellRestartPolicyStopsARepeatedExitLoop() {
+        var policy = ShellRestartPolicy()
+        let start = Date(timeIntervalSince1970: 100)
+
+        policy.recordStart(at: start)
+        XCTAssertTrue(policy.shouldRestart(afterExitAt: start.addingTimeInterval(3)))
+        for offset in 4...5 {
+            let nextStart = start.addingTimeInterval(TimeInterval(offset))
+            policy.recordStart(at: nextStart)
+            XCTAssertTrue(
+                policy.shouldRestart(afterExitAt: nextStart.addingTimeInterval(0.5)))
+        }
+        let finalStart = start.addingTimeInterval(6)
+        policy.recordStart(at: finalStart)
+        XCTAssertFalse(
+            policy.shouldRestart(afterExitAt: finalStart.addingTimeInterval(0.5)))
+    }
+
     func testReadableTerminalUsesStrongerTintThanCompactPanels() {
         let compact = PanelAppearance.tintOpacity(base: 0.65, presentation: .compact)
         let readable = PanelAppearance.tintOpacity(base: 0.65, presentation: .readable)

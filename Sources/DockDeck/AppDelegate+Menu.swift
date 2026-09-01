@@ -12,7 +12,8 @@ extension AppDelegate {
             withTitle: "About DockDeck", action: #selector(showAbout(_:)), keyEquivalent: "")
         appMenu.addItem(.separator())
         appMenu.addItem(
-            withTitle: "Toggle Expanded", action: #selector(toggleExpanded(_:)), keyEquivalent: "e"
+            withTitle: "Toggle Large Terminal", action: #selector(toggleExpanded(_:)),
+            keyEquivalent: "e"
         )
         appMenu.addItem(
             withTitle: "Switch Theme", action: #selector(toggleThemePicker(_:)), keyEquivalent: "t"
@@ -47,21 +48,15 @@ extension AppDelegate {
         let presence = resolveDockPresence()
 
         if isExpanded {
-            isExpanded = false
-            expansionScreenID = nil
-            if let target = collapseTarget(for: presence) {
-                showTerminal(target, animated: true)
-            } else {
-                panel.orderOut(nil)
-            }
-        } else {
-            isFocusExpanded = false
-            isExpanded = true
-            let screen = expansionScreen(fallingBackTo: presence?.host)
-            expansionScreenID = screen.flatMap(displayID(of:))
-            if let screen {
-                showTerminal(expandedFrame(on: screen), animated: true)
-            }
+            returnTerminalToDock()
+            return
+        }
+
+        terminalPanelMode = .large
+        let screen = expansionScreen(fallingBackTo: presence?.host)
+        expansionScreenID = screen.flatMap(displayID(of:))
+        if let screen {
+            showTerminal(expandedFrame(on: screen), animated: true)
         }
         terminalPanelController.setResizable(false)
         applyTerminalAppearance()

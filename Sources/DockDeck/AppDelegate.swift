@@ -3,6 +3,12 @@ import Cocoa
 import CoreGraphics
 import SwiftTerm
 
+enum TerminalPanelMode {
+    case docked
+    case focused
+    case large
+}
+
 final class AppDelegate: NSObject, NSApplicationDelegate {
     static let accessibilityWarmupDelay: TimeInterval = 3
 
@@ -27,8 +33,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     var themePickerPanel: KeyablePanel?
     var settingsPanel: KeyablePanel?
 
-    var isExpanded = false
-    var isFocusExpanded = false
+    var terminalPanelMode: TerminalPanelMode = .docked
+    var isExpanded: Bool { terminalPanelMode == .large }
+    var isFocusExpanded: Bool { terminalPanelMode == .focused }
     var isFrozen = false
     var wasConcealed = false
     var expansionScreenID: CGDirectDisplayID?
@@ -45,6 +52,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     var lastDebugLine: [String: String] = [:]
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        PanelSettings.migratePanelDeckIfNeeded()
         let hasLaunchedBefore = UserDefaults.standard.bool(
             forKey: AppPreferences.hasLaunchedBeforeKey)
         accessibilityTrusted = dockCoordinator.isAccessibilityTrusted
@@ -82,7 +90,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             initialFrame: initialTerminalFrame,
             theme: currentTheme,
             menuTarget: self,
-            menuAction: #selector(showPanelMenu(_:)))
+            menuAction: #selector(showPanelMenu(_:)),
+            onShellEvent: { [weak self] message in
+                self?.debugLog("shell", message)
+            })
         quotaPanelController = QuotaPanelController(
             initialFrame: initialQuotaFrame,
             theme: currentTheme,
@@ -105,11 +116,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NotificationCenter.default.addObserver(
             self, selector: #selector(terminalPanelDidResignKey(_:)),
             name: NSWindow.didResignKeyNotification, object: panel)
+        NSWorkspace.shared.notificationCenter.addObserver(
+            self, selector: #selector(workspaceApplicationDidActivate(_:)),
+            name: NSWorkspace.didActivateApplicationNotification, object: nil)
         terminalLocalMouseMonitor = NSEvent.addLocalMonitorForEvents(
             matching: [.leftMouseDown, .rightMouseDown]
         ) { [weak self] event in
             if event.window === self?.panel {
+                self?.terminalPanelController.ensureShellRunning()
                 self?.expandTerminalForFocus()
+            } else {
+                self?.collapseTerminalAfterFocus()
             }
             return event
         }
@@ -153,9 +170,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationWillTerminate(_ notification: Notification) {
         NotificationCenter.default.removeObserver(self)
+        NSWorkspace.shared.notificationCenter.removeObserver(self)
         if let terminalLocalMouseMonitor { NSEvent.removeMonitor(terminalLocalMouseMonitor) }
         if let terminalGlobalMouseMonitor { NSEvent.removeMonitor(terminalGlobalMouseMonitor) }
         trackingTimer?.invalidate()
+        terminalPanelController?.stopShell()
         usageStore.stop()
     }
 }
