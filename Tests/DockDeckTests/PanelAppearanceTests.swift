@@ -125,6 +125,31 @@ final class PanelAppearanceTests: XCTestCase {
         XCTAssertEqual(emittedSize, 12)
     }
 
+    func testSettingsPanesRenderAtPreferredSize() throws {
+        let enabled = PanelDeckConfiguration.legacy(
+            order: .terminalLeft, enabledPanels: .all)
+        var usageDisabled = enabled
+        usageDisabled.setEnabled(false, for: .usage)
+        let scenarios = SettingsPaneID.allCases.map { ($0, enabled) }
+            + [(.usage, usageDisabled)]
+
+        for (pane, configuration) in scenarios {
+            let view = SettingsPanelView(
+                selectedPane: pane,
+                values: makeSettingsValues(configuration: configuration),
+                fontNames: ["Menlo", TerminalTheme.systemFontName])
+            view.frame = NSRect(origin: .zero, size: SettingsPanelView.preferredSize)
+            view.layoutSubtreeIfNeeded()
+
+            let bitmap = try XCTUnwrap(view.bitmapImageRepForCachingDisplay(in: view.bounds))
+            view.cacheDisplay(in: view.bounds, to: bitmap)
+
+            XCTAssertEqual(view.frame.size, SettingsPanelView.preferredSize)
+            XCTAssertGreaterThan(bitmap.pixelsWide, 0)
+            XCTAssertGreaterThan(bitmap.pixelsHigh, 0)
+        }
+    }
+
     func testShellRestartPolicyStopsARepeatedExitLoop() {
         var policy = ShellRestartPolicy()
         let start = Date(timeIntervalSince1970: 100)
@@ -175,17 +200,23 @@ final class PanelAppearanceTests: XCTestCase {
     ) -> SettingsPanelModel {
         SettingsPanelModel(
             selectedPane: .decks,
-            values: SettingsPanelValues(
-                deckConfiguration: configuration,
-                terminal: TerminalSettingsState(
-                    focusWidthMultiplier: 2, focusHeightMultiplier: 4,
-                    fontName: "Menlo"),
-                usage: UsageSettingsState(
-                    enabledProviders: UsageProviderID.allCases,
-                    fontName: "Menlo", fontSize: 10,
-                    displayMode: .remaining, textColor: .theme),
-                appearance: AppearanceSettingsState(
-                    cornerRadius: 10, tintOpacity: 0.6)),
+            values: makeSettingsValues(configuration: configuration),
             fontNames: ["Menlo"])
+    }
+
+    private func makeSettingsValues(
+        configuration: PanelDeckConfiguration
+    ) -> SettingsPanelValues {
+        SettingsPanelValues(
+            deckConfiguration: configuration,
+            terminal: TerminalSettingsState(
+                focusWidthMultiplier: 2, focusHeightMultiplier: 4,
+                fontName: "Menlo"),
+            usage: UsageSettingsState(
+                enabledProviders: UsageProviderID.allCases,
+                fontName: "Menlo", fontSize: 10,
+                displayMode: .remaining, textColor: .theme),
+            appearance: AppearanceSettingsState(
+                cornerRadius: 10, tintOpacity: 0.6))
     }
 }
