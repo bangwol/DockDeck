@@ -111,6 +111,19 @@ struct UsageSettingsView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
                 GroupBox {
+                    VStack(spacing: 0) {
+                        ForEach(Array(UsageProviderID.allCases.enumerated()), id: \.element) {
+                            index, provider in
+                            if index > 0 { Divider() }
+                            UsageProviderSettingsRow(provider: provider, model: model)
+                        }
+                    }
+                } label: {
+                    Label("Providers", systemImage: "point.3.connected.trianglepath.dotted")
+                        .font(.headline)
+                }
+
+                GroupBox {
                     SettingsPickerRow(title: "Values") {
                         Picker(
                             "Usage values",
@@ -308,6 +321,15 @@ private struct ModuleSettingsRow: View {
                     .foregroundStyle(.secondary)
             }
             Spacer()
+            if let pane = definition.settingsPane {
+                Button {
+                    model.selectPane(pane)
+                } label: {
+                    Image(systemName: "slider.horizontal.3")
+                }
+                .buttonStyle(.borderless)
+                .help("Configure \(definition.title)")
+            }
             Text(sideTitle)
                 .font(.caption.weight(.medium))
                 .foregroundStyle(.secondary)
@@ -325,6 +347,36 @@ private struct ModuleSettingsRow: View {
                     model.canDisable(definition.id)
                         ? "Show or hide \(definition.title)"
                         : "DockDeck keeps one module visible so Settings remains accessible")
+        }
+        .padding(.vertical, 10)
+        .padding(.horizontal, 4)
+    }
+}
+
+private struct UsageProviderSettingsRow: View {
+    let provider: UsageProviderID
+    @ObservedObject var model: SettingsPanelModel
+
+    var body: some View {
+        HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(provider.title)
+                Text(provider.subtitle)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+            Toggle(
+                "Show \(provider.title)",
+                isOn: Binding(
+                    get: { model.isUsageProviderEnabled(provider) },
+                    set: { model.setUsageProvider(provider, enabled: $0) }))
+                .labelsHidden()
+                .disabled(!model.canDisableUsageProvider(provider))
+                .help(
+                    model.canDisableUsageProvider(provider)
+                        ? "Show \(provider.title) and refresh its data"
+                        : "Keep at least one usage provider enabled")
         }
         .padding(.vertical, 10)
         .padding(.horizontal, 4)

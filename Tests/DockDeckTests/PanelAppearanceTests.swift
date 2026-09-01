@@ -76,6 +76,39 @@ final class PanelAppearanceTests: XCTestCase {
 
         XCTAssertEqual(Set(PanelModuleRegistry.all.map(\.id)).count, PanelModuleRegistry.all.count)
         XCTAssertEqual(model.availablePanes, [.decks, .terminal, .usage, .appearance])
+        XCTAssertEqual(model.moduleDefinition(for: .usage)?.id, .usage)
+    }
+
+    func testModuleRuntimeCoordinatorStartsAndStopsOnlyChangedModules() {
+        let coordinator = ModuleRuntimeCoordinator()
+        var terminalStarts = 0
+        var terminalStops = 0
+        var usageStarts = 0
+        var usageStops = 0
+        coordinator.register(
+            .terminal, start: { terminalStarts += 1 }, stop: { terminalStops += 1 })
+        coordinator.register(
+            .usage, start: { usageStarts += 1 }, stop: { usageStops += 1 })
+
+        coordinator.synchronize(enabledModules: [.terminal])
+        coordinator.synchronize(enabledModules: [.terminal])
+        coordinator.synchronize(enabledModules: [.usage, PanelModuleID(rawValue: "future")])
+        coordinator.stopAll()
+
+        XCTAssertEqual(terminalStarts, 1)
+        XCTAssertEqual(terminalStops, 1)
+        XCTAssertEqual(usageStarts, 1)
+        XCTAssertEqual(usageStops, 1)
+    }
+
+    func testUsageSettingsKeepsOneProviderEnabled() {
+        let model = makeSettingsModel(
+            configuration: .legacy(order: .terminalLeft, enabledPanels: .all))
+
+        model.setUsageProvider(.claude, enabled: false)
+        model.setUsageProvider(.codex, enabled: false)
+
+        XCTAssertEqual(model.values.usage.enabledProviders, [.codex])
     }
 
     func testSettingsModelEmitsModuleScopedChanges() {
@@ -148,6 +181,7 @@ final class PanelAppearanceTests: XCTestCase {
                     focusWidthMultiplier: 2, focusHeightMultiplier: 4,
                     fontName: "Menlo"),
                 usage: UsageSettingsState(
+                    enabledProviders: UsageProviderID.allCases,
                     fontName: "Menlo", fontSize: 10,
                     displayMode: .remaining, textColor: .theme),
                 appearance: AppearanceSettingsState(

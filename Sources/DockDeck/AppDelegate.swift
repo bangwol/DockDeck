@@ -20,6 +20,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     lazy var dockCoordinator = DockCoordinator { [weak self] channel, message in
         self?.debugLog(channel, message)
     }
+    let moduleRuntimeCoordinator = ModuleRuntimeCoordinator()
 
     var panel: KeyablePanel { terminalPanelController.panel }
     var quotaPanel: NSPanel { quotaPanelController.panel }
@@ -95,12 +96,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             onShellEvent: { [weak self] message in
                 self?.debugLog("shell", message)
             })
+        usageStore.setEnabledProviders(PanelSettings.enabledUsageProviders)
         quotaPanelController = QuotaPanelController(
             initialFrame: initialQuotaFrame,
             theme: currentTheme,
             store: usageStore,
             menuTarget: self)
         panel.delegate = self
+        registerModuleRuntimes()
+        synchronizeModuleRuntimes()
 
         if case .concealed? = initialPresence {
             debugLog("visibility", "launching concealed (auto-hiding Dock is off screen)")
@@ -139,9 +143,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
         }
 
-        terminalPanelController.startShell()
-        usageStore.start()
-
         startTrackingTimer()
 
         if !accessibilityTrusted {
@@ -175,7 +176,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if let terminalLocalMouseMonitor { NSEvent.removeMonitor(terminalLocalMouseMonitor) }
         if let terminalGlobalMouseMonitor { NSEvent.removeMonitor(terminalGlobalMouseMonitor) }
         trackingTimer?.invalidate()
-        terminalPanelController?.stopShell()
-        usageStore.stop()
+        moduleRuntimeCoordinator.stopAll()
+    }
+
+    private func registerModuleRuntimes() {
+        moduleRuntimeCoordinator.register(
+            .terminal,
+            start: { [weak self] in self?.terminalPanelController.startShell() },
+            stop: { [weak self] in self?.terminalPanelController.stopShell() })
+        moduleRuntimeCoordinator.register(
+            .usage,
+            start: { [weak self] in self?.usageStore.start() },
+            stop: { [weak self] in self?.usageStore.stop() })
+    }
+
+    func synchronizeModuleRuntimes() {
+        moduleRuntimeCoordinator.synchronize(
+            enabledModules: PanelSettings.deckConfiguration.enabled)
     }
 }

@@ -75,8 +75,20 @@ private struct SettingsRootView: View {
                 .frame(height: 54)
 
                 List(model.availablePanes, selection: $model.selectedPane) { pane in
-                    Label(pane.title, systemImage: pane.symbolName)
-                        .tag(pane)
+                    HStack(spacing: 8) {
+                        Label(pane.title, systemImage: pane.symbolName)
+                        Spacer()
+                        if let definition = model.moduleDefinition(for: pane) {
+                            Circle()
+                                .fill(
+                                    model.isEnabled(definition.id)
+                                        ? Color.accentColor : Color.secondary.opacity(0.45))
+                                .frame(width: 6, height: 6)
+                                .accessibilityLabel(
+                                    model.isEnabled(definition.id) ? "Enabled" : "Disabled")
+                        }
+                    }
+                    .tag(pane)
                 }
                 .listStyle(.sidebar)
             }
@@ -86,9 +98,14 @@ private struct SettingsRootView: View {
             Divider()
 
             VStack(spacing: 0) {
-                SettingsHeader(pane: model.selectedPane)
+                SettingsHeader(pane: model.selectedPane, model: model)
                 Divider()
+                if let definition = selectedModule, !model.isEnabled(definition.id) {
+                    DisabledModuleNotice(moduleTitle: definition.title)
+                    Divider()
+                }
                 selectedPane
+                    .disabled(selectedModule.map { !model.isEnabled($0.id) } ?? false)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(Color(nsColor: .windowBackgroundColor))
@@ -96,6 +113,10 @@ private struct SettingsRootView: View {
         .frame(
             minWidth: SettingsPanelView.preferredSize.width,
             minHeight: SettingsPanelView.preferredSize.height)
+    }
+
+    private var selectedModule: PanelModuleDefinition? {
+        model.moduleDefinition(for: model.selectedPane)
     }
 
     @ViewBuilder private var selectedPane: some View {
@@ -114,6 +135,7 @@ private struct SettingsRootView: View {
 
 private struct SettingsHeader: View {
     let pane: SettingsPaneID
+    @ObservedObject var model: SettingsPanelModel
 
     var body: some View {
         HStack(spacing: 12) {
@@ -128,8 +150,38 @@ private struct SettingsHeader: View {
                     .foregroundStyle(.secondary)
             }
             Spacer()
+            if let definition = model.moduleDefinition(for: pane) {
+                Toggle(
+                    "Enabled",
+                    isOn: Binding(
+                        get: { model.isEnabled(definition.id) },
+                        set: { model.setEnabled($0, for: definition.id) }))
+                    .toggleStyle(.switch)
+                    .disabled(!model.canDisable(definition.id))
+                    .help(
+                        model.canDisable(definition.id)
+                            ? "Run and show \(definition.title)"
+                            : "DockDeck keeps one module visible so Settings remains accessible")
+            }
         }
         .padding(.horizontal, 24)
         .frame(height: 76)
+    }
+}
+
+private struct DisabledModuleNotice: View {
+    let moduleTitle: String
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "pause.circle")
+            Text("Enable \(moduleTitle) to run it and apply these settings.")
+                .font(.callout)
+            Spacer()
+        }
+        .foregroundStyle(.secondary)
+        .padding(.horizontal, 24)
+        .frame(height: 42)
+        .background(Color.primary.opacity(0.035))
     }
 }

@@ -187,6 +187,7 @@ enum PanelSettings {
     private static let usageFontNameKey = "DockDeck.settings.usageFontName"
     private static let usageFontSizeKey = "DockDeck.settings.usageFontSize"
     private static let usageTextColorKey = "DockDeck.settings.usageTextColor"
+    private static let enabledUsageProvidersKey = "DockDeck.settings.enabledUsageProviders"
     private static let panelOrderKey = "DockDeck.settings.panelOrder"
     private static let enabledPanelsKey = "DockDeck.settings.enabledPanels"
     private static let panelDeckConfigurationKey =
@@ -256,6 +257,22 @@ enum PanelSettings {
                 .flatMap(UsageTextColor.init(rawValue:)) ?? .theme
         }
         set { UserDefaults.standard.set(newValue.rawValue, forKey: usageTextColorKey) }
+    }
+
+    static var enabledUsageProviders: [UsageProviderID] {
+        get {
+            guard let stored = UserDefaults.standard.stringArray(forKey: enabledUsageProvidersKey)
+            else { return UsageProviderID.allCases }
+            let selected = Set(stored.compactMap(UsageProviderID.init(rawValue:)))
+            let providers = UsageProviderID.allCases.filter(selected.contains)
+            return providers.isEmpty ? UsageProviderID.allCases : providers
+        }
+        set {
+            let selected = Set(newValue)
+            let providers = UsageProviderID.allCases.filter(selected.contains)
+            let resolved = providers.isEmpty ? UsageProviderID.allCases : providers
+            UserDefaults.standard.set(resolved.map(\.rawValue), forKey: enabledUsageProvidersKey)
+        }
     }
 
     static var panelOrder: PanelOrder {
@@ -360,6 +377,7 @@ enum PanelSettings {
         defaults.removeObject(forKey: usageFontNameKey)
         defaults.removeObject(forKey: usageFontSizeKey)
         defaults.removeObject(forKey: usageTextColorKey)
+        defaults.removeObject(forKey: enabledUsageProvidersKey)
         defaults.removeObject(forKey: panelOrderKey)
         defaults.removeObject(forKey: enabledPanelsKey)
         defaults.removeObject(forKey: panelDeckConfigurationKey)

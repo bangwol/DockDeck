@@ -4,6 +4,14 @@ import XCTest
 @testable import DockDeck
 
 final class UsageProviderTests: XCTestCase {
+    func testUsageStorePublishesOnlySelectedProvidersBeforeStarting() {
+        let store = UsageStore()
+
+        store.setEnabledProviders([.claude])
+
+        XCTAssertEqual(store.providers.map(\.id), [.claude])
+    }
+
     func testUsageWindowCalculatesRemainingPercentage() {
         XCTAssertEqual(
             UsageWindow(durationMinutes: 300, usedPercent: 22, resetsAt: nil).remainingPercent,

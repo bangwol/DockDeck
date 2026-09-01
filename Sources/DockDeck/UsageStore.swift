@@ -1,6 +1,27 @@
 import Combine
 import Foundation
 
+enum UsageProviderID: String, CaseIterable, Codable, Identifiable {
+    case codex
+    case claude
+
+    var id: Self { self }
+
+    var title: String {
+        switch self {
+        case .codex: "Codex"
+        case .claude: "Claude"
+        }
+    }
+
+    var subtitle: String {
+        switch self {
+        case .codex: "OpenAI account limits"
+        case .claude: "Claude Code status-line limits"
+        }
+    }
+}
+
 enum UsageFreshness: Equatable {
     case loading
     case live
@@ -58,7 +79,7 @@ struct UsageProviderSnapshot: Equatable {
 }
 
 struct ProviderUsage: Identifiable, Equatable {
-    let id: String
+    let id: UsageProviderID
     let name: String
     let windows: [UsageWindow]
     let freshness: UsageFreshness
@@ -86,18 +107,13 @@ enum UsageProviderError: LocalizedError {
 }
 
 final class UsageStore: ObservableObject {
-    @Published private(set) var providers: [ProviderUsage] = [
-        ProviderUsage(
-            id: "codex", name: "CODEX", windows: [],
-            freshness: .loading, detail: nil),
-        ProviderUsage(
-            id: "claude", name: "CLAUDE", windows: [],
-            freshness: .loading, detail: nil),
-    ]
+    @Published private(set) var providers: [ProviderUsage]
 
     private let codexProvider: CodexAppServerProvider
     private let claudeProvider: ClaudeStatuslineCacheProvider
     private let logger: (String) -> Void
+    private var providerSnapshots: [UsageProviderID: ProviderUsage]
+    private var enabledProviderIDs = Set(UsageProviderID.allCases)
     private var refreshTimer: Timer?
     private var started = false
 
@@ -106,6 +122,13 @@ final class UsageStore: ObservableObject {
         claudeProvider: ClaudeStatuslineCacheProvider = ClaudeStatuslineCacheProvider(),
         logger: @escaping (String) -> Void = { _ in }
     ) {
+        let initialProviders = UsageProviderID.allCases.map {
+            ProviderUsage(
+                id: $0, name: $0.title.uppercased(), windows: [],
+                freshness: .loading, detail: nil)
+        }
+        providers = initialProviders
+        providerSnapshots = Dictionary(uniqueKeysWithValues: initialProviders.map { ($0.id, $0) })
         self.codexProvider = codexProvider
         self.claudeProvider = claudeProvider
         self.logger = logger
@@ -114,12 +137,8 @@ final class UsageStore: ObservableObject {
     func start() {
         guard !started else { return }
         started = true
-        codexProvider.start { [weak self] result in
-            DispatchQueue.main.async {
-                self?.apply(result, providerID: "codex")
-            }
-        }
-        refreshClaude()
+        if enabledProviderIDs.contains(.codex) { startCodex() }
+        if enabledProviderIDs.contains(.claude) { refreshClaude() }
 
         let timer = Timer(timeInterval: 60, repeats: true) { [weak self] _ in
             self?.refresh()
@@ -129,36 +148,67 @@ final class UsageStore: ObservableObject {
     }
 
     func refresh() {
-        codexProvider.refresh()
-        refreshClaude()
+        guard started else { return }
+        if enabledProviderIDs.contains(.codex) { codexProvider.refresh() }
+        if enabledProviderIDs.contains(.claude) { refreshClaude() }
     }
 
     func stop() {
+        guard started else { return }
+        started = false
         refreshTimer?.invalidate()
         refreshTimer = nil
         codexProvider.stop()
-        started = false
+    }
+
+    func setEnabledProviders(_ providerIDs: [UsageProviderID]) {
+        let resolved = Set(providerIDs.isEmpty ? UsageProviderID.allCases : providerIDs)
+        let previous = enabledProviderIDs
+        enabledProviderIDs = resolved
+        publishProviders()
+
+        guard started else { return }
+        if previous.contains(.codex) && !resolved.contains(.codex) {
+            codexProvider.stop()
+        } else if !previous.contains(.codex) && resolved.contains(.codex) {
+            startCodex()
+        }
+        if !previous.contains(.claude) && resolved.contains(.claude) {
+            refreshClaude()
+        }
+    }
+
+    private func startCodex() {
+        codexProvider.start { [weak self] result in
+            DispatchQueue.main.async {
+                guard let self, self.started, self.enabledProviderIDs.contains(.codex) else {
+                    return
+                }
+                self.apply(result, providerID: .codex)
+            }
+        }
     }
 
     private func refreshClaude() {
+        guard started, enabledProviderIDs.contains(.claude) else { return }
         DispatchQueue.global(qos: .utility).async { [weak self] in
             guard let self else { return }
             let result = self.claudeProvider.read()
             DispatchQueue.main.async {
-                self.apply(result, providerID: "claude")
+                guard self.started, self.enabledProviderIDs.contains(.claude) else { return }
+                self.apply(result, providerID: .claude)
             }
         }
     }
 
     private func apply(
-        _ result: Result<UsageProviderSnapshot, UsageProviderError>, providerID: String
+        _ result: Result<UsageProviderSnapshot, UsageProviderError>, providerID: UsageProviderID
     ) {
-        guard let index = providers.firstIndex(where: { $0.id == providerID }) else { return }
-        let previous = providers[index]
+        guard let previous = providerSnapshots[providerID] else { return }
 
         switch result {
         case .success(let snapshot):
-            providers[index] = ProviderUsage(
+            providerSnapshots[providerID] = ProviderUsage(
                 id: previous.id,
                 name: previous.name,
                 windows: snapshot.windows,
@@ -174,17 +224,24 @@ final class UsageStore: ObservableObject {
             default:
                 freshness = previous.windows.isEmpty ? .unavailable : .stale
             }
-            providers[index] = ProviderUsage(
+            providerSnapshots[providerID] = ProviderUsage(
                 id: previous.id,
                 name: previous.name,
                 windows: previous.windows,
                 freshness: freshness,
                 detail: error.localizedDescription)
         }
-        let current = providers[index]
+        publishProviders()
+        guard let current = providerSnapshots[providerID] else { return }
         let windows = current.windows.map {
             "\($0.label)=\(Int($0.remainingPercent.rounded()))% remaining"
         }.joined(separator: ",")
         logger("\(providerID) \(current.freshness) \(windows)")
+    }
+
+    private func publishProviders() {
+        providers = UsageProviderID.allCases.compactMap { providerID in
+            enabledProviderIDs.contains(providerID) ? providerSnapshots[providerID] : nil
+        }
     }
 }

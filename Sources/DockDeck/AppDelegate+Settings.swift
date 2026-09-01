@@ -59,6 +59,7 @@ extension AppDelegate {
         view.onReset = { [weak self, weak view] in
             guard let self else { return }
             PanelSettings.resetToDefaults()
+            self.usageStore.setEnabledProviders(PanelSettings.enabledUsageProviders)
             self.applyCornerRadius()
             self.applyTintOpacity()
             self.applyFont()
@@ -104,6 +105,7 @@ extension AppDelegate {
                 focusHeightMultiplier: PanelSettings.focusHeightMultiplier,
                 fontName: PanelSettings.fontName ?? TerminalTheme.defaultFontName),
             usage: UsageSettingsState(
+                enabledProviders: PanelSettings.enabledUsageProviders,
                 fontName: PanelSettings.usageFontName ?? TerminalTheme.defaultFontName,
                 fontSize: PanelSettings.usageFontSize,
                 displayMode: PanelSettings.usageDisplayMode,
@@ -128,6 +130,10 @@ extension AppDelegate {
             applyFont()
         case .usage(.displayMode(let mode)):
             PanelSettings.usageDisplayMode = mode
+            quotaPanelController.applySettings()
+        case .usage(.providers(let providers)):
+            PanelSettings.enabledUsageProviders = providers
+            usageStore.setEnabledProviders(providers)
             quotaPanelController.applySettings()
         case .usage(.font(let name)):
             PanelSettings.usageFontName = name
@@ -202,6 +208,7 @@ extension AppDelegate {
 
     func applyPanelVisibility() {
         isFrozen = false
+        synchronizeModuleRuntimes()
         if !PanelSettings.enabledPanels.contains(.terminal) {
             terminalPanelMode = .docked
             expansionScreenID = nil

@@ -60,6 +60,10 @@ enum PanelModuleRegistry {
     static func definition(for id: PanelModuleID) -> PanelModuleDefinition? {
         all.first { $0.id == id }
     }
+
+    static func definition(for settingsPane: SettingsPaneID) -> PanelModuleDefinition? {
+        all.first { $0.settingsPane == settingsPane }
+    }
 }
 
 struct TerminalSettingsState: Equatable {
@@ -69,6 +73,7 @@ struct TerminalSettingsState: Equatable {
 }
 
 struct UsageSettingsState: Equatable {
+    var enabledProviders: [UsageProviderID]
     var fontName: String
     var fontSize: CGFloat
     var displayMode: UsageDisplayMode
@@ -99,6 +104,7 @@ enum TerminalSettingsChange {
 }
 
 enum UsageSettingsChange {
+    case providers([UsageProviderID])
     case displayMode(UsageDisplayMode)
     case font(String)
     case fontSize(CGFloat)
@@ -180,6 +186,10 @@ final class SettingsPanelModel: ObservableObject {
         values.deckConfiguration.contains(module)
     }
 
+    func moduleDefinition(for pane: SettingsPaneID) -> PanelModuleDefinition? {
+        PanelModuleRegistry.definition(for: pane)
+    }
+
     func canDisable(_ module: PanelModuleID) -> Bool {
         !isEnabled(module)
             || moduleDefinitions.contains { $0.id != module && isEnabled($0.id) }
@@ -235,6 +245,23 @@ final class SettingsPanelModel: ObservableObject {
     func setUsageFontName(_ value: String) {
         updateValues { $0.usage.fontName = value }
         onChange?(.usage(.font(value)))
+    }
+
+    func isUsageProviderEnabled(_ provider: UsageProviderID) -> Bool {
+        values.usage.enabledProviders.contains(provider)
+    }
+
+    func canDisableUsageProvider(_ provider: UsageProviderID) -> Bool {
+        !isUsageProviderEnabled(provider) || values.usage.enabledProviders.count > 1
+    }
+
+    func setUsageProvider(_ provider: UsageProviderID, enabled: Bool) {
+        guard enabled || canDisableUsageProvider(provider) else { return }
+        var providers = values.usage.enabledProviders.filter { $0 != provider }
+        if enabled { providers.append(provider) }
+        providers = UsageProviderID.allCases.filter(Set(providers).contains)
+        updateValues { $0.usage.enabledProviders = providers }
+        onChange?(.usage(.providers(providers)))
     }
 
     func setUsageFontSize(_ value: CGFloat) {
