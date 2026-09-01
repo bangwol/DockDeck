@@ -34,6 +34,8 @@ final class DockPanelLayoutTests: XCTestCase {
 
         XCTAssertEqual(frames.terminal?.width, 214)
         XCTAssertEqual(frames.quota?.width, 214)
+        XCTAssertEqual(frames.terminal?.minY, 5)
+        XCTAssertEqual(frames.terminal?.maxY, 64)
     }
 
     func testVeryNarrowSidesAreHiddenInsteadOfOverlappingDock() {
@@ -83,7 +85,7 @@ final class DockPanelLayoutTests: XCTestCase {
 
         let frames = DockPanelLayout.fallbackFrames(hostFrame: host, reservedHeight: 65)
 
-        XCTAssertEqual(frames.terminal, NSRect(x: 0, y: 0, width: 214, height: 65))
-        XCTAssertEqual(frames.quota, NSRect(x: 1586, y: 0, width: 214, height: 65))
+        XCTAssertEqual(frames.terminal, NSRect(x: 0, y: 5, width: 214, height: 59))
+        XCTAssertEqual(frames.quota, NSRect(x: 1586, y: 5, width: 214, height: 59))
     }
 }

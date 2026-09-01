@@ -10,6 +10,8 @@ enum DockPanelLayout {
     static let minimumPanelWidth: CGFloat = 160
     static let fallbackPanelWidth: CGFloat = 214
     static let fallbackHeight: CGFloat = 64
+    static let fallbackBottomInset: CGFloat = 5
+    static let fallbackTopInset: CGFloat = 1
     static let focusedWidthMultiplier: CGFloat = 2
     static let focusedHeightMultiplier: CGFloat = 4
     static let minimumFocusedWidthMultiplier: CGFloat = 1.25
@@ -41,16 +43,19 @@ enum DockPanelLayout {
     }
 
     static func fallbackFrames(hostFrame: NSRect, reservedHeight: CGFloat) -> DockPanelFrames {
-        let height = reservedHeight > 4 ? reservedHeight : fallbackHeight
+        let totalInset = fallbackBottomInset + fallbackTopInset
+        let dockRegionHeight = reservedHeight > totalInset ? reservedHeight : fallbackHeight
+        let height = dockRegionHeight - totalInset
+        let minY = hostFrame.minY + fallbackBottomInset
         let terminalWidth = min(fallbackPanelWidth, hostFrame.width)
         let terminal = NSRect(
-            x: hostFrame.minX, y: hostFrame.minY, width: terminalWidth, height: height)
+            x: hostFrame.minX, y: minY, width: terminalWidth, height: height)
 
         let quota: NSRect?
         if hostFrame.width >= terminalWidth + gap + fallbackPanelWidth {
             quota = NSRect(
                 x: hostFrame.maxX - fallbackPanelWidth,
-                y: hostFrame.minY,
+                y: minY,
                 width: fallbackPanelWidth,
                 height: height)
         } else {
