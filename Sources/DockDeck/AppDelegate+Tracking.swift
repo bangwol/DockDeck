@@ -2,13 +2,21 @@ import ApplicationServices
 import Cocoa
 
 extension AppDelegate {
-    static let dockTrackingInterval: TimeInterval = 1.0
-    static let fastTrackingInterval: TimeInterval = 0.06
-    static let coarseTickRatio = 16
+    static let dockTrackingInterval: TimeInterval = 3.0
+    static let fastTrackingInterval: TimeInterval = 0.10
+    static let untrustedTrackingInterval: TimeInterval = 5.0
+    static let coarseTickRatio = 30
     static let armingEdgeStrip: CGFloat = 4
 
     func tick() {
         tickCount += 1
+
+        if !accessibilityTrusted {
+            refreshCoarseCaches()
+            startTrackingTimer()
+            runEvaluation()
+            return
+        }
 
         if !dockCoordinator.autoHides || tickCount % Self.coarseTickRatio == 0 {
             refreshCoarseCaches()
@@ -35,8 +43,13 @@ extension AppDelegate {
     }
 
     func startTrackingTimer() {
-        let interval =
-            dockCoordinator.autoHides ? Self.fastTrackingInterval : Self.dockTrackingInterval
+        let interval: TimeInterval
+        if !accessibilityTrusted {
+            interval = Self.untrustedTrackingInterval
+        } else {
+            interval =
+                dockCoordinator.autoHides ? Self.fastTrackingInterval : Self.dockTrackingInterval
+        }
         guard trackingTimer == nil || trackingTimer.timeInterval != interval else { return }
 
         trackingTimer?.invalidate()

@@ -15,7 +15,8 @@ extension AppDelegate {
             withTitle: "Switch Theme", action: #selector(toggleThemePicker(_:)), keyEquivalent: "t"
         )
         appMenu.addItem(
-            withTitle: "Refresh Usage", action: #selector(refreshUsage(_:)), keyEquivalent: "r"
+            withTitle: "Refresh Usage & Layout", action: #selector(refreshUsage(_:)),
+            keyEquivalent: "r"
         )
         appMenu.addItem(
             withTitle: "Quit DockDeck", action: #selector(NSApplication.terminate(_:)),
@@ -71,5 +72,8 @@ extension AppDelegate {
 
     @objc func refreshUsage(_ sender: Any?) {
         usageStore.refresh()
+        refreshCoarseCaches()
+        startTrackingTimer()
+        runEvaluation()
     }
 }
