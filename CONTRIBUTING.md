@@ -22,6 +22,8 @@ swift test
   Recording, or private usage-endpoint providers.
 - Preserve macOS 13 support and avoid new dependencies when the platform or
   SwiftTerm already provides the required behavior.
+- Keep bundled license notices synchronized with the revisions in
+  `Package.resolved`.
 
 ## PR guidelines
 

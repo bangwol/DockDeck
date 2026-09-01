@@ -9,11 +9,13 @@
 </p>
 
 <p align="center">
-  <img src="assets/dockdeck-overview.png" alt="DockDeck terminal and remaining-usage panels beside the macOS Dock" />
+  <a href="assets/dockdeck-overview.png">
+    <img src="assets/dockdeck-overview.png" alt="DockDeck terminal and remaining-usage panels beside the macOS Dock" />
+  </a>
 </p>
 
 <p align="center">
-  <sub>Compact terminal and configurable Codex and Claude usage beside the macOS Dock.</sub>
+  <sub>Compact terminal and configurable Codex and Claude usage beside the macOS Dock. Open the image for full resolution.</sub>
 </p>
 
 DockDeck uses the space beside a bottom-aligned Dock for two compact developer panels. The terminal stays interactive while the usage panel remains read-only; either panel can be hidden or placed on either side. Both follow the Dock across displays, Spaces, and auto-hide transitions.
@@ -48,7 +50,7 @@ Click the terminal to expand it. Drag any edge to resize it; DockDeck restores t
 - macOS 13 or later
 - Accessibility permission for Dock geometry tracking
 - [Codex CLI](https://github.com/openai/codex) signed in locally for Codex usage data
-- Claude Code `2.1.80` or later with the optional bridge configured for Claude usage data
+- A current Claude Code release with the optional bridge configured for Claude usage data (`rate_limits` was introduced in `2.1.80`)
 - Swift 5.9 or later when building from source
 
 Without Accessibility permission, DockDeck remains usable in fixed fallback positions. Only a bottom-aligned Dock is tracked precisely; side-aligned Docks use the fallback layout.
@@ -57,7 +59,7 @@ Without Accessibility permission, DockDeck remains usable in fixed fallback posi
 
 DockDeck does not yet publish a Developer ID-signed and notarized stable binary. Until that is available, installing from source with `./scripts/install.sh` is the recommended preview path.
 
-GitHub preview releases may include an explicitly labeled `unsigned` ZIP for technical evaluation. It is ad-hoc signed, so macOS requires manual approval in **System Settings → Privacy & Security → Open Anyway**, and an update may require Accessibility approval again. Preview artifacts built by GitHub Actions include a SHA-256 file and build-provenance attestation:
+Tagged GitHub preview releases may include an explicitly labeled `unsigned` ZIP for technical evaluation. Manually dispatched preview builds appear as GitHub Actions artifacts and expire after 14 days; they are not GitHub Releases. Both are ad-hoc signed, so macOS requires manual approval in **System Settings → Privacy & Security → Open Anyway**, and an update may require Accessibility approval again. Preview artifacts built by GitHub Actions include a SHA-256 file and build-provenance attestation:
 
 ```bash
 gh attestation verify DockDeck-*-unsigned.zip -R bangwol/DockDeck
@@ -69,7 +71,7 @@ Percentages and bars show **remaining** capacity by default. Select **Used** und
 
 Codex displays whichever 5-hour and weekly windows the signed-in account returns. DockDeck uses the returned durations instead of guessing the plan. OpenAI documents a shared 5-hour window for local and cloud tasks and notes that weekly limits may also apply in the [Codex pricing guide](https://learn.chatgpt.com/docs/pricing).
 
-Claude displays the 5-hour and weekly fields available in Claude Code's status-line payload. When the payload also supplies `seven_day_fable` or `fable`, DockDeck adds an `FBL` meter; otherwise it omits that meter rather than estimating it. Anthropic documents [Fable's plan-specific availability](https://support.claude.com/en/articles/15424964-claude-fable-5-on-your-plan).
+Claude displays the officially documented 5-hour and weekly fields available in Claude Code's status-line payload. Anthropic does not currently document a separate Fable rate-limit field. For forward compatibility, DockDeck recognizes the experimental aliases `seven_day_fable` and `fable`; it adds an `FBL` meter only when the payload actually contains one of them and never estimates Fable usage. [Fable availability is plan-specific](https://support.claude.com/en/articles/15424964-claude-fable-5-on-your-plan), and Fable 5 requires Claude Code `2.1.170` or later.
 
 - More than 50% remaining (less than 50% used): selected text color
 - 20–50% remaining (50–80% used): orange
@@ -169,14 +171,14 @@ Native installations can update themselves:
 claude update
 ```
 
-Confirm that the installed version is `2.1.80` or later, then start Claude Code once and complete sign-in:
+Update to the current Claude Code release, then start it once and complete sign-in:
 
 ```bash
 claude --version
 claude
 ```
 
-Claude Code added `rate_limits` to status-line input in `2.1.80`. Each 5-hour or weekly window can be absent, and the payload appears only after the first API response for supported accounts.
+Claude Code added `rate_limits` to status-line input in `2.1.80`. DockDeck follows the documented `five_hour` and `seven_day` fields and recommends the current Claude Code release because the status-line schema and account availability can change. Each window can be absent, and the payload appears only after the first API response for supported accounts.
 
 ### 2. Locate the DockDeck bridge
 

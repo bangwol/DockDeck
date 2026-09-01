@@ -2,7 +2,10 @@
 
 ## Supported channels
 
-DockDeck has no stable binary release yet. Security fixes target the default branch and the latest GitHub preview only; older previews are not maintained.
+DockDeck has no stable binary release yet. Security fixes target the default
+branch and, when one exists, the latest tagged GitHub preview release. Manually
+dispatched GitHub Actions artifacts are temporary QA builds, not supported
+release channels. Older previews are not maintained.
 
 ## Reporting a vulnerability
 
