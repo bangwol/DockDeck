@@ -29,6 +29,7 @@ APP_BRIDGE_PATH="$APP_PATH/Contents/Resources/bin/dockdeck-claude-bridge"
 LICENSES_PATH="$APP_PATH/Contents/Resources/Licenses"
 PLIST_PATH="$HOME/Library/LaunchAgents/$LABEL.plist"
 LOG_PATH="$HOME/Library/Logs/DockDeck.log"
+LSREGISTER="/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister"
 
 SIGNING_IDENTITY="${DOCKDECK_SIGNING_IDENTITY:-}"
 SIGNING_SOURCE="configured"
@@ -131,6 +132,11 @@ cat > "$APP_PATH/Contents/Info.plist" <<EOF
 EOF
 
 codesign --force --deep --sign "$SIGNING_IDENTITY" --identifier "$LABEL" "$APP_PATH"
+
+# Keep Accessibility settings pointed at the signed login-item build when a
+# separately packaged ad-hoc preview has also been opened on this Mac.
+"$LSREGISTER" -u "$REPO_DIR/.build/release-dist/DockDeck.app" 2>/dev/null || true
+"$LSREGISTER" -f "$APP_PATH"
 
 mkdir -p "$HOME/Library/LaunchAgents"
 
