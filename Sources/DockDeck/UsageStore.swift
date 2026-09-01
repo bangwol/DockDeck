@@ -77,7 +77,7 @@ enum UsageProviderError: LocalizedError {
         case .executableNotFound:
             "Codex CLI executable not found"
         case .bridgeNotInstalled:
-            "Claude Code 2.1.251+ status-line bridge cache not found"
+            "Claude Code 2.1.80+ status-line bridge cache not found"
         case .authenticationRequired(let message), .invalidResponse(let message),
             .transport(let message):
             message
