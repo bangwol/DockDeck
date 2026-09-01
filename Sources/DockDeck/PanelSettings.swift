@@ -91,6 +91,7 @@ struct PanelModuleID: Hashable, Codable {
         .usage, .systemStats, .serviceMonitor, .weather, .schedule, .clock, .battery,
         .network,
     ]
+    static let builtIns: [PanelModuleID] = [.terminal] + readOnlyBuiltIns
 
     init(rawValue: String) {
         self.rawValue = rawValue
@@ -106,9 +107,12 @@ struct PanelModuleID: Hashable, Codable {
     }
 }
 
-enum PanelSide: String, Codable {
+enum PanelSide: String, Codable, CaseIterable, Identifiable {
     case left
     case right
+
+    var id: Self { self }
+    var opposite: Self { self == .left ? .right : .left }
 }
 
 struct PanelDeckConfiguration: Codable, Equatable {
@@ -131,6 +135,15 @@ struct PanelDeckConfiguration: Codable, Equatable {
         return nil
     }
 
+    func modules(on side: PanelSide) -> [PanelModuleID] {
+        side == .left ? left : right
+    }
+
+    func enabledModules(on side: PanelSide) -> [PanelModuleID] {
+        let enabled = Set(enabled)
+        return modules(on: side).filter(enabled.contains)
+    }
+
     func contains(_ module: PanelModuleID) -> Bool {
         enabled.contains(module)
     }
@@ -138,6 +151,20 @@ struct PanelDeckConfiguration: Codable, Equatable {
     mutating func setEnabled(_ value: Bool, for module: PanelModuleID) {
         enabled.removeAll { $0 == module }
         if value { enabled.append(module) }
+    }
+
+    mutating func move(_ module: PanelModuleID, to side: PanelSide, at index: Int) {
+        guard left.contains(module) || right.contains(module) else { return }
+        left.removeAll { $0 == module }
+        right.removeAll { $0 == module }
+
+        switch side {
+        case .left:
+            left.insert(module, at: min(max(index, 0), left.count))
+        case .right:
+            right.insert(module, at: min(max(index, 0), right.count))
+        }
+        self = normalized()
     }
 
     func normalized() -> Self {
@@ -149,16 +176,9 @@ struct PanelDeckConfiguration: Codable, Equatable {
             left.append(.terminal)
             seen.insert(.terminal)
         }
-        if !seen.contains(.usage) {
-            right.append(.usage)
-            seen.insert(.usage)
-        }
-
-        let readOnlySide: PanelSide = left.contains(.terminal) ? .right : .left
-        left.removeAll { PanelModuleID.readOnlyBuiltIns.contains($0) }
-        right.removeAll { PanelModuleID.readOnlyBuiltIns.contains($0) }
-        for module in PanelModuleID.readOnlyBuiltIns {
-            switch readOnlySide {
+        let defaultReadOnlySide: PanelSide = left.contains(.terminal) ? .right : .left
+        for module in PanelModuleID.readOnlyBuiltIns where !seen.contains(module) {
+            switch defaultReadOnlySide {
             case .left: left.append(module)
             case .right: right.append(module)
             }
@@ -175,7 +195,17 @@ struct PanelDeckConfiguration: Codable, Equatable {
             enabled = [.terminal, .usage]
         }
 
+        let enabledSet = Set(enabled)
+        left = stableEnabledFirst(left, enabled: enabledSet)
+        right = stableEnabledFirst(right, enabled: enabledSet)
+
         return Self(left: left, right: right, enabled: enabled)
+    }
+
+    private func stableEnabledFirst(
+        _ modules: [PanelModuleID], enabled: Set<PanelModuleID>
+    ) -> [PanelModuleID] {
+        modules.filter(enabled.contains) + modules.filter { !enabled.contains($0) }
     }
 
     private func uniqueModules(
@@ -217,6 +247,8 @@ enum PanelSettings {
     private static let systemStatsRefreshIntervalKey =
         "DockDeck.settings.systemStatsRefreshInterval"
     private static let activeReadOnlyModuleKey = "DockDeck.settings.activeReadOnlyModule"
+    private static let activeLeftModuleKey = "DockDeck.settings.activeLeftModule"
+    private static let activeRightModuleKey = "DockDeck.settings.activeRightModule"
     private static let serviceMonitorEndpointsKey = "DockDeck.settings.serviceMonitorEndpoints"
     private static let serviceMonitorRefreshIntervalKey =
         "DockDeck.settings.serviceMonitorRefreshInterval"
@@ -325,11 +357,17 @@ enum PanelSettings {
         }
         set {
             var configuration = deckConfiguration
-            let terminalIsLeft = configuration.side(containing: .terminal) != .right
-            guard terminalIsLeft != (newValue == .terminalLeft) else { return }
-            swap(&configuration.left, &configuration.right)
+            let destination: PanelSide = newValue == .terminalLeft ? .left : .right
+            guard configuration.side(containing: .terminal) != destination else { return }
+            configuration.move(.terminal, to: destination, at: 0)
             deckConfiguration = configuration
+            setActiveModule(.terminal, on: destination)
         }
+    }
+
+    static func enabledModules(on side: PanelSide) -> [PanelModuleID] {
+        let supported = Set(PanelModuleID.builtIns)
+        return deckConfiguration.enabledModules(on: side).filter(supported.contains)
     }
 
     static var enabledReadOnlyModules: [PanelModuleID] {
@@ -341,19 +379,30 @@ enum PanelSettings {
         }
     }
 
-    static var activeReadOnlyModule: PanelModuleID? {
-        get {
-            let preferred = UserDefaults.standard.string(forKey: activeReadOnlyModuleKey)
-                .map(PanelModuleID.init(rawValue:))
-            return ReadOnlyDeckSelection.resolved(
-                preferred: preferred, enabledModules: enabledReadOnlyModules)
-        }
-        set {
-            if let newValue {
-                UserDefaults.standard.set(newValue.rawValue, forKey: activeReadOnlyModuleKey)
-            } else {
-                UserDefaults.standard.removeObject(forKey: activeReadOnlyModuleKey)
-            }
+    static func activeModule(on side: PanelSide) -> PanelModuleID? {
+        let configuration = deckConfiguration
+        let supported = Set(PanelModuleID.builtIns)
+        let enabledModules = configuration.enabledModules(on: side).filter(supported.contains)
+        guard !enabledModules.isEmpty else { return nil }
+
+        let defaults = UserDefaults.standard
+        let stored = defaults.string(forKey: activeModuleKey(for: side))
+            .map(PanelModuleID.init(rawValue:))
+        let legacy = defaults.string(forKey: activeReadOnlyModuleKey)
+            .map(PanelModuleID.init(rawValue:))
+        let preferred = stored
+            ?? (legacy.flatMap { enabledModules.contains($0) ? $0 : nil })
+            ?? (enabledModules.contains(.terminal) ? .terminal : nil)
+        return ReadOnlyDeckSelection.resolved(
+            preferred: preferred, enabledModules: enabledModules)
+    }
+
+    static func setActiveModule(_ module: PanelModuleID?, on side: PanelSide) {
+        let defaults = UserDefaults.standard
+        if let module, enabledModules(on: side).contains(module) {
+            defaults.set(module.rawValue, forKey: activeModuleKey(for: side))
+        } else {
+            defaults.removeObject(forKey: activeModuleKey(for: side))
         }
     }
 
@@ -644,6 +693,8 @@ enum PanelSettings {
         defaults.removeObject(forKey: enabledUsageProvidersKey)
         defaults.removeObject(forKey: systemStatsRefreshIntervalKey)
         defaults.removeObject(forKey: activeReadOnlyModuleKey)
+        defaults.removeObject(forKey: activeLeftModuleKey)
+        defaults.removeObject(forKey: activeRightModuleKey)
         defaults.removeObject(forKey: serviceMonitorEndpointsKey)
         defaults.removeObject(forKey: serviceMonitorRefreshIntervalKey)
         defaults.removeObject(forKey: weatherLocationKey)
@@ -717,5 +768,9 @@ enum PanelSettings {
             if result.count == 100 { break }
         }
         return result
+    }
+
+    private static func activeModuleKey(for side: PanelSide) -> String {
+        side == .left ? activeLeftModuleKey : activeRightModuleKey
     }
 }

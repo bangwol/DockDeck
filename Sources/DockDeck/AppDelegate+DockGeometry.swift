@@ -15,17 +15,14 @@ extension AppDelegate {
             let screen = expansionScreenID.flatMap(screen(for:)) ?? presence.host
             return expandedFrame(on: screen)
         }
-        let collapsed = collapsedFrames(for: presence).terminal
+        let side = PanelSettings.deckConfiguration.side(containing: .terminal) ?? .left
+        let collapsed = collapsedFrames(for: presence).frame(on: side)
         guard isFocusExpanded, let collapsed else { return collapsed }
         return focusedTerminalFrame(collapsed: collapsed, hostFrame: presence.host.frame)
     }
 
     func collapsedFrames(for presence: DockPresence) -> DockPanelFrames {
-        dockCoordinator.frames(for: presence).ordered(PanelSettings.panelOrder)
-    }
-
-    func readOnlyDeckFrame(for presence: DockPresence) -> NSRect? {
-        collapsedFrames(for: presence).quota
+        dockCoordinator.frames(for: presence)
     }
 
     func expandedFrame(on screen: NSScreen) -> NSRect {
@@ -38,7 +35,8 @@ extension AppDelegate {
     }
 
     func fallbackFrame(on screen: NSScreen) -> NSRect {
-        dockCoordinator.fallbackFrames(on: screen).ordered(PanelSettings.panelOrder).terminal
+        let side = PanelSettings.deckConfiguration.side(containing: .terminal) ?? .left
+        return dockCoordinator.fallbackFrames(on: screen).frame(on: side)
             ?? NSRect(
                 x: screen.frame.minX, y: screen.frame.minY,
                 width: Self.fallbackWidth, height: Self.fallbackHeight)
@@ -51,7 +49,9 @@ extension AppDelegate {
         refreshCoarseCaches()
         let presence = resolveDockPresence()
         let screen = expansionScreen(fallingBackTo: presence?.host)
-        let collapsed = collapsedFrame ?? presence.flatMap { collapsedFrames(for: $0).terminal }
+        let side = PanelSettings.deckConfiguration.side(containing: .terminal) ?? .left
+        let collapsed = collapsedFrame
+            ?? presence.flatMap { collapsedFrames(for: $0).frame(on: side) }
         if let screen, let collapsed {
             setFocusedTerminalResizable(collapsed: collapsed, hostFrame: screen.frame)
             showTerminal(
@@ -87,17 +87,17 @@ extension AppDelegate {
         applyTerminalAppearance()
         refreshCoarseCaches()
         let presence = resolveDockPresence()
-        if let target = collapseTarget(for: presence) {
-            showTerminal(target, animated: animated)
+        if let presence, case .concealed = presence {
+            panel.orderOut(nil)
+            hideReadOnlyDecks()
+        } else if let presence {
+            showPanels(
+                in: collapsedFrames(for: presence),
+                terminalTarget: collapseTarget(for: presence),
+                terminalAnimated: animated)
         } else {
             panel.orderOut(nil)
-        }
-        if let presence, case .concealed = presence {
-            hideReadOnlyDeck()
-        } else if let presence, let frame = readOnlyDeckFrame(for: presence) {
-            showReadOnlyDeck(frame)
-        } else {
-            hideReadOnlyDeck()
+            hideReadOnlyDecks()
         }
         debugLog("expand", "returned terminal to Dock")
         updateFallbackHintVisibility()
@@ -108,7 +108,9 @@ extension AppDelegate {
         refreshCoarseCaches()
         let presence = resolveDockPresence()
         let screen = expansionScreen(fallingBackTo: presence?.host)
-        let collapsed = collapsedFrame ?? presence.flatMap { collapsedFrames(for: $0).terminal }
+        let side = PanelSettings.deckConfiguration.side(containing: .terminal) ?? .left
+        let collapsed = collapsedFrame
+            ?? presence.flatMap { collapsedFrames(for: $0).frame(on: side) }
         guard let screen, let collapsed else { return }
         setFocusedTerminalResizable(collapsed: collapsed, hostFrame: screen.frame)
         showTerminal(

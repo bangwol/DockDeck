@@ -18,18 +18,33 @@ extension AppDelegate {
             NSMenuItem(
                 title: "Settings…",
                 action: #selector(toggleSettingsPanel(_:)), keyEquivalent: ""))
-        if PanelSettings.enabledReadOnlyModules.count > 1 {
-            menu.addItem(
-                NSMenuItem(
+        let configuration = PanelSettings.deckConfiguration
+        if let side = configuration.side(containing: .terminal) {
+            let modules = configuration.enabledModules(on: side)
+            if modules.count > 1 {
+                let next = NSMenuItem(
                     title: "Show Next Module",
-                    action: #selector(showNextReadOnlyModule(_:)), keyEquivalent: ""))
-        }
-        if readOnlyDeckPanelController.activeModule == .usage {
-            menu.addItem(
-                NSMenuItem(
-                    title: PanelSettings.usageDisplayMode == .remaining
-                        ? "Show Used Values" : "Show Remaining Values",
-                    action: #selector(toggleUsageDisplayMode(_:)), keyEquivalent: ""))
+                    action: #selector(showNextTerminalDeckModule(_:)), keyEquivalent: "")
+                next.target = self
+                menu.addItem(next)
+
+                let moduleItem = NSMenuItem(title: "Modules", action: nil, keyEquivalent: "")
+                let moduleMenu = NSMenu(title: "Modules")
+                for module in modules {
+                    guard let definition = PanelModuleRegistry.definition(for: module) else {
+                        continue
+                    }
+                    let item = NSMenuItem(
+                        title: definition.title,
+                        action: #selector(selectTerminalDeckModule(_:)), keyEquivalent: "")
+                    item.target = self
+                    item.representedObject = module.rawValue
+                    item.state = module == .terminal ? .on : .off
+                    moduleMenu.addItem(item)
+                }
+                moduleItem.submenu = moduleMenu
+                menu.addItem(moduleItem)
+            }
         }
         menu.addItem(
             NSMenuItem(

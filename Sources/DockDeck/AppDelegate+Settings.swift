@@ -7,46 +7,81 @@ extension AppDelegate {
             return
         }
 
-        let terminalEnabled = PanelSettings.enabledPanels.contains(.terminal)
+        let terminalVisible = panel.isVisible
+        let anchor = terminalVisible
+            ? panel
+            : readOnlyDeckPanelControllers.first(where: { $0.panel.isVisible })?.panel ?? panel
         presentSettingsPanel(
             pane: savedSettingsPane,
-            anchor: terminalEnabled ? panel : readOnlyDeckPanel,
-            restoreTerminalFocus: terminalEnabled)
+            anchor: anchor,
+            restoreTerminalFocus: terminalVisible)
     }
 
     @objc func openReadOnlyModuleSettings(_ sender: Any?) {
-        let pane = readOnlyDeckPanelController.activeModule
+        let controller = readOnlyDeckController(from: sender)
+            ?? readOnlyDeckPanelControllers.first(where: { $0.panel.isVisible })
+            ?? rightReadOnlyDeckPanelController
+        let pane = controller?.activeModule
             .flatMap { PanelModuleRegistry.definition(for: $0)?.settingsPane } ?? .decks
         if let settingsPanel {
             (settingsPanel.contentView as? SettingsPanelView)?.selectPane(pane)
             settingsPanel.makeKeyAndOrderFront(nil)
             return
         }
-        presentSettingsPanel(pane: pane, anchor: readOnlyDeckPanel, restoreTerminalFocus: false)
+        presentSettingsPanel(pane: pane, anchor: controller?.panel ?? panel, restoreTerminalFocus: false)
     }
 
-    @objc func showNextReadOnlyModule(_ sender: Any?) {
-        readOnlyDeckPanelController.selectNext()
-    }
-
-    @objc func selectReadOnlyModule(_ sender: Any?) {
-        guard
-            let item = sender as? NSMenuItem,
-            let rawValue = item.representedObject as? String
+    @objc func showNextTerminalDeckModule(_ sender: Any?) {
+        guard let side = PanelSettings.deckConfiguration.side(containing: .terminal),
+            let next = ReadOnlyDeckSelection.next(
+                after: .terminal, enabledModules: PanelSettings.enabledModules(on: side))
         else { return }
-        readOnlyDeckPanelController.select(PanelModuleID(rawValue: rawValue))
+        PanelSettings.setActiveModule(next, on: side)
+        deckSelectionDidChange(on: side)
+    }
+
+    @objc func selectTerminalDeckModule(_ sender: Any?) {
+        guard let item = sender as? NSMenuItem,
+            let rawValue = item.representedObject as? String,
+            let side = PanelSettings.deckConfiguration.side(containing: .terminal)
+        else { return }
+        let module = PanelModuleID(rawValue: rawValue)
+        guard PanelSettings.enabledModules(on: side).contains(module) else { return }
+        PanelSettings.setActiveModule(module, on: side)
+        deckSelectionDidChange(on: side)
     }
 
     @objc func toggleUsageDisplayMode(_ sender: Any?) {
         PanelSettings.usageDisplayMode =
             PanelSettings.usageDisplayMode == .remaining ? .used : .remaining
-        readOnlyDeckPanelController.applySettings()
+        for controller in readOnlyDeckPanelControllers { controller.applySettings() }
     }
 
     @objc func swapPanelSides(_ sender: Any?) {
         PanelSettings.panelOrder =
             PanelSettings.panelOrder == .terminalLeft ? .terminalRight : .terminalLeft
         applyPanelOrder()
+    }
+
+    func deckSelectionDidChange(on side: PanelSide) {
+        debugLog("deck-selection", side.rawValue)
+        if terminalPanelMode != .docked {
+            terminalPanelMode = .docked
+            expansionScreenID = nil
+            terminalPanelController.setResizable(false)
+            applyTerminalAppearance()
+        }
+        for controller in readOnlyDeckPanelControllers { controller.applySettings() }
+        isFrozen = false
+        refreshCoarseCaches()
+        runEvaluation()
+    }
+
+    private func readOnlyDeckController(from sender: Any?) -> ReadOnlyDeckPanelController? {
+        guard let rawValue = (sender as? NSMenuItem)?.representedObject as? String,
+            let side = PanelSide(rawValue: rawValue)
+        else { return nil }
+        return readOnlyDeckPanelController(on: side)
     }
 
     private var savedSettingsPane: SettingsPaneID {
@@ -93,7 +128,7 @@ extension AppDelegate {
             self.applyCornerRadius()
             self.applyTintOpacity()
             self.applyFont()
-            self.readOnlyDeckPanelController.applySettings()
+            for controller in self.readOnlyDeckPanelControllers { controller.applySettings() }
             self.applyPanelVisibility()
             view?.setValues(self.currentSettingsValues)
             self.resizeFocusedTerminalIfNeeded()
@@ -169,8 +204,15 @@ extension AppDelegate {
     private func applySettingsChange(_ change: SettingsPanelChange) {
         switch change {
         case .deck(let configuration):
+            let previousTerminalSide = PanelSettings.deckConfiguration.side(containing: .terminal)
             PanelSettings.deckConfiguration = configuration
-            readOnlyDeckPanelController.applySettings()
+            if let terminalSide = configuration.side(containing: .terminal),
+                terminalSide != previousTerminalSide
+            {
+                collapsedFrame = nil
+                PanelSettings.setActiveModule(.terminal, on: terminalSide)
+            }
+            for controller in readOnlyDeckPanelControllers { controller.applySettings() }
             applyPanelVisibility()
         case .terminal(.focusSize(let width, let height)):
             PanelSettings.focusWidthMultiplier = width
@@ -181,20 +223,20 @@ extension AppDelegate {
             applyFont()
         case .usage(.displayMode(let mode)):
             PanelSettings.usageDisplayMode = mode
-            readOnlyDeckPanelController.applySettings()
+            for controller in readOnlyDeckPanelControllers { controller.applySettings() }
         case .usage(.providers(let providers)):
             PanelSettings.enabledUsageProviders = providers
             usageStore.setEnabledProviders(providers)
-            readOnlyDeckPanelController.applySettings()
+            for controller in readOnlyDeckPanelControllers { controller.applySettings() }
         case .usage(.font(let name)):
             PanelSettings.usageFontName = name
-            readOnlyDeckPanelController.applySettings()
+            for controller in readOnlyDeckPanelControllers { controller.applySettings() }
         case .usage(.fontSize(let size)):
             PanelSettings.usageFontSize = size
-            readOnlyDeckPanelController.applySettings()
+            for controller in readOnlyDeckPanelControllers { controller.applySettings() }
         case .usage(.textColor(let color)):
             PanelSettings.usageTextColor = color
-            readOnlyDeckPanelController.applySettings()
+            for controller in readOnlyDeckPanelControllers { controller.applySettings() }
         case .systemStats(.refreshInterval(let interval)):
             PanelSettings.systemStatsRefreshInterval = interval
             systemStatsStore.setRefreshInterval(interval)
@@ -228,10 +270,10 @@ extension AppDelegate {
             applyScheduleConfiguration()
         case .clock(.timeZoneIdentifier(let identifier)):
             PanelSettings.clockTimeZoneIdentifier = identifier
-            readOnlyDeckPanelController.applySettings()
+            for controller in readOnlyDeckPanelControllers { controller.applySettings() }
         case .clock(.hourFormat(let format)):
             PanelSettings.clockHourFormat = format
-            readOnlyDeckPanelController.applySettings()
+            for controller in readOnlyDeckPanelControllers { controller.applySettings() }
         case .battery(.refreshInterval(let interval)):
             PanelSettings.batteryRefreshInterval = interval
             batteryStore.setRefreshInterval(interval)
@@ -271,7 +313,7 @@ extension AppDelegate {
         settingsPanel = nil
         settingsPanelRestoresTerminalFocus = false
 
-        guard restoreTerminalFocus, PanelSettings.enabledPanels.contains(.terminal) else { return }
+        guard restoreTerminalFocus, panel.isVisible else { return }
         DispatchQueue.main.async { [weak self] in
             guard let self else { return }
             self.panel.makeKeyAndOrderFront(nil)
@@ -293,12 +335,12 @@ extension AppDelegate {
 
     func applyCornerRadius() {
         terminalPanelController.applyCornerRadius()
-        readOnlyDeckPanelController.applyCornerRadius()
+        for controller in readOnlyDeckPanelControllers { controller.applyCornerRadius() }
     }
 
     func applyTintOpacity() {
         applyTerminalAppearance()
-        readOnlyDeckPanelController.applyTheme(currentTheme)
+        for controller in readOnlyDeckPanelControllers { controller.applyTheme(currentTheme) }
     }
 
     func applyFont() {
@@ -309,6 +351,7 @@ extension AppDelegate {
     }
 
     func applyPanelOrder() {
+        collapsedFrame = nil
         isFrozen = false
         refreshCoarseCaches()
         runEvaluation()
@@ -323,9 +366,9 @@ extension AppDelegate {
             terminalPanelController.setResizable(false)
             if panel.isVisible { panel.orderOut(nil) }
         }
-        readOnlyDeckPanelController.applySettings()
-        if PanelSettings.enabledReadOnlyModules.isEmpty {
-            hideReadOnlyDeck(reason: "disabled in settings")
+        for controller in readOnlyDeckPanelControllers { controller.applySettings() }
+        for side in PanelSide.allCases where PanelSettings.activeModule(on: side) == nil {
+            hideReadOnlyDeck(on: side, reason: "disabled in settings")
         }
         refreshCoarseCaches()
         runEvaluation()

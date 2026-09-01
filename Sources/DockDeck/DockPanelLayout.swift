@@ -4,6 +4,10 @@ struct DockPanelFrames: Equatable {
     let terminal: NSRect?
     let quota: NSRect?
 
+    func frame(on side: PanelSide) -> NSRect? {
+        side == .left ? terminal : quota
+    }
+
     func ordered(_ order: PanelOrder) -> DockPanelFrames {
         switch order {
         case .terminalLeft: self

@@ -338,6 +338,55 @@ final class SettingsPanelModel: ObservableObject {
         publishDeck(configuration)
     }
 
+    func moveModule(
+        _ module: PanelModuleID, to side: PanelSide, before target: PanelModuleID? = nil
+    ) {
+        guard module != target, PanelModuleRegistry.definition(for: module) != nil else { return }
+        var configuration = values.deckConfiguration
+        let destination = configuration.modules(on: side).filter { $0 != module }
+        let index = target.flatMap(destination.firstIndex(of:)) ?? destination.count
+        configuration.move(module, to: side, at: index)
+        publishDeck(configuration)
+    }
+
+    func moveModuleUp(_ module: PanelModuleID) {
+        guard let side = side(containing: module) else { return }
+        let modules = values.deckConfiguration.modules(on: side)
+        guard let index = modules.firstIndex(of: module), index > 0,
+            isEnabled(modules[index - 1]) == isEnabled(module)
+        else { return }
+        var configuration = values.deckConfiguration
+        configuration.move(module, to: side, at: index - 1)
+        publishDeck(configuration)
+    }
+
+    func moveModuleDown(_ module: PanelModuleID) {
+        guard let side = side(containing: module) else { return }
+        let modules = values.deckConfiguration.modules(on: side)
+        guard let index = modules.firstIndex(of: module), index + 1 < modules.count,
+            isEnabled(modules[index + 1]) == isEnabled(module)
+        else { return }
+        var configuration = values.deckConfiguration
+        configuration.move(module, to: side, at: index + 1)
+        publishDeck(configuration)
+    }
+
+    func canMoveModuleUp(_ module: PanelModuleID) -> Bool {
+        guard let side = side(containing: module) else { return false }
+        let modules = values.deckConfiguration.modules(on: side)
+        guard let index = modules.firstIndex(of: module), index > 0 else { return false }
+        return isEnabled(modules[index - 1]) == isEnabled(module)
+    }
+
+    func canMoveModuleDown(_ module: PanelModuleID) -> Bool {
+        guard let side = side(containing: module) else { return false }
+        let modules = values.deckConfiguration.modules(on: side)
+        guard let index = modules.firstIndex(of: module), index + 1 < modules.count else {
+            return false
+        }
+        return isEnabled(modules[index + 1]) == isEnabled(module)
+    }
+
     func swapDecks() {
         var configuration = values.deckConfiguration
         swap(&configuration.left, &configuration.right)
@@ -540,9 +589,12 @@ final class SettingsPanelModel: ObservableObject {
     private static func moduleDefinitions(
         in configuration: PanelDeckConfiguration
     ) -> [PanelModuleDefinition] {
-        (configuration.left + configuration.right).compactMap {
+        let definitions = (configuration.left + configuration.right).compactMap {
             PanelModuleRegistry.definition(for: $0)
         }
+        let enabled = Set(configuration.enabled)
+        return definitions.filter { enabled.contains($0.id) }
+            + definitions.filter { !enabled.contains($0.id) }
     }
 
     private func updateValues(_ update: (inout SettingsPanelValues) -> Void) {

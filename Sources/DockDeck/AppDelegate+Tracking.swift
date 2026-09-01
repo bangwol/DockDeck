@@ -33,7 +33,7 @@ extension AppDelegate {
     }
 
     func isArmed() -> Bool {
-        if panel.isVisible || readOnlyDeckPanel.isVisible { return true }
+        if panel.isVisible || readOnlyDeckPanels.contains(where: \.isVisible) { return true }
         let pointer = NSEvent.mouseLocation
         return NSScreen.screens.contains { screen in
             let frame = screen.frame
@@ -82,9 +82,12 @@ extension AppDelegate {
             debugLog("screens", "no screen at all; falling back\(isHeld ? " (held)" : "")")
             lastPresenceUntracked = true
             guard !isHeld else { return }
-            showTerminal(
-                NSRect(x: 0, y: 0, width: Self.fallbackWidth, height: Self.fallbackHeight))
-            hideReadOnlyDeck()
+            let left = NSRect(
+                x: 0, y: 0, width: Self.fallbackWidth, height: Self.fallbackHeight)
+            let right = NSRect(
+                x: left.maxX + DockPanelLayout.gap, y: 0,
+                width: Self.fallbackWidth, height: Self.fallbackHeight)
+            showPanels(in: DockPanelFrames(terminal: left, quota: right))
             return
         }
         evaluate(presence)
@@ -138,33 +141,55 @@ extension AppDelegate {
                 debugLog("visibility", "concealing with the Dock")
                 panel.orderOut(nil)
             }
-            if readOnlyDeckPanel.isVisible { readOnlyDeckPanel.orderOut(nil) }
+            hideReadOnlyDecks()
         }
     }
 
     func showPanels(for presence: DockPresence) {
         let frames = collapsedFrames(for: presence)
-        let enabledPanels = PanelSettings.enabledPanels
-        if enabledPanels.contains(.terminal), let terminalFrame = terminalFrame(for: presence) {
-            showTerminal(terminalFrame)
-        } else if panel.isVisible {
-            let reason = enabledPanels.contains(.terminal)
-                ? "insufficient space beside Dock" : "disabled in settings"
-            debugLog("visibility", "hiding terminal; \(reason)")
-            panel.orderOut(nil)
+        showPanels(in: frames, terminalTarget: terminalFrame(for: presence))
+    }
+
+    func showPanels(
+        in frames: DockPanelFrames, terminalTarget: NSRect? = nil,
+        terminalAnimated: Bool = false
+    ) {
+        let configuration = PanelSettings.deckConfiguration
+        let terminalSide = configuration.side(containing: .terminal) ?? .left
+        let terminalActive = configuration.contains(.terminal)
+            && PanelSettings.activeModule(on: terminalSide) == .terminal
+        let terminalFrame = terminalTarget ?? frames.frame(on: terminalSide)
+        if terminalActive, let terminalFrame {
+            showTerminal(terminalFrame, animated: terminalAnimated)
+        } else {
+            if panel.isVisible {
+                let reason = terminalActive
+                    ? "insufficient space beside Dock" : "another deck module is active"
+                debugLog("visibility", "hiding terminal; \(reason)")
+                panel.orderOut(nil)
+            }
         }
 
-        if !PanelSettings.enabledReadOnlyModules.isEmpty, let readOnlyFrame = frames.quota {
-            showReadOnlyDeck(readOnlyFrame)
-        } else {
-            let reason = !PanelSettings.enabledReadOnlyModules.isEmpty
-                ? "insufficient space beside Dock" : "disabled in settings"
-            hideReadOnlyDeck(reason: reason)
+        for side in PanelSide.allCases {
+            let activeModule = PanelSettings.activeModule(on: side)
+            if let activeModule, activeModule != .terminal, let frame = frames.frame(on: side) {
+                showReadOnlyDeck(on: side, frame: frame)
+            } else {
+                let reason = activeModule == nil
+                    ? "no enabled module in deck"
+                    : activeModule == .terminal
+                        ? "terminal is active" : "insufficient space beside Dock"
+                hideReadOnlyDeck(on: side, reason: reason)
+            }
         }
     }
 
     func showTerminal(_ frame: NSRect, animated: Bool = false) {
-        guard PanelSettings.enabledPanels.contains(.terminal) else {
+        let configuration = PanelSettings.deckConfiguration
+        guard configuration.contains(.terminal),
+            let side = configuration.side(containing: .terminal),
+            PanelSettings.activeModule(on: side) == .terminal
+        else {
             if panel.isVisible { panel.orderOut(nil) }
             return
         }
@@ -172,19 +197,30 @@ extension AppDelegate {
         applyFrame(frame, animated: animated)
     }
 
-    func showReadOnlyDeck(_ frame: NSRect) {
-        guard !PanelSettings.enabledReadOnlyModules.isEmpty else {
-            hideReadOnlyDeck(reason: "disabled in settings")
+    func showReadOnlyDeck(on side: PanelSide, frame: NSRect) {
+        let controller = readOnlyDeckPanelController(on: side)
+        guard let activeModule = PanelSettings.activeModule(on: side),
+            activeModule != .terminal
+        else {
+            hideReadOnlyDeck(on: side, reason: "no read-only module is active")
             return
         }
-        if !readOnlyDeckPanel.isVisible { readOnlyDeckPanel.orderFrontRegardless() }
-        applyReadOnlyDeckFrame(frame)
+        controller.applySettings()
+        if !controller.panel.isVisible { controller.panel.orderFrontRegardless() }
+        applyReadOnlyDeckFrame(frame, on: side)
     }
 
-    func hideReadOnlyDeck(reason: String = "insufficient space beside Dock") {
-        guard readOnlyDeckPanel.isVisible else { return }
-        debugLog("visibility", "hiding read-only deck; \(reason)")
-        readOnlyDeckPanel.orderOut(nil)
+    func hideReadOnlyDeck(
+        on side: PanelSide, reason: String = "insufficient space beside Dock"
+    ) {
+        let panel = readOnlyDeckPanelController(on: side).panel
+        guard panel.isVisible else { return }
+        debugLog("visibility", "hiding \(side.rawValue) deck; \(reason)")
+        panel.orderOut(nil)
+    }
+
+    func hideReadOnlyDecks(reason: String = "insufficient space beside Dock") {
+        for side in PanelSide.allCases { hideReadOnlyDeck(on: side, reason: reason) }
     }
 
     func restoreLastFullyVisibleFrameIfStranded(on host: NSScreen) {
@@ -227,10 +263,11 @@ extension AppDelegate {
             }, completionHandler: layoutTerminal)
     }
 
-    func applyReadOnlyDeckFrame(_ frame: NSRect) {
-        guard readOnlyDeckPanel.frame != frame else { return }
-        debugLog("read-only-frame", "\(frame)")
-        readOnlyDeckPanel.setFrame(frame, display: true)
+    func applyReadOnlyDeckFrame(_ frame: NSRect, on side: PanelSide) {
+        let panel = readOnlyDeckPanelController(on: side).panel
+        guard panel.frame != frame else { return }
+        debugLog("\(side.rawValue)-deck-frame", "\(frame)")
+        panel.setFrame(frame, display: true)
     }
 
     func collapseTarget(for presence: DockPresence?) -> NSRect? {
@@ -245,7 +282,8 @@ extension AppDelegate {
         guard let presence else {
             return NSRect(x: 0, y: 0, width: Self.fallbackWidth, height: Self.fallbackHeight)
         }
-        return collapsedFrames(for: presence).terminal
+        let side = PanelSettings.deckConfiguration.side(containing: .terminal) ?? .left
+        return collapsedFrames(for: presence).frame(on: side)
     }
 
     func expansionScreen(fallingBackTo host: NSScreen?) -> NSScreen? {

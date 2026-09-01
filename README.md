@@ -18,7 +18,7 @@
   <sub>Compact terminal and configurable Codex and Claude usage beside the macOS Dock. Open the image for full resolution.</sub>
 </p>
 
-DockDeck uses the space beside a bottom-aligned Dock for two compact developer panels. The terminal stays interactive while a read-only Deck hosts Usage, System Stats, Service Monitor, Weather, Schedule, World Clock, Battery, and Network modules; either Deck can be hidden or placed on either side. Both follow the Dock across displays, Spaces, and auto-hide transitions.
+DockDeck uses the space beside a bottom-aligned Dock for two compact module Decks. Assign Terminal, Usage, System Stats, Service Monitor, Weather, Schedule, World Clock, Battery, and Network to either side; each Deck shows one enabled module at a time. The terminal stays interactive whenever it is selected. Both Decks follow the Dock across displays, Spaces, and auto-hide transitions.
 
 ## Features
 
@@ -51,9 +51,9 @@ Keyboard shortcuts:
 
 DockDeck reserves the Command-key shortcuts above plus the standard `⌘C`, `⌘V`, and `⌘A` editing shortcuts. `Ctrl` combinations, Option/Meta, Esc, Tab, arrow keys, Home/End, Delete, and F1–F12 continue through SwiftTerm's normal terminal input handling. Option acts as Meta by default. Page Up and Page Down follow SwiftTerm's terminal scrolling behavior unless the running terminal application requests cursor-key handling.
 
-Click the terminal to expand it, then click elsewhere to return it to the Dock. Drag any edge to resize it; DockDeck restores those proportions the next time it expands. Right-click the read-only Deck to switch between enabled modules. Open the shared **Settings…** panel from either panel. `⌘E` toggles a separate, fixed 75% large-terminal mode; its menu action is labeled **Return Terminal to Dock** while active. Running `exit` starts a fresh DockDeck login shell; use `⌘Q` to quit the app.
+Click the terminal to expand it, then click elsewhere to return it to the Dock. Drag any edge to resize it; DockDeck restores those proportions the next time it expands. Right-click either Deck to switch among its enabled modules. Open the shared **Settings…** panel from either panel. `⌘E` selects Terminal and toggles a separate, fixed 75% large-terminal mode; its menu action is labeled **Return Terminal to Dock** while active. Running `exit` starts a fresh DockDeck login shell; use `⌘Q` to quit the app.
 
-Settings are organized into **Decks**, module-specific pages, and **Appearance**. Decks show the modules assigned to each side of the Dock, enable or disable each module, and swap the complete left and right Decks. At least one module remains visible so Settings stays reachable. Disabled modules stop sampling and subprocesses. DockDeck remembers the last Settings section you opened.
+Settings are organized into **Decks**, module-specific pages, and **Appearance**. Drag module cards within a Deck to set its cycle order or between Decks to change sides. Enabled modules stay above disabled modules; the same moves are available from each card's context menu. You can also swap the complete left and right Decks. At least one module remains enabled so Settings stays reachable. Disabled modules stop sampling and subprocesses. DockDeck remembers each Deck's selected module and the last Settings section you opened.
 
 ## Reading System Stats
 

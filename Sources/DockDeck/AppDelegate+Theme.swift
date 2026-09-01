@@ -7,7 +7,7 @@ extension AppDelegate {
         terminalView.nativeForegroundColor = theme.foregroundColor
         terminalView.installColors(theme.ansiPalette)
         menuButton.contentTintColor = theme.chromeTintColor
-        readOnlyDeckPanelController.applyTheme(theme)
+        for controller in readOnlyDeckPanelControllers { controller.applyTheme(theme) }
         applyThemeToFallbackHint(theme)
         if persist {
             UserDefaults.standard.set(theme.id, forKey: AppPreferences.themeIDKey)
@@ -24,14 +24,14 @@ extension AppDelegate {
         if let pickerPanel = themePickerPanel {
             pickerPanel.orderOut(nil)
             themePickerPanel = nil
-            if PanelSettings.enabledPanels.contains(.terminal) {
+            if panel.isVisible {
                 panel.makeKeyAndOrderFront(nil)
                 panel.makeFirstResponder(terminalView)
             }
             return
         }
 
-        guard PanelSettings.enabledPanels.contains(.terminal) else { return }
+        guard panel.isVisible else { return }
 
         let picker = ThemePickerView(themes: Theme.all, selectedID: currentTheme.id)
         picker.onCommit = { [weak self] theme in

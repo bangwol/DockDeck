@@ -43,7 +43,12 @@ extension AppDelegate {
     }
 
     @objc func toggleExpanded(_ sender: Any?) {
-        guard PanelSettings.enabledPanels.contains(.terminal) else { return }
+        let configuration = PanelSettings.deckConfiguration
+        guard configuration.contains(.terminal),
+            let terminalSide = configuration.side(containing: .terminal)
+        else { return }
+        PanelSettings.setActiveModule(.terminal, on: terminalSide)
+        for controller in readOnlyDeckPanelControllers { controller.applySettings() }
         refreshCoarseCaches()
         let presence = resolveDockPresence()
 
@@ -61,11 +66,11 @@ extension AppDelegate {
         terminalPanelController.setResizable(false)
         applyTerminalAppearance()
         if let presence, case .concealed = presence {
-            hideReadOnlyDeck()
-        } else if let presence, let frame = readOnlyDeckFrame(for: presence) {
-            showReadOnlyDeck(frame)
+            hideReadOnlyDecks()
+        } else if let presence {
+            showPanels(for: presence)
         } else {
-            hideReadOnlyDeck()
+            hideReadOnlyDecks()
         }
         debugLog("expand", "isExpanded=\(isExpanded) screen=\(describe(expansionScreenID))")
         updateFallbackHintVisibility()

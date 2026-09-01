@@ -13,7 +13,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     static let accessibilityWarmupDelay: TimeInterval = 3
 
     var terminalPanelController: TerminalPanelController!
-    var readOnlyDeckPanelController: ReadOnlyDeckPanelController!
+    var leftReadOnlyDeckPanelController: ReadOnlyDeckPanelController!
+    var rightReadOnlyDeckPanelController: ReadOnlyDeckPanelController!
     lazy var usageStore = UsageStore { [weak self] message in
         self?.debugLog("usage", message)
     }
@@ -30,7 +31,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     let moduleRuntimeCoordinator = ModuleRuntimeCoordinator()
 
     var panel: KeyablePanel { terminalPanelController.panel }
-    var readOnlyDeckPanel: NSPanel { readOnlyDeckPanelController.panel }
+    var readOnlyDeckPanelControllers: [ReadOnlyDeckPanelController] {
+        [leftReadOnlyDeckPanelController, rightReadOnlyDeckPanelController].compactMap { $0 }
+    }
+    var readOnlyDeckPanels: [NSPanel] { readOnlyDeckPanelControllers.map(\.panel) }
+    func readOnlyDeckPanelController(on side: PanelSide) -> ReadOnlyDeckPanelController {
+        side == .left ? leftReadOnlyDeckPanelController : rightReadOnlyDeckPanelController
+    }
     var terminalView: LocalProcessTerminalView { terminalPanelController.terminalView }
     var menuButton: NSButton { terminalPanelController.menuButton }
     var trackingTimer: Timer!
@@ -73,7 +80,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let initialPresence = resolveDockPresence()
         let fallbackScreen = mainDisplayScreen() ?? NSScreen.screens.first
         let fallbackFrames = fallbackScreen.map {
-            dockCoordinator.fallbackFrames(on: $0).ordered(PanelSettings.panelOrder)
+            dockCoordinator.fallbackFrames(on: $0)
         }
         let initialFrames =
             initialPresence.map { collapsedFrames(for: $0) }
@@ -82,17 +89,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 terminal: NSRect(
                     x: 0, y: 0, width: Self.fallbackWidth, height: Self.fallbackHeight),
                 quota: nil)
+        let terminalSide = PanelSettings.deckConfiguration.side(containing: .terminal) ?? .left
         let initialTerminalFrame =
-            initialFrames.terminal
+            initialFrames.frame(on: terminalSide)
             ?? NSRect(x: 0, y: 0, width: Self.fallbackWidth, height: Self.fallbackHeight)
-        let initialQuotaFrame =
-            initialFrames.quota
+        let initialLeftFrame =
+            initialFrames.frame(on: .left)
+            ?? initialTerminalFrame
+        let initialRightFrame =
+            initialFrames.frame(on: .right)
             ?? NSRect(
                 x: initialTerminalFrame.maxX + DockPanelLayout.gap,
                 y: initialTerminalFrame.minY,
                 width: DockPanelLayout.fallbackPanelWidth,
                 height: initialTerminalFrame.height)
-        collapsedFrame = initialFrames.terminal
+        collapsedFrame = initialFrames.frame(on: terminalSide)
         lastPresenceUntracked = initialPresence?.isUntracked ?? true
 
         terminalPanelController = TerminalPanelController(
@@ -104,8 +115,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 self?.debugLog("shell", message)
             })
         usageStore.setEnabledProviders(PanelSettings.enabledUsageProviders)
-        readOnlyDeckPanelController = ReadOnlyDeckPanelController(
-            initialFrame: initialQuotaFrame,
+        leftReadOnlyDeckPanelController = ReadOnlyDeckPanelController(
+            initialFrame: initialLeftFrame,
             theme: currentTheme,
             usageStore: usageStore,
             systemStatsStore: systemStatsStore,
@@ -115,7 +126,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             clockStore: clockStore,
             batteryStore: batteryStore,
             networkStore: networkStore,
-            menuTarget: self)
+            menuTarget: self,
+            side: .left,
+            onSelectionChange: { [weak self] side in
+                self?.deckSelectionDidChange(on: side)
+            })
+        rightReadOnlyDeckPanelController = ReadOnlyDeckPanelController(
+            initialFrame: initialRightFrame,
+            theme: currentTheme,
+            usageStore: usageStore,
+            systemStatsStore: systemStatsStore,
+            serviceMonitorStore: serviceMonitorStore,
+            weatherStore: weatherStore,
+            scheduleStore: scheduleStore,
+            clockStore: clockStore,
+            batteryStore: batteryStore,
+            networkStore: networkStore,
+            menuTarget: self,
+            side: .right,
+            onSelectionChange: { [weak self] side in
+                self?.deckSelectionDidChange(on: side)
+            })
         panel.delegate = self
         registerModuleRuntimes()
         synchronizeModuleRuntimes()
@@ -123,13 +154,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if case .concealed? = initialPresence {
             debugLog("visibility", "launching concealed (auto-hiding Dock is off screen)")
         } else {
-            let enabledPanels = PanelSettings.enabledPanels
-            if enabledPanels.contains(.terminal), initialFrames.terminal != nil {
-                panel.orderFrontRegardless()
-            }
-            if !PanelSettings.enabledReadOnlyModules.isEmpty, initialFrames.quota != nil {
-                readOnlyDeckPanel.orderFrontRegardless()
-            }
+            showPanels(in: initialFrames)
         }
         panel.makeFirstResponder(terminalView)
         NotificationCenter.default.addObserver(

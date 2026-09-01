@@ -1,28 +1,22 @@
 import Cocoa
 import SwiftUI
+import UniformTypeIdentifiers
+
+private let deckModuleType = UTType(
+    exportedAs: "com.bangwol.dockdeck.module", conformingTo: .data)
 
 struct DecksSettingsView: View {
     @ObservedObject var model: SettingsPanelModel
+    @State private var draggedModule: PanelModuleID?
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
                 HStack(alignment: .top, spacing: 14) {
-                    DeckPreviewCard(side: .left, model: model)
-                    DeckPreviewCard(side: .right, model: model)
-                }
-
-                GroupBox {
-                    VStack(spacing: 0) {
-                        ForEach(Array(model.moduleDefinitions.enumerated()), id: \.element.id) {
-                            index, definition in
-                            if index > 0 { Divider() }
-                            ModuleSettingsRow(definition: definition, model: model)
-                        }
-                    }
-                } label: {
-                    Label("Modules", systemImage: "square.grid.2x2")
-                        .font(.headline)
+                    DeckPreviewCard(
+                        side: .left, model: model, draggedModule: $draggedModule)
+                    DeckPreviewCard(
+                        side: .right, model: model, draggedModule: $draggedModule)
                 }
 
                 HStack {
@@ -31,7 +25,7 @@ struct DecksSettingsView: View {
                     }
                     .buttonStyle(.bordered)
                     Spacer()
-                    Text("At least one module stays visible.")
+                    Text("Drag to arrange. Enabled modules stay above hidden modules.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -382,6 +376,7 @@ struct AppearanceSettingsView: View {
 private struct DeckPreviewCard: View {
     let side: PanelSide
     @ObservedObject var model: SettingsPanelModel
+    @Binding var draggedModule: PanelModuleID?
 
     private var title: String { side == .left ? "Left Deck" : "Right Deck" }
 
@@ -389,31 +384,11 @@ private struct DeckPreviewCard: View {
         GroupBox {
             VStack(spacing: 8) {
                 ForEach(model.moduleDefinitions(on: side)) { definition in
-                    HStack(spacing: 10) {
-                        Image(systemName: definition.symbolName)
-                            .frame(width: 18)
-                        VStack(alignment: .leading, spacing: 1) {
-                            Text(definition.title)
-                                .fontWeight(.medium)
-                            Text(definition.subtitle)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                        Spacer()
-                        Image(
-                            systemName: model.isEnabled(definition.id)
-                                ? "checkmark.circle.fill" : "circle.dashed")
-                            .foregroundStyle(
-                                model.isEnabled(definition.id) ? Color.accentColor : .secondary)
-                    }
-                    .padding(10)
-                    .background(
-                        RoundedRectangle(cornerRadius: 8)
-                            .fill(Color(nsColor: .controlBackgroundColor)))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 8)
-                            .stroke(Color.primary.opacity(0.08)))
-                    .opacity(model.isEnabled(definition.id) ? 1 : 0.55)
+                    DeckModuleCard(
+                        definition: definition,
+                        side: side,
+                        model: model,
+                        draggedModule: $draggedModule)
                 }
             }
             .frame(maxWidth: .infinity, minHeight: 74, alignment: .top)
@@ -422,63 +397,115 @@ private struct DeckPreviewCard: View {
                 .font(.headline)
         }
         .frame(maxWidth: .infinity)
+        .onDrop(
+            of: [deckModuleType.identifier],
+            delegate: DeckModuleDropDelegate(
+                side: side, target: nil, model: model, draggedModule: $draggedModule))
     }
 }
 
-private struct ModuleSettingsRow: View {
+private struct DeckModuleCard: View {
     let definition: PanelModuleDefinition
+    let side: PanelSide
     @ObservedObject var model: SettingsPanelModel
-
-    private var sideTitle: String {
-        switch model.side(containing: definition.id) {
-        case .left: "Left"
-        case .right: "Right"
-        case nil: "Unplaced"
-        }
-    }
+    @Binding var draggedModule: PanelModuleID?
 
     var body: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 10) {
+            Image(systemName: "line.3.horizontal")
+                .font(.caption)
+                .foregroundStyle(.tertiary)
+                .accessibilityHidden(true)
             Image(systemName: definition.symbolName)
-                .font(.system(size: 16))
-                .foregroundStyle(.secondary)
-                .frame(width: 22)
-            VStack(alignment: .leading, spacing: 2) {
+                .frame(width: 18)
+            VStack(alignment: .leading, spacing: 1) {
                 Text(definition.title)
+                    .fontWeight(.medium)
                 Text(definition.subtitle)
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
             Spacer()
-            if let pane = definition.settingsPane {
-                Button {
-                    model.selectPane(pane)
-                } label: {
-                    Image(systemName: "slider.horizontal.3")
-                }
-                .buttonStyle(.borderless)
-                .help("Configure \(definition.title)")
-            }
-            Text(sideTitle)
-                .font(.caption.weight(.medium))
-                .foregroundStyle(.secondary)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 3)
-                .background(Capsule().fill(Color.primary.opacity(0.06)))
             Toggle(
                 "Show \(definition.title)",
                 isOn: Binding(
                     get: { model.isEnabled(definition.id) },
                     set: { model.setEnabled($0, for: definition.id) }))
                 .labelsHidden()
+                .toggleStyle(.checkbox)
                 .disabled(!model.canDisable(definition.id))
                 .help(
                     model.canDisable(definition.id)
-                        ? "Show or hide \(definition.title)"
-                        : "DockDeck keeps one module visible so Settings remains accessible")
+                        ? "Run and show \(definition.title)"
+                        : "DockDeck keeps one module enabled so Settings remains accessible")
         }
-        .padding(.vertical, 10)
-        .padding(.horizontal, 4)
+        .padding(10)
+        .background(
+            RoundedRectangle(cornerRadius: 8)
+                .fill(Color(nsColor: .controlBackgroundColor)))
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(Color.primary.opacity(0.08)))
+        .opacity(model.isEnabled(definition.id) ? 1 : 0.55)
+        .contentShape(Rectangle())
+        .onDrag {
+            draggedModule = definition.id
+            let provider = NSItemProvider()
+            provider.registerDataRepresentation(
+                forTypeIdentifier: deckModuleType.identifier,
+                visibility: .ownProcess
+            ) { completion in
+                completion(Data(definition.id.rawValue.utf8), nil)
+                return nil
+            }
+            return provider
+        }
+        .onDrop(
+            of: [deckModuleType.identifier],
+            delegate: DeckModuleDropDelegate(
+                side: side, target: definition.id, model: model,
+                draggedModule: $draggedModule))
+        .contextMenu {
+            if let pane = definition.settingsPane {
+                Button("Configure \(definition.title)…") { model.selectPane(pane) }
+                Divider()
+            }
+            let destination = side.opposite
+            Button("Move to \(destination == .left ? "Left" : "Right") Deck") {
+                model.moveModule(definition.id, to: destination)
+            }
+            Divider()
+            Button("Move Up") { model.moveModuleUp(definition.id) }
+                .disabled(!model.canMoveModuleUp(definition.id))
+            Button("Move Down") { model.moveModuleDown(definition.id) }
+                .disabled(!model.canMoveModuleDown(definition.id))
+        }
+        .accessibilityAction(
+            named: Text("Move to \(side.opposite == .left ? "Left" : "Right") Deck")
+        ) {
+            model.moveModule(definition.id, to: side.opposite)
+        }
+        .help("Drag to move or reorder \(definition.title)")
+    }
+}
+
+private struct DeckModuleDropDelegate: DropDelegate {
+    let side: PanelSide
+    let target: PanelModuleID?
+    let model: SettingsPanelModel
+    @Binding var draggedModule: PanelModuleID?
+
+    func validateDrop(info: DropInfo) -> Bool { draggedModule != nil }
+
+    func dropUpdated(info: DropInfo) -> DropProposal? {
+        DropProposal(operation: .move)
+    }
+
+    func performDrop(info: DropInfo) -> Bool {
+        guard let module = draggedModule else { return false }
+        model.moveModule(module, to: side, before: target)
+        draggedModule = nil
+        return true
     }
 }
 

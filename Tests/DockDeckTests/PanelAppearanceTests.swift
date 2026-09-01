@@ -35,7 +35,7 @@ final class PanelAppearanceTests: XCTestCase {
         let data = try JSONEncoder().encode(configuration)
         let decoded = try JSONDecoder().decode(PanelDeckConfiguration.self, from: data)
 
-        XCTAssertEqual(decoded.left, [.terminal, futureModule])
+        XCTAssertEqual(decoded.left, [futureModule, .terminal])
         XCTAssertEqual(
             decoded.right,
             [
@@ -45,20 +45,30 @@ final class PanelAppearanceTests: XCTestCase {
         XCTAssertEqual(decoded.enabled, [futureModule])
     }
 
-    func testDeckConfigurationKeepsReadOnlyModulesOppositeTerminal() {
+    func testDeckConfigurationPreservesPerModuleSideAssignments() {
         let configuration = PanelDeckConfiguration(
             left: [.terminal, .systemStats],
             right: [.usage],
             enabled: [.terminal, .usage, .systemStats]
         ).normalized()
 
-        XCTAssertEqual(configuration.left, [.terminal])
+        XCTAssertEqual(configuration.left, [.terminal, .systemStats])
         XCTAssertEqual(
             configuration.right,
             [
-                .usage, .systemStats, .serviceMonitor, .weather, .schedule, .clock, .battery,
-                .network,
+                .usage, .serviceMonitor, .weather, .schedule, .clock, .battery, .network,
             ])
+    }
+
+    func testDeckConfigurationKeepsEnabledModulesAboveDisabledModules() {
+        let configuration = PanelDeckConfiguration(
+            left: [.terminal, .weather, .systemStats],
+            right: [.usage],
+            enabled: [.usage, .systemStats]
+        ).normalized()
+
+        XCTAssertEqual(configuration.left, [.systemStats, .terminal, .weather])
+        XCTAssertEqual(configuration.right.first, .usage)
     }
 
     func testSettingsModelSwapsCompleteDecksWithoutDroppingFutureModules() {
@@ -84,6 +94,29 @@ final class PanelAppearanceTests: XCTestCase {
             ])
         XCTAssertEqual(model.values.deckConfiguration.right, [.terminal, futureModule])
         XCTAssertEqual(persistedConfiguration, model.values.deckConfiguration)
+    }
+
+    func testSettingsModelMovesModulesAcrossDecksAndMaintainsStatusGroups() {
+        let model = makeSettingsModel(
+            configuration: PanelDeckConfiguration(
+                left: [.terminal], right: [.usage, .systemStats],
+                enabled: [.terminal, .usage, .systemStats]))
+        var persistedConfiguration: PanelDeckConfiguration?
+        model.onChange = {
+            if case .deck(let configuration) = $0 { persistedConfiguration = configuration }
+        }
+
+        model.moveModule(.systemStats, to: .left, before: .terminal)
+
+        XCTAssertEqual(model.values.deckConfiguration.left, [.systemStats, .terminal])
+        XCTAssertEqual(model.side(containing: .systemStats), .left)
+        XCTAssertEqual(persistedConfiguration, model.values.deckConfiguration)
+
+        model.setEnabled(false, for: .systemStats)
+
+        XCTAssertEqual(model.values.deckConfiguration.left, [.terminal, .systemStats])
+        XCTAssertEqual(Array(model.moduleDefinitions.prefix(2).map(\.id)), [.terminal, .usage])
+        XCTAssertTrue(model.moduleDefinitions.dropFirst(2).allSatisfy { !model.isEnabled($0.id) })
     }
 
     func testSettingsModelKeepsTheLastModuleVisible() {
@@ -221,6 +254,26 @@ final class PanelAppearanceTests: XCTestCase {
             ReadOnlyDeckSelection.next(after: .systemStats, enabledModules: modules), .usage)
     }
 
+    func testDeckSelectionsAreIndependentBySide() {
+        let previousConfiguration = PanelSettings.deckConfiguration
+        let previousLeft = PanelSettings.activeModule(on: .left)
+        let previousRight = PanelSettings.activeModule(on: .right)
+        defer {
+            PanelSettings.deckConfiguration = previousConfiguration
+            PanelSettings.setActiveModule(previousLeft, on: .left)
+            PanelSettings.setActiveModule(previousRight, on: .right)
+        }
+        PanelSettings.deckConfiguration = PanelDeckConfiguration(
+            left: [.terminal, .systemStats], right: [.usage, .weather],
+            enabled: [.terminal, .systemStats, .usage, .weather])
+
+        PanelSettings.setActiveModule(.systemStats, on: .left)
+        PanelSettings.setActiveModule(.weather, on: .right)
+
+        XCTAssertEqual(PanelSettings.activeModule(on: .left), .systemStats)
+        XCTAssertEqual(PanelSettings.activeModule(on: .right), .weather)
+    }
+
     func testSettingsModelLimitsServiceMonitorEndpoints() {
         let model = makeSettingsModel(
             configuration: .legacy(order: .terminalLeft, enabledPanels: .all))
@@ -335,9 +388,14 @@ final class PanelAppearanceTests: XCTestCase {
 
     func testUsagePanelAcceptsContextMenuWithoutTakingKeyboardFocus() throws {
         let previousConfiguration = PanelSettings.deckConfiguration
-        defer { PanelSettings.deckConfiguration = previousConfiguration }
+        let previousRight = PanelSettings.activeModule(on: .right)
+        defer {
+            PanelSettings.deckConfiguration = previousConfiguration
+            PanelSettings.setActiveModule(previousRight, on: .right)
+        }
         PanelSettings.deckConfiguration = .legacy(
             order: .terminalLeft, enabledPanels: .all)
+        PanelSettings.setActiveModule(.usage, on: .right)
 
         let controller = ReadOnlyDeckPanelController(
             initialFrame: NSRect(x: 0, y: 0, width: 214, height: 59),
