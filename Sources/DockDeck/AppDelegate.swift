@@ -55,7 +55,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         refreshCoarseCaches()
         let initialPresence = resolveDockPresence()
         let fallbackScreen = mainDisplayScreen() ?? NSScreen.screens.first
-        let fallbackFrames = fallbackScreen.map { dockCoordinator.fallbackFrames(on: $0) }
+        let fallbackFrames = fallbackScreen.map {
+            dockCoordinator.fallbackFrames(on: $0).ordered(PanelSettings.panelOrder)
+        }
         let initialFrames =
             initialPresence.map { collapsedFrames(for: $0) }
             ?? fallbackFrames
@@ -84,7 +86,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         quotaPanelController = QuotaPanelController(
             initialFrame: initialQuotaFrame,
             theme: currentTheme,
-            store: usageStore)
+            store: usageStore,
+            menuTarget: self)
         panel.delegate = self
 
         if case .concealed? = initialPresence {

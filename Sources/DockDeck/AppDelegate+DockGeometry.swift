@@ -21,7 +21,7 @@ extension AppDelegate {
     }
 
     func collapsedFrames(for presence: DockPresence) -> DockPanelFrames {
-        dockCoordinator.frames(for: presence)
+        dockCoordinator.frames(for: presence).ordered(PanelSettings.panelOrder)
     }
 
     func quotaFrame(for presence: DockPresence) -> NSRect? {
@@ -38,7 +38,7 @@ extension AppDelegate {
     }
 
     func fallbackFrame(on screen: NSScreen) -> NSRect {
-        dockCoordinator.fallbackFrames(on: screen).terminal
+        dockCoordinator.fallbackFrames(on: screen).ordered(PanelSettings.panelOrder).terminal
             ?? NSRect(
                 x: screen.frame.minX, y: screen.frame.minY,
                 width: Self.fallbackWidth, height: Self.fallbackHeight)

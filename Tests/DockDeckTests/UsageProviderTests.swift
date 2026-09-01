@@ -13,6 +13,14 @@ final class UsageProviderTests: XCTestCase {
             0)
     }
 
+    func testUsageDisplayModeChoosesRemainingOrUsedValue() {
+        let window = UsageWindow(
+            durationMinutes: 300, usedPercent: 22, resetsAt: nil)
+
+        XCTAssertEqual(UsageDisplayMode.remaining.value(for: window), 78)
+        XCTAssertEqual(UsageDisplayMode.used.value(for: window), 22)
+    }
+
     func testCodexLaunchEnvironmentIncludesExecutableDirectory() {
         let executable = URL(fileURLWithPath: "/opt/codex/bin/codex")
 

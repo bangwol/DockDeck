@@ -18,6 +18,9 @@ extension AppDelegate {
             withTitle: "Switch Theme", action: #selector(toggleThemePicker(_:)), keyEquivalent: "t"
         )
         appMenu.addItem(
+            withTitle: "Settings…", action: #selector(toggleSettingsPanel(_:)), keyEquivalent: ","
+        )
+        appMenu.addItem(
             withTitle: "Refresh Usage & Layout", action: #selector(refreshUsage(_:)),
             keyEquivalent: "r"
         )

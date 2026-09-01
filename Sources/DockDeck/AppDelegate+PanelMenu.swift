@@ -20,6 +20,16 @@ extension AppDelegate {
                 action: #selector(toggleSettingsPanel(_:)), keyEquivalent: ""))
         menu.addItem(
             NSMenuItem(
+                title: PanelSettings.usageDisplayMode == .remaining
+                    ? "Show Used Values" : "Show Remaining Values",
+                action: #selector(toggleUsageDisplayMode(_:)), keyEquivalent: ""))
+        menu.addItem(
+            NSMenuItem(
+                title: PanelSettings.panelOrder == .terminalLeft
+                    ? "Move Terminal to Right" : "Move Terminal to Left",
+                action: #selector(swapPanelSides(_:)), keyEquivalent: ""))
+        menu.addItem(
+            NSMenuItem(
                 title: "Refresh Usage & Layout",
                 action: #selector(refreshUsage(_:)), keyEquivalent: "r"))
         menu.addItem(.separator())

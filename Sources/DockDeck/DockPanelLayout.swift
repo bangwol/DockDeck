@@ -3,6 +3,13 @@ import Cocoa
 struct DockPanelFrames: Equatable {
     let terminal: NSRect?
     let quota: NSRect?
+
+    func ordered(_ order: PanelOrder) -> DockPanelFrames {
+        switch order {
+        case .terminalLeft: self
+        case .terminalRight: DockPanelFrames(terminal: quota, quota: terminal)
+        }
+    }
 }
 
 enum DockPanelLayout {

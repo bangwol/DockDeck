@@ -13,20 +13,20 @@
 </p>
 
 <p align="center">
-  <sub>Compact terminal on the left; remaining Codex and Claude capacity on the right.</sub>
+  <sub>Compact terminal and configurable Codex and Claude usage beside the macOS Dock.</sub>
 </p>
 
-DockDeck uses the space beside a bottom-aligned Dock for two compact developer panels. The terminal stays interactive on the left, while the read-only usage panel stays on the right. Both follow the Dock across displays, Spaces, and auto-hide transitions.
+DockDeck uses the space beside a bottom-aligned Dock for two compact developer panels. The terminal stays interactive while the usage panel remains read-only; either panel can be placed on either side. Both follow the Dock across displays, Spaces, and auto-hide transitions.
 
 ## Features
 
 - Persistent [SwiftTerm](https://github.com/migueldeicaza/SwiftTerm) login shell with a compact `% ` prompt that does not change user shell files.
-- Remaining Codex and Claude capacity from their supported local interfaces; no browser cookies or private web endpoints.
+- Remaining or used Codex and Claude capacity from their supported local interfaces; no browser cookies or private web endpoints.
 - Dock-aware, symmetric placement across displays, Spaces, and auto-hide transitions.
-- Read-only usage panel that never takes keyboard focus.
+- Read-only usage panel with configurable values, font, size, and color; right-click it for the shared settings menu.
 - Click-to-focus terminal expansion, native edge resizing, and remembered dimensions.
 - Native Liquid Glass on macOS 26, with a translucent fallback and stronger terminal tint on earlier macOS.
-- Manual large-terminal mode plus 20 themes with configurable font, tint, and corner radius.
+- Manual large-terminal mode plus 20 themes with configurable fonts, tint, corner radius, and panel placement.
 
 Keyboard shortcuts:
 
@@ -34,10 +34,11 @@ Keyboard shortcuts:
 | --- | --- |
 | `⌘E` | Toggle the manual large terminal mode |
 | `⌘T` | Open the theme picker |
+| `⌘,` | Open the shared settings panel |
 | `⌘R` | Refresh usage data and Dock layout |
 | `⌘Q` | Quit DockDeck |
 
-Click the terminal to expand it. Drag any edge to resize it; DockDeck restores those proportions the next time it expands. The terminal menu's **Settings…** panel provides the same controls. `⌘E` toggles a separate, fixed 75% large-terminal mode.
+Click the terminal to expand it. Drag any edge to resize it; DockDeck restores those proportions the next time it expands. Open the shared **Settings…** panel from the terminal menu, app menu, or usage-panel context menu. `⌘E` toggles a separate, fixed 75% large-terminal mode.
 
 ## Requirements
 
@@ -61,15 +62,15 @@ gh attestation verify DockDeck-*-unsigned.zip -R bangwol/DockDeck
 
 ## Reading the usage panel
 
-Every percentage and filled bar represents capacity **remaining**, not capacity used. For example, `22%` means 22% remains and 78% has been used.
+Percentages and bars show **remaining** capacity by default. Select **Used** under **Settings → Usage → Values** to invert both the number and filled bar. For example, the same quota appears as either 22% remaining or 78% used.
 
 Codex displays whichever 5-hour and weekly windows the signed-in account returns. DockDeck uses the returned durations instead of guessing the plan. OpenAI documents a shared 5-hour window for local and cloud tasks and notes that weekly limits may also apply in the [Codex pricing guide](https://learn.chatgpt.com/docs/pricing).
 
-Claude displays the 5-hour and weekly fields available in Claude Code's status-line payload. The current official schema exposes only `five_hour` and `seven_day`, so DockDeck cannot currently show a separate Fable meter. It does not estimate missing data or call undocumented account endpoints. Anthropic documents [Fable's plan-specific availability](https://support.claude.com/en/articles/15424964-claude-fable-5-on-your-plan).
+Claude displays the 5-hour and weekly fields available in Claude Code's status-line payload. When the payload also supplies `seven_day_fable` or `fable`, DockDeck adds an `FBL` meter; otherwise it omits that meter rather than estimating it. Anthropic documents [Fable's plan-specific availability](https://support.claude.com/en/articles/15424964-claude-fable-5-on-your-plan).
 
-- More than 50% remaining: normal theme color
-- 20–50% remaining: orange
-- Less than 20% remaining: red
+- More than 50% remaining (less than 50% used): selected text color
+- 20–50% remaining (50–80% used): orange
+- Less than 20% remaining (more than 80% used): red
 
 ## Run from source
 

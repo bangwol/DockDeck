@@ -88,4 +88,15 @@ final class DockPanelLayoutTests: XCTestCase {
         XCTAssertEqual(frames.terminal, NSRect(x: 0, y: 5, width: 214, height: 59))
         XCTAssertEqual(frames.quota, NSRect(x: 1586, y: 5, width: 214, height: 59))
     }
+
+    func testPanelOrderCanSwapTerminalAndUsageSlots() {
+        let left = NSRect(x: 0, y: 5, width: 214, height: 59)
+        let right = NSRect(x: 1586, y: 5, width: 214, height: 59)
+        let frames = DockPanelFrames(terminal: left, quota: right)
+
+        XCTAssertEqual(frames.ordered(.terminalLeft), frames)
+        XCTAssertEqual(
+            frames.ordered(.terminalRight),
+            DockPanelFrames(terminal: right, quota: left))
+    }
 }

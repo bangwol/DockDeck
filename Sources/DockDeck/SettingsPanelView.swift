@@ -2,45 +2,63 @@ import Cocoa
 
 final class SettingsPanelView: NSView {
     private let padding: CGFloat = 12
-    private let rowGap: CGFloat = 14
-    private let controlWidth: CGFloat = 200
+    private let rowGap: CGFloat = 11
+    private let sectionGap: CGFloat = 16
+    private let controlWidth: CGFloat = 220
     private let closeButtonSize: CGFloat = 14
 
     private let cornerRadiusSlider = NSSlider()
     private let tintOpacitySlider = NSSlider()
     private let focusWidthSlider = NSSlider()
     private let focusHeightSlider = NSSlider()
+    private let usageFontSizeSlider = NSSlider()
     private let focusWidthLabel = NSTextField(labelWithString: "")
     private let focusHeightLabel = NSTextField(labelWithString: "")
-    private let fontPopup = NSPopUpButton(frame: .zero, pullsDown: false)
+    private let usageFontSizeLabel = NSTextField(labelWithString: "")
+    private let terminalFontPopup = NSPopUpButton(frame: .zero, pullsDown: false)
+    private let usageFontPopup = NSPopUpButton(frame: .zero, pullsDown: false)
+    private let usageDisplayPopup = NSPopUpButton(frame: .zero, pullsDown: false)
+    private let usageColorPopup = NSPopUpButton(frame: .zero, pullsDown: false)
+    private let panelOrderPopup = NSPopUpButton(frame: .zero, pullsDown: false)
     private let fontNames: [String]
+    private let usageDisplayModes = UsageDisplayMode.allCases
+    private let usageColors = UsageTextColor.allCases
+    private let panelOrders = PanelOrder.allCases
 
     var onCornerRadiusChange: ((CGFloat) -> Void)?
     var onTintOpacityChange: ((CGFloat) -> Void)?
     var onFocusSizeChange: ((CGFloat, CGFloat) -> Void)?
-    var onFontChange: ((String) -> Void)?
+    var onTerminalFontChange: ((String) -> Void)?
+    var onUsageFontChange: ((String) -> Void)?
+    var onUsageFontSizeChange: ((CGFloat) -> Void)?
+    var onUsageDisplayModeChange: ((UsageDisplayMode) -> Void)?
+    var onUsageTextColorChange: ((UsageTextColor) -> Void)?
+    var onPanelOrderChange: ((PanelOrder) -> Void)?
     var onReset: (() -> Void)?
     var onCancel: (() -> Void)?
 
     init(
         cornerRadius: CGFloat, tintOpacity: CGFloat,
         focusWidthMultiplier: CGFloat, focusHeightMultiplier: CGFloat,
-        fontNames: [String], selectedFontName: String
+        fontNames: [String], selectedTerminalFontName: String,
+        selectedUsageFontName: String, usageFontSize: CGFloat,
+        usageDisplayMode: UsageDisplayMode, usageTextColor: UsageTextColor,
+        panelOrder: PanelOrder
     ) {
         self.fontNames = fontNames
         let width = controlWidth + padding * 2
 
         super.init(frame: NSRect(x: 0, y: 0, width: width, height: 0))
         wantsLayer = true
-        layer?.backgroundColor = NSColor.black.withAlphaComponent(0.75).cgColor
-        layer?.cornerRadius = 8
+        layer?.backgroundColor = NSColor.black.withAlphaComponent(0.78).cgColor
+        layer?.cornerRadius = 10
         layer?.masksToBounds = true
         layer?.borderWidth = 1
         layer?.borderColor = NSColor.white.withAlphaComponent(0.15).cgColor
 
         var y: CGFloat = padding
 
-        let title = Self.makeLabel("Settings", size: 12, weight: .semibold, alpha: 0.85)
+        let title = Self.makeLabel("DockDeck Settings", size: 12, weight: .semibold, alpha: 0.88)
         title.frame = NSRect(
             x: padding, y: y, width: controlWidth - closeButtonSize - 6, height: 16)
         addSubview(title)
@@ -56,96 +74,119 @@ final class SettingsPanelView: NSView {
         closeButton.contentTintColor = NSColor.white.withAlphaComponent(0.5)
         (closeButton.cell as? NSButtonCell)?.imageScaling = .scaleProportionallyDown
         addSubview(closeButton)
-        y += 16 + rowGap
+        y += 16 + sectionGap
 
-        let radiusLabel = Self.makeLabel("Corner radius")
-        radiusLabel.frame = NSRect(x: padding, y: y, width: controlWidth, height: 14)
-        addSubview(radiusLabel)
-        y += 14 + 4
+        y = addSection("PANELS", at: y)
 
-        cornerRadiusSlider.minValue = 0
-        cornerRadiusSlider.maxValue = 24
-        cornerRadiusSlider.doubleValue = Double(cornerRadius)
-        cornerRadiusSlider.isContinuous = true
-        cornerRadiusSlider.target = self
-        cornerRadiusSlider.action = #selector(cornerRadiusChanged)
+        y = addLabel("Placement", at: y)
+        configurePopup(panelOrderPopup, action: #selector(panelOrderChanged))
+        panelOrders.forEach { panelOrderPopup.addItem(withTitle: $0.title) }
+        panelOrderPopup.frame = NSRect(x: padding, y: y, width: controlWidth, height: 22)
+        select(panelOrder, in: panelOrders, popup: panelOrderPopup)
+        addSubview(panelOrderPopup)
+        y += 22 + rowGap
+
+        y = addLabel("Corner radius", at: y)
+        configureSlider(
+            cornerRadiusSlider, min: 0, max: 24, value: cornerRadius,
+            action: #selector(cornerRadiusChanged))
         cornerRadiusSlider.frame = NSRect(x: padding, y: y, width: controlWidth, height: 20)
         addSubview(cornerRadiusSlider)
         y += 20 + rowGap
 
-        let opacityLabel = Self.makeLabel("Theme tint")
-        opacityLabel.frame = NSRect(x: padding, y: y, width: controlWidth, height: 14)
-        addSubview(opacityLabel)
-        y += 14 + 4
-
-        tintOpacitySlider.minValue = 0.2
-        tintOpacitySlider.maxValue = 1.0
-        tintOpacitySlider.doubleValue = Double(tintOpacity)
-        tintOpacitySlider.isContinuous = true
-        tintOpacitySlider.target = self
-        tintOpacitySlider.action = #selector(opacityChanged)
+        y = addLabel("Theme tint", at: y)
+        configureSlider(
+            tintOpacitySlider, min: 0.2, max: 1, value: tintOpacity,
+            action: #selector(opacityChanged))
         tintOpacitySlider.frame = NSRect(x: padding, y: y, width: controlWidth, height: 20)
         addSubview(tintOpacitySlider)
-        y += 20 + rowGap
+        y += 20 + sectionGap
 
-        configureFocusLabel(focusWidthLabel)
+        y = addSection("TERMINAL", at: y)
+
+        configureValueLabel(focusWidthLabel)
         focusWidthLabel.frame = NSRect(x: padding, y: y, width: controlWidth, height: 14)
         addSubview(focusWidthLabel)
-        y += 14 + 4
-
-        focusWidthSlider.minValue = Double(DockPanelLayout.minimumFocusedWidthMultiplier)
-        focusWidthSlider.maxValue = Double(DockPanelLayout.maximumFocusedWidthMultiplier)
-        focusWidthSlider.doubleValue = Double(focusWidthMultiplier)
-        focusWidthSlider.isContinuous = true
-        focusWidthSlider.target = self
-        focusWidthSlider.action = #selector(focusSizeChanged)
+        y += 18
+        configureSlider(
+            focusWidthSlider,
+            min: DockPanelLayout.minimumFocusedWidthMultiplier,
+            max: DockPanelLayout.maximumFocusedWidthMultiplier,
+            value: focusWidthMultiplier, action: #selector(focusSizeChanged))
         focusWidthSlider.frame = NSRect(x: padding, y: y, width: controlWidth, height: 20)
         addSubview(focusWidthSlider)
         y += 20 + rowGap
 
-        configureFocusLabel(focusHeightLabel)
+        configureValueLabel(focusHeightLabel)
         focusHeightLabel.frame = NSRect(x: padding, y: y, width: controlWidth, height: 14)
         addSubview(focusHeightLabel)
-        y += 14 + 4
-
-        focusHeightSlider.minValue = Double(DockPanelLayout.minimumFocusedHeightMultiplier)
-        focusHeightSlider.maxValue = Double(DockPanelLayout.maximumFocusedHeightMultiplier)
-        focusHeightSlider.doubleValue = Double(focusHeightMultiplier)
-        focusHeightSlider.isContinuous = true
-        focusHeightSlider.target = self
-        focusHeightSlider.action = #selector(focusSizeChanged)
+        y += 18
+        configureSlider(
+            focusHeightSlider,
+            min: DockPanelLayout.minimumFocusedHeightMultiplier,
+            max: DockPanelLayout.maximumFocusedHeightMultiplier,
+            value: focusHeightMultiplier, action: #selector(focusSizeChanged))
         focusHeightSlider.frame = NSRect(x: padding, y: y, width: controlWidth, height: 20)
         addSubview(focusHeightSlider)
         y += 20 + rowGap
 
-        updateFocusLabels()
+        y = addLabel("Terminal font", at: y)
+        configureFontPopup(
+            terminalFontPopup, selectedName: selectedTerminalFontName,
+            action: #selector(terminalFontChanged))
+        terminalFontPopup.frame = NSRect(x: padding, y: y, width: controlWidth, height: 22)
+        addSubview(terminalFontPopup)
+        y += 22 + sectionGap
 
-        let fontLabel = Self.makeLabel("Font")
-        fontLabel.frame = NSRect(x: padding, y: y, width: controlWidth, height: 14)
-        addSubview(fontLabel)
-        y += 14 + 4
+        y = addSection("USAGE", at: y)
 
-        fontPopup.frame = NSRect(x: padding, y: y, width: controlWidth, height: 22)
-        fontPopup.target = self
-        fontPopup.action = #selector(fontChanged)
-        for name in fontNames {
-            fontPopup.addItem(withTitle: TerminalTheme.displayName(forFontName: name))
-        }
-        if let index = fontNames.firstIndex(of: selectedFontName) {
-            fontPopup.selectItem(at: index)
-        }
-        addSubview(fontPopup)
+        y = addLabel("Values", at: y)
+        configurePopup(usageDisplayPopup, action: #selector(usageDisplayChanged))
+        usageDisplayModes.forEach { usageDisplayPopup.addItem(withTitle: $0.title) }
+        usageDisplayPopup.frame = NSRect(x: padding, y: y, width: controlWidth, height: 22)
+        select(usageDisplayMode, in: usageDisplayModes, popup: usageDisplayPopup)
+        addSubview(usageDisplayPopup)
         y += 22 + rowGap
+
+        y = addLabel("Usage font", at: y)
+        configureFontPopup(
+            usageFontPopup, selectedName: selectedUsageFontName,
+            action: #selector(usageFontChanged))
+        usageFontPopup.frame = NSRect(x: padding, y: y, width: controlWidth, height: 22)
+        addSubview(usageFontPopup)
+        y += 22 + rowGap
+
+        configureValueLabel(usageFontSizeLabel)
+        usageFontSizeLabel.frame = NSRect(x: padding, y: y, width: controlWidth, height: 14)
+        addSubview(usageFontSizeLabel)
+        y += 18
+        configureSlider(
+            usageFontSizeSlider,
+            min: PanelSettings.minimumUsageFontSize,
+            max: PanelSettings.maximumUsageFontSize,
+            value: usageFontSize, action: #selector(usageFontSizeChanged))
+        usageFontSizeSlider.frame = NSRect(x: padding, y: y, width: controlWidth, height: 20)
+        addSubview(usageFontSizeSlider)
+        y += 20 + rowGap
+
+        y = addLabel("Text color", at: y)
+        configurePopup(usageColorPopup, action: #selector(usageColorChanged))
+        usageColors.forEach { usageColorPopup.addItem(withTitle: $0.title) }
+        usageColorPopup.frame = NSRect(x: padding, y: y, width: controlWidth, height: 22)
+        select(usageTextColor, in: usageColors, popup: usageColorPopup)
+        addSubview(usageColorPopup)
+        y += 22 + sectionGap
 
         let resetButton = NSButton(
             title: "Reset to Defaults", target: self, action: #selector(resetTapped))
         resetButton.isBordered = false
-        resetButton.contentTintColor = NSColor.white.withAlphaComponent(0.55)
+        resetButton.contentTintColor = NSColor.white.withAlphaComponent(0.58)
         resetButton.font = NSFont.systemFont(ofSize: 10)
         resetButton.frame = NSRect(x: padding, y: y, width: controlWidth, height: 14)
         addSubview(resetButton)
         y += 14 + padding
 
+        updateValueLabels()
         frame = NSRect(x: 0, y: 0, width: width, height: y)
     }
 
@@ -167,16 +208,21 @@ final class SettingsPanelView: NSView {
     func setValues(
         cornerRadius: CGFloat, tintOpacity: CGFloat,
         focusWidthMultiplier: CGFloat, focusHeightMultiplier: CGFloat,
-        fontName: String
+        terminalFontName: String, usageFontName: String, usageFontSize: CGFloat,
+        usageDisplayMode: UsageDisplayMode, usageTextColor: UsageTextColor,
+        panelOrder: PanelOrder
     ) {
         cornerRadiusSlider.doubleValue = Double(cornerRadius)
         tintOpacitySlider.doubleValue = Double(tintOpacity)
         focusWidthSlider.doubleValue = Double(focusWidthMultiplier)
         focusHeightSlider.doubleValue = Double(focusHeightMultiplier)
-        updateFocusLabels()
-        if let index = fontNames.firstIndex(of: fontName) {
-            fontPopup.selectItem(at: index)
-        }
+        usageFontSizeSlider.doubleValue = Double(usageFontSize)
+        selectFont(terminalFontName, popup: terminalFontPopup)
+        selectFont(usageFontName, popup: usageFontPopup)
+        select(usageDisplayMode, in: usageDisplayModes, popup: usageDisplayPopup)
+        select(usageTextColor, in: usageColors, popup: usageColorPopup)
+        select(panelOrder, in: panelOrders, popup: panelOrderPopup)
+        updateValueLabels()
     }
 
     @objc private func cornerRadiusChanged() {
@@ -190,15 +236,43 @@ final class SettingsPanelView: NSView {
     @objc private func focusSizeChanged() {
         focusWidthSlider.doubleValue = (focusWidthSlider.doubleValue * 4).rounded() / 4
         focusHeightSlider.doubleValue = (focusHeightSlider.doubleValue * 4).rounded() / 4
-        updateFocusLabels()
+        updateValueLabels()
         onFocusSizeChange?(
             CGFloat(focusWidthSlider.doubleValue), CGFloat(focusHeightSlider.doubleValue))
     }
 
-    @objc private func fontChanged() {
-        let index = fontPopup.indexOfSelectedItem
-        guard index >= 0, index < fontNames.count else { return }
-        onFontChange?(fontNames[index])
+    @objc private func terminalFontChanged() {
+        guard let fontName = selectedFont(in: terminalFontPopup) else { return }
+        onTerminalFontChange?(fontName)
+    }
+
+    @objc private func usageFontChanged() {
+        guard let fontName = selectedFont(in: usageFontPopup) else { return }
+        onUsageFontChange?(fontName)
+    }
+
+    @objc private func usageFontSizeChanged() {
+        usageFontSizeSlider.doubleValue = (usageFontSizeSlider.doubleValue * 2).rounded() / 2
+        updateValueLabels()
+        onUsageFontSizeChange?(CGFloat(usageFontSizeSlider.doubleValue))
+    }
+
+    @objc private func usageDisplayChanged() {
+        let index = usageDisplayPopup.indexOfSelectedItem
+        guard usageDisplayModes.indices.contains(index) else { return }
+        onUsageDisplayModeChange?(usageDisplayModes[index])
+    }
+
+    @objc private func usageColorChanged() {
+        let index = usageColorPopup.indexOfSelectedItem
+        guard usageColors.indices.contains(index) else { return }
+        onUsageTextColorChange?(usageColors[index])
+    }
+
+    @objc private func panelOrderChanged() {
+        let index = panelOrderPopup.indexOfSelectedItem
+        guard panelOrders.indices.contains(index) else { return }
+        onPanelOrderChange?(panelOrders[index])
     }
 
     @objc private func resetTapped() {
@@ -209,24 +283,85 @@ final class SettingsPanelView: NSView {
         onCancel?()
     }
 
+    private func addSection(_ text: String, at y: CGFloat) -> CGFloat {
+        let label = Self.makeLabel(text, size: 9, weight: .semibold, alpha: 0.38)
+        label.frame = NSRect(x: padding, y: y, width: controlWidth, height: 12)
+        addSubview(label)
+        return y + 12 + 8
+    }
+
+    private func addLabel(_ text: String, at y: CGFloat) -> CGFloat {
+        let label = Self.makeLabel(text)
+        label.frame = NSRect(x: padding, y: y, width: controlWidth, height: 14)
+        addSubview(label)
+        return y + 18
+    }
+
+    private func configureSlider(
+        _ slider: NSSlider, min: CGFloat, max: CGFloat, value: CGFloat, action: Selector
+    ) {
+        slider.minValue = Double(min)
+        slider.maxValue = Double(max)
+        slider.doubleValue = Double(value)
+        slider.isContinuous = true
+        slider.target = self
+        slider.action = action
+    }
+
+    private func configurePopup(_ popup: NSPopUpButton, action: Selector) {
+        popup.target = self
+        popup.action = action
+    }
+
+    private func configureFontPopup(
+        _ popup: NSPopUpButton, selectedName: String, action: Selector
+    ) {
+        configurePopup(popup, action: action)
+        fontNames.forEach {
+            popup.addItem(withTitle: TerminalTheme.displayName(forFontName: $0))
+        }
+        selectFont(selectedName, popup: popup)
+    }
+
+    private func configureValueLabel(_ label: NSTextField) {
+        label.font = NSFont.systemFont(ofSize: 10, weight: .medium)
+        label.textColor = NSColor.white.withAlphaComponent(0.52)
+    }
+
+    private func updateValueLabels() {
+        focusWidthLabel.stringValue = String(
+            format: "Click expansion width %.2g×", focusWidthSlider.doubleValue)
+        focusHeightLabel.stringValue = String(
+            format: "Click expansion height %.2g×", focusHeightSlider.doubleValue)
+        usageFontSizeLabel.stringValue = String(
+            format: "Usage font size %.1f pt", usageFontSizeSlider.doubleValue)
+    }
+
+    private func selectedFont(in popup: NSPopUpButton) -> String? {
+        let index = popup.indexOfSelectedItem
+        guard fontNames.indices.contains(index) else { return nil }
+        return fontNames[index]
+    }
+
+    private func selectFont(_ name: String, popup: NSPopUpButton) {
+        guard let index = fontNames.firstIndex(of: name) else { return }
+        popup.selectItem(at: index)
+    }
+
+    private func select<Value: Equatable>(
+        _ value: Value, in values: [Value], popup: NSPopUpButton
+    ) {
+        guard let index = values.firstIndex(of: value) else { return }
+        popup.selectItem(at: index)
+    }
+
     private static func makeLabel(
-        _ text: String, size: CGFloat = 10, weight: NSFont.Weight = .medium, alpha: CGFloat = 0.5
+        _ text: String, size: CGFloat = 10, weight: NSFont.Weight = .medium,
+        alpha: CGFloat = 0.52
     ) -> NSTextField {
         let label = NSTextField(labelWithString: text)
         label.font = NSFont.systemFont(ofSize: size, weight: weight)
         label.textColor = NSColor.white.withAlphaComponent(alpha)
         return label
-    }
-
-    private func configureFocusLabel(_ label: NSTextField) {
-        label.font = NSFont.systemFont(ofSize: 10, weight: .medium)
-        label.textColor = NSColor.white.withAlphaComponent(0.5)
-    }
-
-    private func updateFocusLabels() {
-        focusWidthLabel.stringValue = String(
-            format: "Click expansion width %.2g×", focusWidthSlider.doubleValue)
-        focusHeightLabel.stringValue = String(
-            format: "Click expansion height %.2g×", focusHeightSlider.doubleValue)
     }
 }
