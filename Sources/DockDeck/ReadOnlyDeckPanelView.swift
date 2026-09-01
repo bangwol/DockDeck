@@ -27,6 +27,7 @@ struct ReadOnlyDeckPanelView: View {
     @ObservedObject var scheduleStore: ScheduleStore
     @ObservedObject var clockStore: ClockStore
     @ObservedObject var batteryStore: BatteryStore
+    @ObservedObject var networkStore: NetworkStore
     let activeModule: PanelModuleID?
     let theme: Theme
 
@@ -50,6 +51,8 @@ struct ReadOnlyDeckPanelView: View {
                 hourFormat: PanelSettings.clockHourFormat)
         case .battery:
             BatteryPanelView(store: batteryStore, theme: theme)
+        case .network:
+            NetworkPanelView(store: networkStore, theme: theme)
         default:
             EmptyView()
         }

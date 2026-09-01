@@ -1,0 +1,53 @@
+import SwiftUI
+
+struct NetworkSettingsView: View {
+    @ObservedObject var model: SettingsPanelModel
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                GroupBox {
+                    SettingsPickerRow(title: "Refresh") {
+                        Picker(
+                            "Network refresh interval",
+                            selection: Binding(
+                                get: { model.values.network.refreshInterval },
+                                set: model.setNetworkRefreshInterval)
+                        ) {
+                            ForEach(PanelSettings.networkRefreshIntervals, id: \.self) {
+                                Text(String(Int($0)) + " seconds").tag($0)
+                            }
+                        }
+                        .labelsHidden()
+                        .frame(width: 230)
+                    }
+                    .padding(.top, 4)
+                } label: {
+                    Label("Sampling", systemImage: "timer")
+                        .font(.headline)
+                }
+
+                GroupBox {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Label("Download rate", systemImage: "arrow.down")
+                        Label("Upload rate", systemImage: "arrow.up")
+                        Label("Current primary interface", systemImage: "network")
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.vertical, 4)
+                } label: {
+                    Label("Metrics", systemImage: "network")
+                        .font(.headline)
+                }
+
+                Text(
+                    "Network reads only macOS byte counters for the primary interface. "
+                        + "It does not inspect traffic, addresses, hostnames, or packet contents. "
+                        + "Sampling stops while disabled.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            .padding(24)
+        }
+    }
+}

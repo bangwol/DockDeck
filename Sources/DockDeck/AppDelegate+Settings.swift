@@ -89,6 +89,7 @@ extension AppDelegate {
                 includeAllDay: PanelSettings.scheduleIncludesAllDay,
                 refreshInterval: PanelSettings.scheduleRefreshInterval)
             self.batteryStore.setRefreshInterval(PanelSettings.batteryRefreshInterval)
+            self.networkStore.setRefreshInterval(PanelSettings.networkRefreshInterval)
             self.applyCornerRadius()
             self.applyTintOpacity()
             self.applyFont()
@@ -157,6 +158,8 @@ extension AppDelegate {
                 hourFormat: PanelSettings.clockHourFormat),
             battery: BatterySettingsState(
                 refreshInterval: PanelSettings.batteryRefreshInterval),
+            network: NetworkSettingsState(
+                refreshInterval: PanelSettings.networkRefreshInterval),
             appearance: AppearanceSettingsState(
                 cornerRadius: PanelSettings.cornerRadius,
                 tintOpacity: PanelSettings.tintOpacity
@@ -232,6 +235,9 @@ extension AppDelegate {
         case .battery(.refreshInterval(let interval)):
             PanelSettings.batteryRefreshInterval = interval
             batteryStore.setRefreshInterval(interval)
+        case .network(.refreshInterval(let interval)):
+            PanelSettings.networkRefreshInterval = interval
+            networkStore.setRefreshInterval(interval)
         case .appearance(.cornerRadius(let radius)):
             PanelSettings.cornerRadius = radius
             applyCornerRadius()

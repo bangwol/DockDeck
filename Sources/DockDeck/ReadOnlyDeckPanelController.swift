@@ -18,6 +18,7 @@ final class ReadOnlyDeckPanelController: NSObject, NSMenuDelegate {
     private let scheduleStore: ScheduleStore
     private let clockStore: ClockStore
     private let batteryStore: BatteryStore
+    private let networkStore: NetworkStore
     private weak var menuTarget: AnyObject?
     private var theme: Theme
 
@@ -31,6 +32,7 @@ final class ReadOnlyDeckPanelController: NSObject, NSMenuDelegate {
         scheduleStore: ScheduleStore,
         clockStore: ClockStore,
         batteryStore: BatteryStore,
+        networkStore: NetworkStore,
         menuTarget: AnyObject
     ) {
         self.usageStore = usageStore
@@ -40,6 +42,7 @@ final class ReadOnlyDeckPanelController: NSObject, NSMenuDelegate {
         self.scheduleStore = scheduleStore
         self.clockStore = clockStore
         self.batteryStore = batteryStore
+        self.networkStore = networkStore
         self.theme = theme
         self.menuTarget = menuTarget
 
@@ -70,6 +73,7 @@ final class ReadOnlyDeckPanelController: NSObject, NSMenuDelegate {
                 scheduleStore: scheduleStore,
                 clockStore: clockStore,
                 batteryStore: batteryStore,
+                networkStore: networkStore,
                 activeModule: PanelSettings.activeReadOnlyModule,
                 theme: theme))
         hostingView.frame = surfaceView.bounds
@@ -112,6 +116,7 @@ final class ReadOnlyDeckPanelController: NSObject, NSMenuDelegate {
             scheduleStore: scheduleStore,
             clockStore: clockStore,
             batteryStore: batteryStore,
+            networkStore: networkStore,
             activeModule: activeModule,
             theme: theme)
     }

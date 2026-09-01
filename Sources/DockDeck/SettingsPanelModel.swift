@@ -11,6 +11,7 @@ enum SettingsPaneID: String, CaseIterable, Identifiable {
     case schedule
     case clock
     case battery
+    case network
     case appearance
 
     var id: Self { self }
@@ -26,6 +27,7 @@ enum SettingsPaneID: String, CaseIterable, Identifiable {
         case .schedule: "Schedule"
         case .clock: "World Clock"
         case .battery: "Battery"
+        case .network: "Network"
         case .appearance: "Appearance"
         }
     }
@@ -41,6 +43,7 @@ enum SettingsPaneID: String, CaseIterable, Identifiable {
         case .schedule: "Show the current or next calendar event."
         case .clock: "Show local time or another time zone."
         case .battery: "Show charge, power state, and time remaining."
+        case .network: "Show local download and upload throughput."
         case .appearance: "Adjust the shared panel surface."
         }
     }
@@ -56,6 +59,7 @@ enum SettingsPaneID: String, CaseIterable, Identifiable {
         case .schedule: "calendar"
         case .clock: "clock"
         case .battery: "battery.75percent"
+        case .network: "network"
         case .appearance: "paintbrush"
         }
     }
@@ -97,6 +101,9 @@ enum PanelModuleRegistry {
         PanelModuleDefinition(
             id: .battery, title: "Battery", subtitle: "Charge and power state",
             symbolName: "battery.75percent", settingsPane: .battery),
+        PanelModuleDefinition(
+            id: .network, title: "Network", subtitle: "Download and upload rates",
+            symbolName: "network", settingsPane: .network),
     ]
 
     static func definition(for id: PanelModuleID) -> PanelModuleDefinition? {
@@ -152,6 +159,10 @@ struct BatterySettingsState: Equatable {
     var refreshInterval: TimeInterval
 }
 
+struct NetworkSettingsState: Equatable {
+    var refreshInterval: TimeInterval
+}
+
 struct AppearanceSettingsState: Equatable {
     var cornerRadius: CGFloat
     var tintOpacity: CGFloat
@@ -167,6 +178,7 @@ struct SettingsPanelValues: Equatable {
     var schedule: ScheduleSettingsState
     var clock: ClockSettingsState
     var battery: BatterySettingsState
+    var network: NetworkSettingsState
     var appearance: AppearanceSettingsState
 
     func normalized() -> Self {
@@ -219,6 +231,10 @@ enum BatterySettingsChange {
     case refreshInterval(TimeInterval)
 }
 
+enum NetworkSettingsChange {
+    case refreshInterval(TimeInterval)
+}
+
 enum AppearanceSettingsChange {
     case cornerRadius(CGFloat)
     case tintOpacity(CGFloat)
@@ -234,6 +250,7 @@ enum SettingsPanelChange {
     case schedule(ScheduleSettingsChange)
     case clock(ClockSettingsChange)
     case battery(BatterySettingsChange)
+    case network(NetworkSettingsChange)
     case appearance(AppearanceSettingsChange)
 }
 
@@ -505,6 +522,14 @@ final class SettingsPanelModel: ObservableObject {
         }) ?? PanelSettings.defaultBatteryRefreshInterval
         updateValues { $0.battery.refreshInterval = selected }
         onChange?(.battery(.refreshInterval(selected)))
+    }
+
+    func setNetworkRefreshInterval(_ value: TimeInterval) {
+        let selected = PanelSettings.networkRefreshIntervals.min(by: {
+            abs($0 - value) < abs($1 - value)
+        }) ?? PanelSettings.defaultNetworkRefreshInterval
+        updateValues { $0.network.refreshInterval = selected }
+        onChange?(.network(.refreshInterval(selected)))
     }
 
     func setValues(_ values: SettingsPanelValues) {

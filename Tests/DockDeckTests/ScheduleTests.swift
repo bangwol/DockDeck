@@ -165,6 +165,7 @@ final class ScheduleTests: XCTestCase {
             clock: ClockSettingsState(
                 timeZoneIdentifier: ClockTimeZone.systemIdentifier, hourFormat: .system),
             battery: BatterySettingsState(refreshInterval: 60),
+            network: NetworkSettingsState(refreshInterval: 2),
             appearance: AppearanceSettingsState(cornerRadius: 10, tintOpacity: 0.6))
     }
 }

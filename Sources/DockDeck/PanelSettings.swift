@@ -85,9 +85,11 @@ struct PanelModuleID: Hashable, Codable {
     static let schedule = PanelModuleID(rawValue: "schedule")
     static let clock = PanelModuleID(rawValue: "clock")
     static let battery = PanelModuleID(rawValue: "battery")
+    static let network = PanelModuleID(rawValue: "network")
 
     static let readOnlyBuiltIns: [PanelModuleID] = [
         .usage, .systemStats, .serviceMonitor, .weather, .schedule, .clock, .battery,
+        .network,
     ]
 
     init(rawValue: String) {
@@ -199,6 +201,8 @@ enum PanelSettings {
     static let scheduleRefreshIntervals: [TimeInterval] = [60, 5 * 60, 15 * 60]
     static let defaultBatteryRefreshInterval: TimeInterval = 60
     static let batteryRefreshIntervals: [TimeInterval] = [30, 60, 5 * 60]
+    static let defaultNetworkRefreshInterval: TimeInterval = 2
+    static let networkRefreshIntervals: [TimeInterval] = [1, 2, 5]
 
     private static let cornerRadiusKey = "DockDeck.settings.cornerRadius"
     private static let tintOpacityKey = "DockDeck.settings.tintOpacity"
@@ -226,6 +230,7 @@ enum PanelSettings {
         "DockDeck.settings.clockTimeZoneIdentifier"
     private static let clockHourFormatKey = "DockDeck.settings.clockHourFormat"
     private static let batteryRefreshIntervalKey = "DockDeck.settings.batteryRefreshInterval"
+    private static let networkRefreshIntervalKey = "DockDeck.settings.networkRefreshInterval"
     private static let panelOrderKey = "DockDeck.settings.panelOrder"
     private static let enabledPanelsKey = "DockDeck.settings.enabledPanels"
     private static let panelDeckConfigurationKey =
@@ -530,6 +535,25 @@ enum PanelSettings {
         }
     }
 
+    static var networkRefreshInterval: TimeInterval {
+        get {
+            let defaults = UserDefaults.standard
+            guard defaults.object(forKey: networkRefreshIntervalKey) != nil else {
+                return defaultNetworkRefreshInterval
+            }
+            let value = defaults.double(forKey: networkRefreshIntervalKey)
+            return networkRefreshIntervals.min(by: {
+                abs($0 - value) < abs($1 - value)
+            }) ?? defaultNetworkRefreshInterval
+        }
+        set {
+            let value = networkRefreshIntervals.min(by: {
+                abs($0 - newValue) < abs($1 - newValue)
+            }) ?? defaultNetworkRefreshInterval
+            UserDefaults.standard.set(value, forKey: networkRefreshIntervalKey)
+        }
+    }
+
     static var enabledPanels: EnabledPanels {
         get {
             var panels: EnabledPanels = []
@@ -631,6 +655,7 @@ enum PanelSettings {
         defaults.removeObject(forKey: clockTimeZoneIdentifierKey)
         defaults.removeObject(forKey: clockHourFormatKey)
         defaults.removeObject(forKey: batteryRefreshIntervalKey)
+        defaults.removeObject(forKey: networkRefreshIntervalKey)
         defaults.removeObject(forKey: panelOrderKey)
         defaults.removeObject(forKey: enabledPanelsKey)
         defaults.removeObject(forKey: panelDeckConfigurationKey)
