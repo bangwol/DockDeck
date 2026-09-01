@@ -13,17 +13,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     static let accessibilityWarmupDelay: TimeInterval = 3
 
     var terminalPanelController: TerminalPanelController!
-    var quotaPanelController: QuotaPanelController!
+    var readOnlyDeckPanelController: ReadOnlyDeckPanelController!
     lazy var usageStore = UsageStore { [weak self] message in
         self?.debugLog("usage", message)
     }
+    lazy var systemStatsStore = SystemStatsStore()
     lazy var dockCoordinator = DockCoordinator { [weak self] channel, message in
         self?.debugLog(channel, message)
     }
     let moduleRuntimeCoordinator = ModuleRuntimeCoordinator()
 
     var panel: KeyablePanel { terminalPanelController.panel }
-    var quotaPanel: NSPanel { quotaPanelController.panel }
+    var readOnlyDeckPanel: NSPanel { readOnlyDeckPanelController.panel }
     var terminalView: LocalProcessTerminalView { terminalPanelController.terminalView }
     var menuButton: NSButton { terminalPanelController.menuButton }
     var trackingTimer: Timer!
@@ -97,10 +98,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 self?.debugLog("shell", message)
             })
         usageStore.setEnabledProviders(PanelSettings.enabledUsageProviders)
-        quotaPanelController = QuotaPanelController(
+        readOnlyDeckPanelController = ReadOnlyDeckPanelController(
             initialFrame: initialQuotaFrame,
             theme: currentTheme,
-            store: usageStore,
+            usageStore: usageStore,
+            systemStatsStore: systemStatsStore,
             menuTarget: self)
         panel.delegate = self
         registerModuleRuntimes()
@@ -113,8 +115,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             if enabledPanels.contains(.terminal), initialFrames.terminal != nil {
                 panel.orderFrontRegardless()
             }
-            if enabledPanels.contains(.usage), initialFrames.quota != nil {
-                quotaPanel.orderFrontRegardless()
+            if !PanelSettings.enabledReadOnlyModules.isEmpty, initialFrames.quota != nil {
+                readOnlyDeckPanel.orderFrontRegardless()
             }
         }
         panel.makeFirstResponder(terminalView)
@@ -188,6 +190,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             .usage,
             start: { [weak self] in self?.usageStore.start() },
             stop: { [weak self] in self?.usageStore.stop() })
+        moduleRuntimeCoordinator.register(
+            .systemStats,
+            start: { [weak self] in self?.systemStatsStore.start() },
+            stop: { [weak self] in self?.systemStatsStore.stop() })
     }
 
     func synchronizeModuleRuntimes() {

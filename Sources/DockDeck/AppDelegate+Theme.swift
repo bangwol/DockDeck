@@ -7,7 +7,7 @@ extension AppDelegate {
         terminalView.nativeForegroundColor = theme.foregroundColor
         terminalView.installColors(theme.ansiPalette)
         menuButton.contentTintColor = theme.chromeTintColor
-        quotaPanelController.applyTheme(theme)
+        readOnlyDeckPanelController.applyTheme(theme)
         applyThemeToFallbackHint(theme)
         if persist {
             UserDefaults.standard.set(theme.id, forKey: AppPreferences.themeIDKey)

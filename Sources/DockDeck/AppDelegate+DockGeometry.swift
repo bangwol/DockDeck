@@ -24,7 +24,7 @@ extension AppDelegate {
         dockCoordinator.frames(for: presence).ordered(PanelSettings.panelOrder)
     }
 
-    func quotaFrame(for presence: DockPresence) -> NSRect? {
+    func readOnlyDeckFrame(for presence: DockPresence) -> NSRect? {
         collapsedFrames(for: presence).quota
     }
 
@@ -93,11 +93,11 @@ extension AppDelegate {
             panel.orderOut(nil)
         }
         if let presence, case .concealed = presence {
-            hideQuota()
-        } else if let presence, let frame = quotaFrame(for: presence) {
-            showQuota(frame)
+            hideReadOnlyDeck()
+        } else if let presence, let frame = readOnlyDeckFrame(for: presence) {
+            showReadOnlyDeck(frame)
         } else {
-            hideQuota()
+            hideReadOnlyDeck()
         }
         debugLog("expand", "returned terminal to Dock")
         updateFallbackHintVisibility()

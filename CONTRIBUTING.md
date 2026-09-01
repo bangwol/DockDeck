@@ -39,8 +39,10 @@ swift test
 - Keep shared surface controls under Appearance.
 - Put provider-level controls in the owning module pane. Usage providers must
   stop their own polling or subprocess when deselected.
-- Do not expose stacking, drag reordering, or module installation before the
-  panel runtime implements the same behavior.
+- Read-only modules share the read-only Deck and must render correctly at the
+  compact panel size before they are registered. Keep module switching manual
+  and predictable; do not add automatic rotation, drag reordering, or module
+  installation without implementing and testing those runtime behaviors.
 
 ## PR guidelines
 

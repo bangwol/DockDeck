@@ -22,7 +22,7 @@ extension AppDelegate {
             withTitle: "Settings…", action: #selector(toggleSettingsPanel(_:)), keyEquivalent: ","
         )
         appMenu.addItem(
-            withTitle: "Refresh Usage & Layout", action: #selector(refreshUsage(_:)),
+            withTitle: "Refresh Modules & Layout", action: #selector(refreshModules(_:)),
             keyEquivalent: "r"
         )
         appMenu.addItem(
@@ -61,18 +61,21 @@ extension AppDelegate {
         terminalPanelController.setResizable(false)
         applyTerminalAppearance()
         if let presence, case .concealed = presence {
-            hideQuota()
-        } else if let presence, let frame = quotaFrame(for: presence) {
-            showQuota(frame)
+            hideReadOnlyDeck()
+        } else if let presence, let frame = readOnlyDeckFrame(for: presence) {
+            showReadOnlyDeck(frame)
         } else {
-            hideQuota()
+            hideReadOnlyDeck()
         }
         debugLog("expand", "isExpanded=\(isExpanded) screen=\(describe(expansionScreenID))")
         updateFallbackHintVisibility()
     }
 
-    @objc func refreshUsage(_ sender: Any?) {
-        usageStore.refresh()
+    @objc func refreshModules(_ sender: Any?) {
+        if PanelSettings.enabledReadOnlyModules.contains(.usage) { usageStore.refresh() }
+        if PanelSettings.enabledReadOnlyModules.contains(.systemStats) {
+            systemStatsStore.refresh()
+        }
         refreshCoarseCaches()
         startTrackingTimer()
         runEvaluation()

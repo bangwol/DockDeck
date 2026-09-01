@@ -18,11 +18,19 @@ extension AppDelegate {
             NSMenuItem(
                 title: "Settings…",
                 action: #selector(toggleSettingsPanel(_:)), keyEquivalent: ""))
-        menu.addItem(
-            NSMenuItem(
-                title: PanelSettings.usageDisplayMode == .remaining
-                    ? "Show Used Values" : "Show Remaining Values",
-                action: #selector(toggleUsageDisplayMode(_:)), keyEquivalent: ""))
+        if PanelSettings.enabledReadOnlyModules.count > 1 {
+            menu.addItem(
+                NSMenuItem(
+                    title: "Show Next Module",
+                    action: #selector(showNextReadOnlyModule(_:)), keyEquivalent: ""))
+        }
+        if readOnlyDeckPanelController.activeModule == .usage {
+            menu.addItem(
+                NSMenuItem(
+                    title: PanelSettings.usageDisplayMode == .remaining
+                        ? "Show Used Values" : "Show Remaining Values",
+                    action: #selector(toggleUsageDisplayMode(_:)), keyEquivalent: ""))
+        }
         menu.addItem(
             NSMenuItem(
                 title: PanelSettings.panelOrder == .terminalLeft
@@ -30,8 +38,8 @@ extension AppDelegate {
                 action: #selector(swapPanelSides(_:)), keyEquivalent: ""))
         menu.addItem(
             NSMenuItem(
-                title: "Refresh Usage & Layout",
-                action: #selector(refreshUsage(_:)), keyEquivalent: "r"))
+                title: "Refresh Modules & Layout",
+                action: #selector(refreshModules(_:)), keyEquivalent: "r"))
         menu.addItem(.separator())
         menu.addItem(
             NSMenuItem(

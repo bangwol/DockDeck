@@ -14,7 +14,7 @@ final class PanelAppearanceTests: XCTestCase {
         let configuration = PanelDeckConfiguration.legacy(
             order: .terminalRight, enabledPanels: .terminal)
 
-        XCTAssertEqual(configuration.left, [.usage])
+        XCTAssertEqual(configuration.left, [.usage, .systemStats])
         XCTAssertEqual(configuration.right, [.terminal])
         XCTAssertEqual(configuration.enabled, [.terminal])
         XCTAssertEqual(configuration.side(containing: .terminal), .right)
@@ -31,8 +31,19 @@ final class PanelAppearanceTests: XCTestCase {
         let decoded = try JSONDecoder().decode(PanelDeckConfiguration.self, from: data)
 
         XCTAssertEqual(decoded.left, [.terminal, clock])
-        XCTAssertEqual(decoded.right, [.usage])
+        XCTAssertEqual(decoded.right, [.usage, .systemStats])
         XCTAssertEqual(decoded.enabled, [clock])
+    }
+
+    func testDeckConfigurationKeepsReadOnlyModulesOppositeTerminal() {
+        let configuration = PanelDeckConfiguration(
+            left: [.terminal, .systemStats],
+            right: [.usage],
+            enabled: [.terminal, .usage, .systemStats]
+        ).normalized()
+
+        XCTAssertEqual(configuration.left, [.terminal])
+        XCTAssertEqual(configuration.right, [.usage, .systemStats])
     }
 
     func testSettingsModelSwapsCompleteDecksWithoutDroppingFutureModules() {
@@ -50,7 +61,7 @@ final class PanelAppearanceTests: XCTestCase {
 
         model.swapDecks()
 
-        XCTAssertEqual(model.values.deckConfiguration.left, [.usage])
+        XCTAssertEqual(model.values.deckConfiguration.left, [.usage, .systemStats])
         XCTAssertEqual(model.values.deckConfiguration.right, [.terminal, clock])
         XCTAssertEqual(persistedConfiguration, model.values.deckConfiguration)
     }
@@ -75,8 +86,11 @@ final class PanelAppearanceTests: XCTestCase {
             configuration: .legacy(order: .terminalLeft, enabledPanels: .all))
 
         XCTAssertEqual(Set(PanelModuleRegistry.all.map(\.id)).count, PanelModuleRegistry.all.count)
-        XCTAssertEqual(model.availablePanes, [.decks, .terminal, .usage, .appearance])
+        XCTAssertEqual(
+            model.availablePanes,
+            [.decks, .terminal, .usage, .systemStats, .appearance])
         XCTAssertEqual(model.moduleDefinition(for: .usage)?.id, .usage)
+        XCTAssertEqual(model.moduleDefinition(for: .systemStats)?.id, .systemStats)
     }
 
     func testModuleRuntimeCoordinatorStartsAndStopsOnlyChangedModules() {
@@ -123,6 +137,38 @@ final class PanelAppearanceTests: XCTestCase {
 
         XCTAssertEqual(model.values.usage.fontSize, 12)
         XCTAssertEqual(emittedSize, 12)
+    }
+
+    func testSettingsModelRoundsSystemStatsRefreshInterval() {
+        let model = makeSettingsModel(
+            configuration: .legacy(order: .terminalLeft, enabledPanels: .all))
+        var emittedInterval: TimeInterval?
+        model.onChange = {
+            if case .systemStats(.refreshInterval(let interval)) = $0 {
+                emittedInterval = interval
+            }
+        }
+
+        model.setSystemStatsRefreshInterval(4.2)
+
+        XCTAssertEqual(model.values.systemStats.refreshInterval, 5)
+        XCTAssertEqual(emittedInterval, 5)
+    }
+
+    func testReadOnlyDeckSelectionCyclesEnabledModules() {
+        let modules: [PanelModuleID] = [.usage, .systemStats]
+
+        XCTAssertEqual(
+            ReadOnlyDeckSelection.resolved(preferred: .systemStats, enabledModules: modules),
+            .systemStats)
+        XCTAssertEqual(
+            ReadOnlyDeckSelection.resolved(
+                preferred: PanelModuleID(rawValue: "missing"), enabledModules: modules),
+            .usage)
+        XCTAssertEqual(
+            ReadOnlyDeckSelection.next(after: .usage, enabledModules: modules), .systemStats)
+        XCTAssertEqual(
+            ReadOnlyDeckSelection.next(after: .systemStats, enabledModules: modules), .usage)
     }
 
     func testSettingsPanesRenderAtPreferredSize() throws {
@@ -178,9 +224,17 @@ final class PanelAppearanceTests: XCTestCase {
     }
 
     func testUsagePanelAcceptsContextMenuWithoutTakingKeyboardFocus() throws {
-        let controller = QuotaPanelController(
+        let previousConfiguration = PanelSettings.deckConfiguration
+        defer { PanelSettings.deckConfiguration = previousConfiguration }
+        PanelSettings.deckConfiguration = .legacy(
+            order: .terminalLeft, enabledPanels: .all)
+
+        let controller = ReadOnlyDeckPanelController(
             initialFrame: NSRect(x: 0, y: 0, width: 214, height: 59),
-            theme: Theme.theme(id: ""), store: UsageStore(), menuTarget: NSObject())
+            theme: Theme.theme(id: ""),
+            usageStore: UsageStore(),
+            systemStatsStore: SystemStatsStore(),
+            menuTarget: NSObject())
         let menu = try XCTUnwrap(controller.panel.contentView?.menu)
 
         controller.menuWillOpen(menu)
@@ -191,7 +245,7 @@ final class PanelAppearanceTests: XCTestCase {
             menu.items.filter { !$0.isSeparatorItem }.map(\.title),
             [
                 "Settings…", "Show Used Values", "Move Terminal to Right",
-                "Refresh Usage & Layout",
+                "Refresh Modules & Layout",
             ])
     }
 
@@ -216,6 +270,7 @@ final class PanelAppearanceTests: XCTestCase {
                 enabledProviders: UsageProviderID.allCases,
                 fontName: "Menlo", fontSize: 10,
                 displayMode: .remaining, textColor: .theme),
+            systemStats: SystemStatsSettingsState(refreshInterval: 2),
             appearance: AppearanceSettingsState(
                 cornerRadius: 10, tintOpacity: 0.6))
     }

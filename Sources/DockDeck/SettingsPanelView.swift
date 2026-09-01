@@ -127,6 +127,8 @@ private struct SettingsRootView: View {
             TerminalSettingsView(model: model)
         case .usage:
             UsageSettingsView(model: model)
+        case .systemStats:
+            SystemStatsSettingsView(model: model)
         case .appearance:
             AppearanceSettingsView(model: model)
         }

@@ -33,7 +33,7 @@ extension AppDelegate {
     }
 
     func isArmed() -> Bool {
-        if panel.isVisible || quotaPanel.isVisible { return true }
+        if panel.isVisible || readOnlyDeckPanel.isVisible { return true }
         let pointer = NSEvent.mouseLocation
         return NSScreen.screens.contains { screen in
             let frame = screen.frame
@@ -84,7 +84,7 @@ extension AppDelegate {
             guard !isHeld else { return }
             showTerminal(
                 NSRect(x: 0, y: 0, width: Self.fallbackWidth, height: Self.fallbackHeight))
-            hideQuota()
+            hideReadOnlyDeck()
             return
         }
         evaluate(presence)
@@ -138,7 +138,7 @@ extension AppDelegate {
                 debugLog("visibility", "concealing with the Dock")
                 panel.orderOut(nil)
             }
-            if quotaPanel.isVisible { quotaPanel.orderOut(nil) }
+            if readOnlyDeckPanel.isVisible { readOnlyDeckPanel.orderOut(nil) }
         }
     }
 
@@ -154,12 +154,12 @@ extension AppDelegate {
             panel.orderOut(nil)
         }
 
-        if enabledPanels.contains(.usage), let quotaFrame = frames.quota {
-            showQuota(quotaFrame)
+        if !PanelSettings.enabledReadOnlyModules.isEmpty, let readOnlyFrame = frames.quota {
+            showReadOnlyDeck(readOnlyFrame)
         } else {
-            let reason = enabledPanels.contains(.usage)
+            let reason = !PanelSettings.enabledReadOnlyModules.isEmpty
                 ? "insufficient space beside Dock" : "disabled in settings"
-            hideQuota(reason: reason)
+            hideReadOnlyDeck(reason: reason)
         }
     }
 
@@ -172,19 +172,19 @@ extension AppDelegate {
         applyFrame(frame, animated: animated)
     }
 
-    func showQuota(_ frame: NSRect) {
-        guard PanelSettings.enabledPanels.contains(.usage) else {
-            hideQuota(reason: "disabled in settings")
+    func showReadOnlyDeck(_ frame: NSRect) {
+        guard !PanelSettings.enabledReadOnlyModules.isEmpty else {
+            hideReadOnlyDeck(reason: "disabled in settings")
             return
         }
-        if !quotaPanel.isVisible { quotaPanel.orderFrontRegardless() }
-        applyQuotaFrame(frame)
+        if !readOnlyDeckPanel.isVisible { readOnlyDeckPanel.orderFrontRegardless() }
+        applyReadOnlyDeckFrame(frame)
     }
 
-    func hideQuota(reason: String = "insufficient space beside Dock") {
-        guard quotaPanel.isVisible else { return }
-        debugLog("visibility", "hiding quota; \(reason)")
-        quotaPanel.orderOut(nil)
+    func hideReadOnlyDeck(reason: String = "insufficient space beside Dock") {
+        guard readOnlyDeckPanel.isVisible else { return }
+        debugLog("visibility", "hiding read-only deck; \(reason)")
+        readOnlyDeckPanel.orderOut(nil)
     }
 
     func restoreLastFullyVisibleFrameIfStranded(on host: NSScreen) {
@@ -227,10 +227,10 @@ extension AppDelegate {
             }, completionHandler: layoutTerminal)
     }
 
-    func applyQuotaFrame(_ frame: NSRect) {
-        guard quotaPanel.frame != frame else { return }
-        debugLog("quota-frame", "\(frame)")
-        quotaPanel.setFrame(frame, display: true)
+    func applyReadOnlyDeckFrame(_ frame: NSRect) {
+        guard readOnlyDeckPanel.frame != frame else { return }
+        debugLog("read-only-frame", "\(frame)")
+        readOnlyDeckPanel.setFrame(frame, display: true)
     }
 
     func collapseTarget(for presence: DockPresence?) -> NSRect? {

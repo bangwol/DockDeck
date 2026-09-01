@@ -5,7 +5,7 @@
 <h1 align="center">DockDeck</h1>
 
 <p align="center">
-  A terminal and an AI usage dashboard that live beside your macOS Dock.
+  A terminal and compact developer modules that live beside your macOS Dock.
 </p>
 
 <p align="center">
@@ -18,15 +18,16 @@
   <sub>Compact terminal and configurable Codex and Claude usage beside the macOS Dock. Open the image for full resolution.</sub>
 </p>
 
-DockDeck uses the space beside a bottom-aligned Dock for two compact developer panels. The terminal stays interactive while the usage panel remains read-only; either panel can be hidden or placed on either side. Both follow the Dock across displays, Spaces, and auto-hide transitions.
+DockDeck uses the space beside a bottom-aligned Dock for two compact developer panels. The terminal stays interactive while a read-only Deck hosts Usage and System Stats modules; either Deck can be hidden or placed on either side. Both follow the Dock across displays, Spaces, and auto-hide transitions.
 
 ## Features
 
 - Persistent [SwiftTerm](https://github.com/migueldeicaza/SwiftTerm) login shell with a compact `% ` prompt that does not change user shell files.
 - Remaining or used Codex and Claude capacity from their supported local interfaces; either provider can be selected independently, with no browser cookies or private web endpoints.
+- Local CPU, memory, and disk utilization with a configurable 1–10 second sampling interval.
 - Dock-aware, symmetric placement across displays, Spaces, and auto-hide transitions.
-- Read-only usage panel with configurable values, font, size, and color; right-click it for the shared settings menu.
-- A shared sidebar-based Settings window with Deck cards, module detail pages, side placement, and independent Terminal and Usage visibility controls.
+- Read-only module Deck with manual module switching; right-click it to select a module or open its settings.
+- A shared sidebar-based Settings window with Deck cards, module detail pages, side placement, and independent module visibility controls.
 - Disabled modules stop their background timers and subprocesses instead of merely hiding their panels.
 - Click-to-focus terminal expansion, native edge resizing, and remembered dimensions.
 - Native Liquid Glass on macOS 26, with a translucent fallback and stronger terminal tint on earlier macOS.
@@ -39,14 +40,18 @@ Keyboard shortcuts:
 | `⌘E` | Toggle the manual large terminal mode |
 | `⌘T` | Open the theme picker |
 | `⌘,` | Open the shared settings panel |
-| `⌘R` | Refresh usage data and Dock layout |
+| `⌘R` | Refresh active module data and Dock layout |
 | `⌘Q` | Quit DockDeck |
 
 DockDeck reserves the Command-key shortcuts above plus the standard `⌘C`, `⌘V`, and `⌘A` editing shortcuts. `Ctrl` combinations, Option/Meta, Esc, Tab, arrow keys, Home/End, Delete, and F1–F12 continue through SwiftTerm's normal terminal input handling. Option acts as Meta by default. Page Up and Page Down follow SwiftTerm's terminal scrolling behavior unless the running terminal application requests cursor-key handling.
 
-Click the terminal to expand it, then click elsewhere to return it to the Dock. Drag any edge to resize it; DockDeck restores those proportions the next time it expands. Open the shared **Settings…** panel from the terminal menu, app menu, or usage-panel context menu. `⌘E` toggles a separate, fixed 75% large-terminal mode; its menu action is labeled **Return Terminal to Dock** while active. Running `exit` starts a fresh DockDeck login shell; use `⌘Q` to quit the app.
+Click the terminal to expand it, then click elsewhere to return it to the Dock. Drag any edge to resize it; DockDeck restores those proportions the next time it expands. Right-click the read-only Deck to switch between enabled modules. Open the shared **Settings…** panel from either panel. `⌘E` toggles a separate, fixed 75% large-terminal mode; its menu action is labeled **Return Terminal to Dock** while active. Running `exit` starts a fresh DockDeck login shell; use `⌘Q` to quit the app.
 
-Settings are organized into **Decks**, **Terminal**, **Usage**, and **Appearance**. Decks show the modules assigned to each side of the Dock, let either current module be hidden, and swap the complete left and right Decks. At least one module remains visible so Settings stays reachable. DockDeck remembers the last Settings section you opened.
+Settings are organized into **Decks**, module-specific pages, and **Appearance**. Decks show the modules assigned to each side of the Dock, enable or disable each module, and swap the complete left and right Decks. At least one module remains visible so Settings stays reachable. Disabled modules stop sampling and subprocesses. DockDeck remembers the last Settings section you opened.
+
+## Reading System Stats
+
+System Stats reports CPU utilization since the previous sample, physical memory in use, and startup-volume disk space in use. It uses local macOS host and file-system APIs, requires no additional permission, and performs no network requests. Enable it under **Settings → Decks**, then right-click the read-only Deck to switch modules.
 
 ## Requirements
 
@@ -139,6 +144,7 @@ DockDeck does not read browser cookies, browser credential stores, or private we
 | --- | --- | --- |
 | Codex | `codex app-server` using `account/rateLimits/read` | Runs the locally installed official Codex CLI as a long-lived subprocess |
 | Claude | Claude Code status-line JSON | Stores only `rate_limits` and an observation timestamp in a local cache |
+| System Stats | macOS host and file-system APIs | Samples CPU, physical memory, and startup-volume capacity locally |
 
 The Claude cache is written atomically to:
 

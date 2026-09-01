@@ -10,23 +10,37 @@ extension AppDelegate {
         let terminalEnabled = PanelSettings.enabledPanels.contains(.terminal)
         presentSettingsPanel(
             pane: savedSettingsPane,
-            anchor: terminalEnabled ? panel : quotaPanel,
+            anchor: terminalEnabled ? panel : readOnlyDeckPanel,
             restoreTerminalFocus: terminalEnabled)
     }
 
-    @objc func openUsageSettings(_ sender: Any?) {
+    @objc func openReadOnlyModuleSettings(_ sender: Any?) {
+        let pane = readOnlyDeckPanelController.activeModule
+            .flatMap { PanelModuleRegistry.definition(for: $0)?.settingsPane } ?? .decks
         if let settingsPanel {
-            (settingsPanel.contentView as? SettingsPanelView)?.selectPane(.usage)
+            (settingsPanel.contentView as? SettingsPanelView)?.selectPane(pane)
             settingsPanel.makeKeyAndOrderFront(nil)
             return
         }
-        presentSettingsPanel(pane: .usage, anchor: quotaPanel, restoreTerminalFocus: false)
+        presentSettingsPanel(pane: pane, anchor: readOnlyDeckPanel, restoreTerminalFocus: false)
+    }
+
+    @objc func showNextReadOnlyModule(_ sender: Any?) {
+        readOnlyDeckPanelController.selectNext()
+    }
+
+    @objc func selectReadOnlyModule(_ sender: Any?) {
+        guard
+            let item = sender as? NSMenuItem,
+            let rawValue = item.representedObject as? String
+        else { return }
+        readOnlyDeckPanelController.select(PanelModuleID(rawValue: rawValue))
     }
 
     @objc func toggleUsageDisplayMode(_ sender: Any?) {
         PanelSettings.usageDisplayMode =
             PanelSettings.usageDisplayMode == .remaining ? .used : .remaining
-        quotaPanelController.applySettings()
+        readOnlyDeckPanelController.applySettings()
     }
 
     @objc func swapPanelSides(_ sender: Any?) {
@@ -60,10 +74,12 @@ extension AppDelegate {
             guard let self else { return }
             PanelSettings.resetToDefaults()
             self.usageStore.setEnabledProviders(PanelSettings.enabledUsageProviders)
+            self.systemStatsStore.setRefreshInterval(
+                PanelSettings.systemStatsRefreshInterval)
             self.applyCornerRadius()
             self.applyTintOpacity()
             self.applyFont()
-            self.quotaPanelController.applySettings()
+            self.readOnlyDeckPanelController.applySettings()
             self.applyPanelVisibility()
             view?.setValues(self.currentSettingsValues)
             self.resizeFocusedTerminalIfNeeded()
@@ -110,6 +126,8 @@ extension AppDelegate {
                 fontSize: PanelSettings.usageFontSize,
                 displayMode: PanelSettings.usageDisplayMode,
                 textColor: PanelSettings.usageTextColor),
+            systemStats: SystemStatsSettingsState(
+                refreshInterval: PanelSettings.systemStatsRefreshInterval),
             appearance: AppearanceSettingsState(
                 cornerRadius: PanelSettings.cornerRadius,
                 tintOpacity: PanelSettings.tintOpacity
@@ -120,6 +138,7 @@ extension AppDelegate {
         switch change {
         case .deck(let configuration):
             PanelSettings.deckConfiguration = configuration
+            readOnlyDeckPanelController.applySettings()
             applyPanelVisibility()
         case .terminal(.focusSize(let width, let height)):
             PanelSettings.focusWidthMultiplier = width
@@ -130,20 +149,23 @@ extension AppDelegate {
             applyFont()
         case .usage(.displayMode(let mode)):
             PanelSettings.usageDisplayMode = mode
-            quotaPanelController.applySettings()
+            readOnlyDeckPanelController.applySettings()
         case .usage(.providers(let providers)):
             PanelSettings.enabledUsageProviders = providers
             usageStore.setEnabledProviders(providers)
-            quotaPanelController.applySettings()
+            readOnlyDeckPanelController.applySettings()
         case .usage(.font(let name)):
             PanelSettings.usageFontName = name
-            quotaPanelController.applySettings()
+            readOnlyDeckPanelController.applySettings()
         case .usage(.fontSize(let size)):
             PanelSettings.usageFontSize = size
-            quotaPanelController.applySettings()
+            readOnlyDeckPanelController.applySettings()
         case .usage(.textColor(let color)):
             PanelSettings.usageTextColor = color
-            quotaPanelController.applySettings()
+            readOnlyDeckPanelController.applySettings()
+        case .systemStats(.refreshInterval(let interval)):
+            PanelSettings.systemStatsRefreshInterval = interval
+            systemStatsStore.setRefreshInterval(interval)
         case .appearance(.cornerRadius(let radius)):
             PanelSettings.cornerRadius = radius
             applyCornerRadius()
@@ -185,12 +207,12 @@ extension AppDelegate {
 
     func applyCornerRadius() {
         terminalPanelController.applyCornerRadius()
-        quotaPanelController.applyCornerRadius()
+        readOnlyDeckPanelController.applyCornerRadius()
     }
 
     func applyTintOpacity() {
         applyTerminalAppearance()
-        quotaPanelController.applyTheme(currentTheme)
+        readOnlyDeckPanelController.applyTheme(currentTheme)
     }
 
     func applyFont() {
@@ -215,8 +237,9 @@ extension AppDelegate {
             terminalPanelController.setResizable(false)
             if panel.isVisible { panel.orderOut(nil) }
         }
-        if !PanelSettings.enabledPanels.contains(.usage) {
-            hideQuota(reason: "disabled in settings")
+        readOnlyDeckPanelController.applySettings()
+        if PanelSettings.enabledReadOnlyModules.isEmpty {
+            hideReadOnlyDeck(reason: "disabled in settings")
         }
         refreshCoarseCaches()
         runEvaluation()

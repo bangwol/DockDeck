@@ -5,6 +5,7 @@ enum SettingsPaneID: String, CaseIterable, Identifiable {
     case decks
     case terminal
     case usage
+    case systemStats
     case appearance
 
     var id: Self { self }
@@ -14,6 +15,7 @@ enum SettingsPaneID: String, CaseIterable, Identifiable {
         case .decks: "Decks"
         case .terminal: "Terminal"
         case .usage: "Usage"
+        case .systemStats: "System Stats"
         case .appearance: "Appearance"
         }
     }
@@ -23,6 +25,7 @@ enum SettingsPaneID: String, CaseIterable, Identifiable {
         case .decks: "Choose which modules appear beside the Dock."
         case .terminal: "Control terminal expansion and text."
         case .usage: "Choose how account limits are displayed."
+        case .systemStats: "Monitor local CPU, memory, and disk usage."
         case .appearance: "Adjust the shared panel surface."
         }
     }
@@ -32,6 +35,7 @@ enum SettingsPaneID: String, CaseIterable, Identifiable {
         case .decks: "rectangle.stack"
         case .terminal: "terminal"
         case .usage: "chart.bar"
+        case .systemStats: "gauge.with.dots.needle.67percent"
         case .appearance: "paintbrush"
         }
     }
@@ -55,6 +59,9 @@ enum PanelModuleRegistry {
         PanelModuleDefinition(
             id: .usage, title: "Usage", subtitle: "Codex and Claude limits",
             symbolName: "chart.bar", settingsPane: .usage),
+        PanelModuleDefinition(
+            id: .systemStats, title: "System Stats", subtitle: "CPU, memory, and disk",
+            symbolName: "gauge.with.dots.needle.67percent", settingsPane: .systemStats),
     ]
 
     static func definition(for id: PanelModuleID) -> PanelModuleDefinition? {
@@ -80,6 +87,10 @@ struct UsageSettingsState: Equatable {
     var textColor: UsageTextColor
 }
 
+struct SystemStatsSettingsState: Equatable {
+    var refreshInterval: TimeInterval
+}
+
 struct AppearanceSettingsState: Equatable {
     var cornerRadius: CGFloat
     var tintOpacity: CGFloat
@@ -89,6 +100,7 @@ struct SettingsPanelValues: Equatable {
     var deckConfiguration: PanelDeckConfiguration
     var terminal: TerminalSettingsState
     var usage: UsageSettingsState
+    var systemStats: SystemStatsSettingsState
     var appearance: AppearanceSettingsState
 
     func normalized() -> Self {
@@ -111,6 +123,10 @@ enum UsageSettingsChange {
     case textColor(UsageTextColor)
 }
 
+enum SystemStatsSettingsChange {
+    case refreshInterval(TimeInterval)
+}
+
 enum AppearanceSettingsChange {
     case cornerRadius(CGFloat)
     case tintOpacity(CGFloat)
@@ -120,6 +136,7 @@ enum SettingsPanelChange {
     case deck(PanelDeckConfiguration)
     case terminal(TerminalSettingsChange)
     case usage(UsageSettingsChange)
+    case systemStats(SystemStatsSettingsChange)
     case appearance(AppearanceSettingsChange)
 }
 
@@ -278,6 +295,14 @@ final class SettingsPanelModel: ObservableObject {
     func setUsageTextColor(_ value: UsageTextColor) {
         updateValues { $0.usage.textColor = value }
         onChange?(.usage(.textColor(value)))
+    }
+
+    func setSystemStatsRefreshInterval(_ value: TimeInterval) {
+        let selected = PanelSettings.systemStatsRefreshIntervals.min(by: {
+            abs($0 - value) < abs($1 - value)
+        }) ?? PanelSettings.defaultSystemStatsRefreshInterval
+        updateValues { $0.systemStats.refreshInterval = selected }
+        onChange?(.systemStats(.refreshInterval(selected)))
     }
 
     func setValues(_ values: SettingsPanelValues) {

@@ -195,6 +195,57 @@ struct UsageSettingsView: View {
     }
 }
 
+struct SystemStatsSettingsView: View {
+    @ObservedObject var model: SettingsPanelModel
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                GroupBox {
+                    SettingsPickerRow(title: "Refresh") {
+                        Picker(
+                            "System Stats refresh interval",
+                            selection: Binding(
+                                get: { model.values.systemStats.refreshInterval },
+                                set: model.setSystemStatsRefreshInterval)
+                        ) {
+                            ForEach(PanelSettings.systemStatsRefreshIntervals, id: \.self) {
+                                Text("\(Int($0)) seconds").tag($0)
+                            }
+                        }
+                        .labelsHidden()
+                        .frame(width: 230)
+                    }
+                    .padding(.top, 4)
+                } label: {
+                    Label("Sampling", systemImage: "timer")
+                        .font(.headline)
+                }
+
+                GroupBox {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Label("CPU", systemImage: "cpu")
+                        Label("Memory", systemImage: "memorychip")
+                        Label("Disk", systemImage: "internaldrive")
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.vertical, 4)
+                } label: {
+                    Label("Metrics", systemImage: "gauge.with.dots.needle.67percent")
+                        .font(.headline)
+                }
+
+                Text(
+                    "All values are sampled locally with macOS system APIs. "
+                        + "Sampling stops completely while this module is disabled.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            .padding(24)
+        }
+    }
+}
+
 struct AppearanceSettingsView: View {
     @ObservedObject var model: SettingsPanelModel
 

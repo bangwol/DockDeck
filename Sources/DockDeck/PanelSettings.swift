@@ -79,6 +79,9 @@ struct PanelModuleID: Hashable, Codable {
 
     static let terminal = PanelModuleID(rawValue: "terminal")
     static let usage = PanelModuleID(rawValue: "usage")
+    static let systemStats = PanelModuleID(rawValue: "system-stats")
+
+    static let readOnlyBuiltIns: [PanelModuleID] = [.usage, .systemStats]
 
     init(rawValue: String) {
         self.rawValue = rawValue
@@ -123,15 +126,6 @@ struct PanelDeckConfiguration: Codable, Equatable {
         enabled.contains(module)
     }
 
-    mutating func move(_ module: PanelModuleID, to side: PanelSide) {
-        left.removeAll { $0 == module }
-        right.removeAll { $0 == module }
-        switch side {
-        case .left: left.append(module)
-        case .right: right.append(module)
-        }
-    }
-
     mutating func setEnabled(_ value: Bool, for module: PanelModuleID) {
         enabled.removeAll { $0 == module }
         if value { enabled.append(module) }
@@ -149,6 +143,17 @@ struct PanelDeckConfiguration: Codable, Equatable {
         if !seen.contains(.usage) {
             right.append(.usage)
             seen.insert(.usage)
+        }
+
+        let readOnlySide: PanelSide = left.contains(.terminal) ? .right : .left
+        left.removeAll { PanelModuleID.readOnlyBuiltIns.contains($0) }
+        right.removeAll { PanelModuleID.readOnlyBuiltIns.contains($0) }
+        for module in PanelModuleID.readOnlyBuiltIns {
+            switch readOnlySide {
+            case .left: left.append(module)
+            case .right: right.append(module)
+            }
+            seen.insert(module)
         }
 
         var enabledSeen: Set<PanelModuleID> = []
@@ -177,6 +182,8 @@ enum PanelSettings {
     static let minimumUsageFontSize: CGFloat = 8
     static let maximumUsageFontSize: CGFloat = 14
     static let defaultUsageFontSize: CGFloat = 10
+    static let defaultSystemStatsRefreshInterval: TimeInterval = 2
+    static let systemStatsRefreshIntervals: [TimeInterval] = [1, 2, 5, 10]
 
     private static let cornerRadiusKey = "DockDeck.settings.cornerRadius"
     private static let tintOpacityKey = "DockDeck.settings.tintOpacity"
@@ -188,6 +195,9 @@ enum PanelSettings {
     private static let usageFontSizeKey = "DockDeck.settings.usageFontSize"
     private static let usageTextColorKey = "DockDeck.settings.usageTextColor"
     private static let enabledUsageProvidersKey = "DockDeck.settings.enabledUsageProviders"
+    private static let systemStatsRefreshIntervalKey =
+        "DockDeck.settings.systemStatsRefreshInterval"
+    private static let activeReadOnlyModuleKey = "DockDeck.settings.activeReadOnlyModule"
     private static let panelOrderKey = "DockDeck.settings.panelOrder"
     private static let enabledPanelsKey = "DockDeck.settings.enabledPanels"
     private static let panelDeckConfigurationKey =
@@ -282,11 +292,54 @@ enum PanelSettings {
         }
         set {
             var configuration = deckConfiguration
-            configuration.move(
-                .terminal, to: newValue == .terminalLeft ? .left : .right)
-            configuration.move(
-                .usage, to: newValue == .terminalLeft ? .right : .left)
+            let terminalIsLeft = configuration.side(containing: .terminal) != .right
+            guard terminalIsLeft != (newValue == .terminalLeft) else { return }
+            swap(&configuration.left, &configuration.right)
             deckConfiguration = configuration
+        }
+    }
+
+    static var enabledReadOnlyModules: [PanelModuleID] {
+        let configuration = deckConfiguration
+        let enabled = Set(configuration.enabled)
+        let known = Set(PanelModuleID.readOnlyBuiltIns)
+        return (configuration.left + configuration.right).filter {
+            known.contains($0) && enabled.contains($0)
+        }
+    }
+
+    static var activeReadOnlyModule: PanelModuleID? {
+        get {
+            let preferred = UserDefaults.standard.string(forKey: activeReadOnlyModuleKey)
+                .map(PanelModuleID.init(rawValue:))
+            return ReadOnlyDeckSelection.resolved(
+                preferred: preferred, enabledModules: enabledReadOnlyModules)
+        }
+        set {
+            if let newValue {
+                UserDefaults.standard.set(newValue.rawValue, forKey: activeReadOnlyModuleKey)
+            } else {
+                UserDefaults.standard.removeObject(forKey: activeReadOnlyModuleKey)
+            }
+        }
+    }
+
+    static var systemStatsRefreshInterval: TimeInterval {
+        get {
+            let defaults = UserDefaults.standard
+            guard defaults.object(forKey: systemStatsRefreshIntervalKey) != nil else {
+                return defaultSystemStatsRefreshInterval
+            }
+            let value = defaults.double(forKey: systemStatsRefreshIntervalKey)
+            return systemStatsRefreshIntervals.min(by: {
+                abs($0 - value) < abs($1 - value)
+            }) ?? defaultSystemStatsRefreshInterval
+        }
+        set {
+            let value = systemStatsRefreshIntervals.min(by: {
+                abs($0 - newValue) < abs($1 - newValue)
+            }) ?? defaultSystemStatsRefreshInterval
+            UserDefaults.standard.set(value, forKey: systemStatsRefreshIntervalKey)
         }
     }
 
@@ -378,6 +431,8 @@ enum PanelSettings {
         defaults.removeObject(forKey: usageFontSizeKey)
         defaults.removeObject(forKey: usageTextColorKey)
         defaults.removeObject(forKey: enabledUsageProvidersKey)
+        defaults.removeObject(forKey: systemStatsRefreshIntervalKey)
+        defaults.removeObject(forKey: activeReadOnlyModuleKey)
         defaults.removeObject(forKey: panelOrderKey)
         defaults.removeObject(forKey: enabledPanelsKey)
         defaults.removeObject(forKey: panelDeckConfigurationKey)
