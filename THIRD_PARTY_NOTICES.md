@@ -2,7 +2,7 @@
 
 DockDeck links the following open-source dependency:
 
-## SwiftTerm 1.20.0
+## SwiftTerm 1.18.0
 
 - Source: https://github.com/migueldeicaza/SwiftTerm
 - License: MIT
