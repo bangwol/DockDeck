@@ -345,7 +345,7 @@ struct ServiceMonitorSettingsView: View {
                     }
                     .padding(.top, 4)
                 } label: {
-                    Label("Services", systemImage: "network")
+                    Label("Services", systemImage: "server.rack")
                         .font(.headline)
                 }
 
@@ -517,6 +517,8 @@ private struct DeckModuleCard: View {
             VStack(alignment: .leading, spacing: 1) {
                 Text(definition.title)
                     .fontWeight(.medium)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.85)
                 Text(definition.subtitle)
                     .font(.caption)
                     .foregroundStyle(.secondary)

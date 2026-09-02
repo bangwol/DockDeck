@@ -42,7 +42,7 @@ enum SettingsPaneID: String, CaseIterable, Identifiable {
         case .weather: "Show current conditions for a selected city."
         case .schedule: "Show the current or next calendar event."
         case .clock: "Show local time or another time zone."
-        case .battery: "Show charge, power state, and time remaining."
+        case .battery: "Show charge, power state, and time left."
         case .network: "Show local download and upload throughput."
         case .appearance: "Adjust the shared panel surface."
         }
@@ -54,7 +54,7 @@ enum SettingsPaneID: String, CaseIterable, Identifiable {
         case .terminal: "terminal"
         case .usage: "chart.bar"
         case .systemStats: "gauge.with.dots.needle.67percent"
-        case .serviceMonitor: "network"
+        case .serviceMonitor: "server.rack"
         case .weather: "cloud.sun"
         case .schedule: "calendar"
         case .clock: "clock"
@@ -88,7 +88,7 @@ enum PanelModuleRegistry {
             symbolName: "gauge.with.dots.needle.67percent", settingsPane: .systemStats),
         PanelModuleDefinition(
             id: .serviceMonitor, title: "Service Monitor", subtitle: "HTTPS availability",
-            symbolName: "network", settingsPane: .serviceMonitor),
+            symbolName: "server.rack", settingsPane: .serviceMonitor),
         PanelModuleDefinition(
             id: .weather, title: "Weather", subtitle: "Selected-city conditions",
             symbolName: "cloud.sun", settingsPane: .weather),
