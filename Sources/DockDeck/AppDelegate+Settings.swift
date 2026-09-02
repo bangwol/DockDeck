@@ -103,6 +103,7 @@ extension AppDelegate {
             applyTerminalAppearance()
         }
         for controller in readOnlyDeckPanelControllers { controller.applySettings() }
+        synchronizeModuleRuntimes()
         isFrozen = false
         refreshCoarseCaches()
         runEvaluation()

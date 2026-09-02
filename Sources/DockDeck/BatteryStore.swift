@@ -93,6 +93,7 @@ final class BatteryStore: ObservableObject {
 
     private var timer: Timer?
     private var refreshInterval: TimeInterval
+    private var refreshCadence = ModuleRefreshCadence(backgroundMultiplier: 4)
 
     init(
         refreshInterval: TimeInterval = PanelSettings.batteryRefreshInterval,
@@ -122,12 +123,24 @@ final class BatteryStore: ObservableObject {
         scheduleTimer()
     }
 
+    func setRuntimeActivity(
+        _ activity: ModuleRuntimeActivity, lowPowerMode: Bool
+    ) {
+        guard refreshCadence.update(activity: activity, lowPowerMode: lowPowerMode),
+            timer != nil
+        else { return }
+        timer?.invalidate()
+        scheduleTimer()
+    }
+
     func refresh() {
         snapshot = BatteryReader.read()
     }
 
     private func scheduleTimer() {
-        timer = .moduleRefreshTimer(interval: refreshInterval) { [weak self] in self?.refresh() }
+        let interval = refreshCadence.effectiveInterval(
+            configuredInterval: refreshInterval)
+        timer = .moduleRefreshTimer(interval: interval) { [weak self] in self?.refresh() }
     }
 
     private static func resolvedRefreshInterval(_ interval: TimeInterval) -> TimeInterval {

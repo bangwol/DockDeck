@@ -249,6 +249,7 @@ final class WeatherStore: ObservableObject {
     private var generation = 0
     private var isRunning = false
     private let session: URLSession
+    private var refreshCadence = ModuleRefreshCadence(backgroundMultiplier: 2)
 
     init(
         location: WeatherLocation? = PanelSettings.weatherLocation,
@@ -298,6 +299,15 @@ final class WeatherStore: ObservableObject {
         task = nil
         scheduleTimer()
         refresh()
+    }
+
+    func setRuntimeActivity(
+        _ activity: ModuleRuntimeActivity, lowPowerMode: Bool
+    ) {
+        guard refreshCadence.update(activity: activity, lowPowerMode: lowPowerMode),
+            isRunning
+        else { return }
+        scheduleTimer()
     }
 
     func refresh() {
@@ -361,7 +371,9 @@ final class WeatherStore: ObservableObject {
             timer = nil
             return
         }
-        timer = .moduleRefreshTimer(interval: refreshInterval) { [weak self] in self?.refresh() }
+        let interval = refreshCadence.effectiveInterval(
+            configuredInterval: refreshInterval)
+        timer = .moduleRefreshTimer(interval: interval) { [weak self] in self?.refresh() }
     }
 
     private static func makeSession() -> URLSession {

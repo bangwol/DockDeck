@@ -30,14 +30,14 @@ enum ReadOnlyDeckSelection {
 }
 
 struct ReadOnlyDeckPanelView: View {
-    @ObservedObject var usageStore: UsageStore
-    @ObservedObject var systemStatsStore: SystemStatsStore
-    @ObservedObject var serviceMonitorStore: ServiceMonitorStore
-    @ObservedObject var weatherStore: WeatherStore
-    @ObservedObject var scheduleStore: ScheduleStore
-    @ObservedObject var clockStore: ClockStore
-    @ObservedObject var batteryStore: BatteryStore
-    @ObservedObject var networkStore: NetworkStore
+    let usageStore: UsageStore
+    let systemStatsStore: SystemStatsStore
+    let serviceMonitorStore: ServiceMonitorStore
+    let weatherStore: WeatherStore
+    let scheduleStore: ScheduleStore
+    let clockStore: ClockStore
+    let batteryStore: BatteryStore
+    let networkStore: NetworkStore
     let activeModule: PanelModuleID?
     let theme: Theme
 

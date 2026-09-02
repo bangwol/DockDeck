@@ -122,6 +122,7 @@ final class NetworkStore: ObservableObject {
     private var previous: (counters: NetworkCounters, date: Date)?
     private var timer: Timer?
     private var refreshInterval: TimeInterval
+    private var refreshCadence = ModuleRefreshCadence(backgroundMultiplier: 4)
 
     init(
         refreshInterval: TimeInterval = PanelSettings.networkRefreshInterval,
@@ -148,6 +149,16 @@ final class NetworkStore: ObservableObject {
         guard refreshInterval != interval else { return }
         refreshInterval = interval
         guard timer != nil else { return }
+        timer?.invalidate()
+        scheduleTimer()
+    }
+
+    func setRuntimeActivity(
+        _ activity: ModuleRuntimeActivity, lowPowerMode: Bool
+    ) {
+        guard refreshCadence.update(activity: activity, lowPowerMode: lowPowerMode),
+            timer != nil
+        else { return }
         timer?.invalidate()
         scheduleTimer()
     }
@@ -181,7 +192,9 @@ final class NetworkStore: ObservableObject {
     }
 
     private func scheduleTimer() {
-        timer = .moduleRefreshTimer(interval: refreshInterval) { [weak self] in self?.refresh() }
+        let interval = refreshCadence.effectiveInterval(
+            configuredInterval: refreshInterval)
+        timer = .moduleRefreshTimer(interval: interval) { [weak self] in self?.refresh() }
     }
 
     private static func resolvedRefreshInterval(_ interval: TimeInterval) -> TimeInterval {

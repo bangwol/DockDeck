@@ -209,20 +209,49 @@ final class PanelAppearanceTests: XCTestCase {
         var terminalStops = 0
         var usageStarts = 0
         var usageStops = 0
+        var usageActivities: [(ModuleRuntimeActivity, Bool)] = []
         coordinator.register(
             .terminal, start: { terminalStarts += 1 }, stop: { terminalStops += 1 })
         coordinator.register(
-            .usage, start: { usageStarts += 1 }, stop: { usageStops += 1 })
+            .usage,
+            start: { usageStarts += 1 },
+            stop: { usageStops += 1 },
+            updateActivity: { usageActivities.append(($0, $1)) })
 
-        coordinator.synchronize(enabledModules: [.terminal])
-        coordinator.synchronize(enabledModules: [.terminal])
-        coordinator.synchronize(enabledModules: [.usage, PanelModuleID(rawValue: "future")])
+        coordinator.synchronize(
+            enabledModules: [.terminal, .usage], visibleModules: [.terminal])
+        coordinator.synchronize(
+            enabledModules: [.terminal, .usage], visibleModules: [.terminal])
+        coordinator.synchronize(
+            enabledModules: [.terminal, .usage], visibleModules: [.usage],
+            lowPowerMode: true)
+        coordinator.synchronize(
+            enabledModules: [.usage, PanelModuleID(rawValue: "future")],
+            visibleModules: [.usage], lowPowerMode: true)
         coordinator.stopAll()
 
         XCTAssertEqual(terminalStarts, 1)
         XCTAssertEqual(terminalStops, 1)
         XCTAssertEqual(usageStarts, 1)
         XCTAssertEqual(usageStops, 1)
+        XCTAssertEqual(coordinator.state(for: .terminal), .stopped)
+        XCTAssertEqual(coordinator.state(for: .usage), .stopped)
+        XCTAssertEqual(usageActivities.count, 2)
+        XCTAssertEqual(usageActivities[0].0, .background)
+        XCTAssertFalse(usageActivities[0].1)
+        XCTAssertEqual(usageActivities[1].0, .visible)
+        XCTAssertTrue(usageActivities[1].1)
+    }
+
+    func testModuleRefreshCadenceCombinesVisibilityAndLowPower() {
+        var cadence = ModuleRefreshCadence(backgroundMultiplier: 4)
+
+        XCTAssertEqual(cadence.effectiveInterval(configuredInterval: 2), 2)
+        XCTAssertTrue(cadence.update(activity: .background, lowPowerMode: false))
+        XCTAssertEqual(cadence.effectiveInterval(configuredInterval: 2), 8)
+        XCTAssertTrue(cadence.update(activity: .background, lowPowerMode: true))
+        XCTAssertEqual(cadence.effectiveInterval(configuredInterval: 2), 16)
+        XCTAssertFalse(cadence.update(activity: .background, lowPowerMode: true))
     }
 
     func testUsageSettingsKeepsOneProviderEnabled() {

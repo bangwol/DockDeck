@@ -211,6 +211,7 @@ final class ScheduleStore: ObservableObject {
     private var generation = 0
     private var isRunning = false
     private let provider: ScheduleEventProviding
+    private var refreshCadence = ModuleRefreshCadence()
 
     init(
         selectedCalendarIDs: [String] = PanelSettings.scheduleCalendarIDs,
@@ -289,6 +290,15 @@ final class ScheduleStore: ObservableObject {
         scheduleTimer()
     }
 
+    func setRuntimeActivity(
+        _ activity: ModuleRuntimeActivity, lowPowerMode: Bool
+    ) {
+        guard refreshCadence.update(activity: activity, lowPowerMode: lowPowerMode),
+            isRunning, authorization.canRead
+        else { return }
+        scheduleTimer()
+    }
+
     func refresh(now: Date = Date()) {
         guard isRunning else { return }
         authorization = provider.authorizationState
@@ -318,7 +328,9 @@ final class ScheduleStore: ObservableObject {
             timer = nil
             return
         }
-        timer = .moduleRefreshTimer(interval: refreshInterval) { [weak self] in self?.refresh() }
+        let interval = refreshCadence.effectiveInterval(
+            configuredInterval: refreshInterval)
+        timer = .moduleRefreshTimer(interval: interval) { [weak self] in self?.refresh() }
     }
 
     private static func resolvedRefreshInterval(_ value: TimeInterval) -> TimeInterval {

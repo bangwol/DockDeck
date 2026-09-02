@@ -187,6 +187,7 @@ final class ServiceMonitorStore: ObservableObject {
     private var generation = 0
     private var isRunning = false
     private let session: URLSession
+    private var refreshCadence = ModuleRefreshCadence()
 
     init(
         endpoints: [ServiceMonitorEndpoint] = PanelSettings.serviceMonitorEndpoints,
@@ -253,6 +254,15 @@ final class ServiceMonitorStore: ObservableObject {
         cancelTasks()
         scheduleTimer()
         scheduleConfigurationRefresh()
+    }
+
+    func setRuntimeActivity(
+        _ activity: ModuleRuntimeActivity, lowPowerMode: Bool
+    ) {
+        guard refreshCadence.update(activity: activity, lowPowerMode: lowPowerMode),
+            isRunning
+        else { return }
+        scheduleTimer()
     }
 
     func refresh() {
@@ -332,7 +342,9 @@ final class ServiceMonitorStore: ObservableObject {
             timer = nil
             return
         }
-        timer = .moduleRefreshTimer(interval: refreshInterval) { [weak self] in self?.refresh() }
+        let interval = refreshCadence.effectiveInterval(
+            configuredInterval: refreshInterval)
+        timer = .moduleRefreshTimer(interval: interval) { [weak self] in self?.refresh() }
     }
 
     private func scheduleConfigurationRefresh() {

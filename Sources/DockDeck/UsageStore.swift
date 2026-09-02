@@ -107,6 +107,8 @@ enum UsageProviderError: LocalizedError {
 }
 
 final class UsageStore: ObservableObject {
+    private static let refreshInterval: TimeInterval = 60
+
     @Published private(set) var providers: [ProviderUsage]
 
     private let codexProvider: CodexAppServerProvider
@@ -116,6 +118,7 @@ final class UsageStore: ObservableObject {
     private var enabledProviderIDs = Set(UsageProviderID.allCases)
     private var refreshTimer: Timer?
     private var started = false
+    private var refreshCadence = ModuleRefreshCadence(backgroundMultiplier: 5)
 
     init(
         codexProvider: CodexAppServerProvider = CodexAppServerProvider(),
@@ -140,7 +143,7 @@ final class UsageStore: ObservableObject {
         if enabledProviderIDs.contains(.codex) { startCodex() }
         if enabledProviderIDs.contains(.claude) { refreshClaude() }
 
-        refreshTimer = .moduleRefreshTimer(interval: 60) { [weak self] in self?.refresh() }
+        scheduleRefreshTimer()
     }
 
     func refresh() {
@@ -172,6 +175,15 @@ final class UsageStore: ObservableObject {
         if !previous.contains(.claude) && resolved.contains(.claude) {
             refreshClaude()
         }
+    }
+
+    func setRuntimeActivity(
+        _ activity: ModuleRuntimeActivity, lowPowerMode: Bool
+    ) {
+        guard refreshCadence.update(activity: activity, lowPowerMode: lowPowerMode),
+            started
+        else { return }
+        scheduleRefreshTimer()
     }
 
     private func startCodex() {
@@ -238,6 +250,19 @@ final class UsageStore: ObservableObject {
     private func publishProviders() {
         providers = UsageProviderID.allCases.compactMap { providerID in
             enabledProviderIDs.contains(providerID) ? providerSnapshots[providerID] : nil
+        }
+    }
+
+    private func scheduleRefreshTimer() {
+        refreshTimer?.invalidate()
+        guard started else {
+            refreshTimer = nil
+            return
+        }
+        let interval = refreshCadence.effectiveInterval(
+            configuredInterval: Self.refreshInterval)
+        refreshTimer = .moduleRefreshTimer(interval: interval) { [weak self] in
+            self?.refresh()
         }
     }
 }

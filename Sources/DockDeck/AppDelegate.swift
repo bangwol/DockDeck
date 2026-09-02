@@ -232,6 +232,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             name: NSApplication.didChangeScreenParametersNotification,
             object: nil
         )
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(powerStateDidChange(_:)),
+            name: Notification.Name.NSProcessInfoPowerStateDidChange,
+            object: nil
+        )
     }
 
     func applicationWillTerminate(_ notification: Notification) {
@@ -252,23 +258,43 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         moduleRuntimeCoordinator.register(
             .usage,
             start: { [weak self] in self?.usageStore.start() },
-            stop: { [weak self] in self?.usageStore.stop() })
+            stop: { [weak self] in self?.usageStore.stop() },
+            updateActivity: { [weak self] activity, lowPowerMode in
+                self?.usageStore.setRuntimeActivity(
+                    activity, lowPowerMode: lowPowerMode)
+            })
         moduleRuntimeCoordinator.register(
             .systemStats,
             start: { [weak self] in self?.systemStatsStore.start() },
-            stop: { [weak self] in self?.systemStatsStore.stop() })
+            stop: { [weak self] in self?.systemStatsStore.stop() },
+            updateActivity: { [weak self] activity, lowPowerMode in
+                self?.systemStatsStore.setRuntimeActivity(
+                    activity, lowPowerMode: lowPowerMode)
+            })
         moduleRuntimeCoordinator.register(
             .serviceMonitor,
             start: { [weak self] in self?.serviceMonitorStore.start() },
-            stop: { [weak self] in self?.serviceMonitorStore.stop() })
+            stop: { [weak self] in self?.serviceMonitorStore.stop() },
+            updateActivity: { [weak self] activity, lowPowerMode in
+                self?.serviceMonitorStore.setRuntimeActivity(
+                    activity, lowPowerMode: lowPowerMode)
+            })
         moduleRuntimeCoordinator.register(
             .weather,
             start: { [weak self] in self?.weatherStore.start() },
-            stop: { [weak self] in self?.weatherStore.stop() })
+            stop: { [weak self] in self?.weatherStore.stop() },
+            updateActivity: { [weak self] activity, lowPowerMode in
+                self?.weatherStore.setRuntimeActivity(
+                    activity, lowPowerMode: lowPowerMode)
+            })
         moduleRuntimeCoordinator.register(
             .schedule,
             start: { [weak self] in self?.scheduleStore.start() },
-            stop: { [weak self] in self?.scheduleStore.stop() })
+            stop: { [weak self] in self?.scheduleStore.stop() },
+            updateActivity: { [weak self] activity, lowPowerMode in
+                self?.scheduleStore.setRuntimeActivity(
+                    activity, lowPowerMode: lowPowerMode)
+            })
         moduleRuntimeCoordinator.register(
             .clock,
             start: { [weak self] in self?.clockStore.start() },
@@ -276,15 +302,32 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         moduleRuntimeCoordinator.register(
             .battery,
             start: { [weak self] in self?.batteryStore.start() },
-            stop: { [weak self] in self?.batteryStore.stop() })
+            stop: { [weak self] in self?.batteryStore.stop() },
+            updateActivity: { [weak self] activity, lowPowerMode in
+                self?.batteryStore.setRuntimeActivity(
+                    activity, lowPowerMode: lowPowerMode)
+            })
         moduleRuntimeCoordinator.register(
             .network,
             start: { [weak self] in self?.networkStore.start() },
-            stop: { [weak self] in self?.networkStore.stop() })
+            stop: { [weak self] in self?.networkStore.stop() },
+            updateActivity: { [weak self] activity, lowPowerMode in
+                self?.networkStore.setRuntimeActivity(
+                    activity, lowPowerMode: lowPowerMode)
+            })
     }
 
     func synchronizeModuleRuntimes() {
+        let visibleModules = PanelSide.allCases.compactMap {
+            PanelSettings.activeModule(on: $0)
+        }
         moduleRuntimeCoordinator.synchronize(
-            enabledModules: PanelSettings.deckConfiguration.enabled)
+            enabledModules: PanelSettings.deckConfiguration.enabled,
+            visibleModules: visibleModules,
+            lowPowerMode: ProcessInfo.processInfo.isLowPowerModeEnabled)
+    }
+
+    @objc private func powerStateDidChange(_ notification: Notification) {
+        synchronizeModuleRuntimes()
     }
 }

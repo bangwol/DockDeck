@@ -179,6 +179,7 @@ final class SystemStatsStore: ObservableObject {
     private var temperatureReadInFlight = false
     private var temperatureReadGeneration = 0
     private var refreshInterval: TimeInterval
+    private var refreshCadence = ModuleRefreshCadence(backgroundMultiplier: 4)
 
     init(
         refreshInterval: TimeInterval = PanelSettings.systemStatsRefreshInterval,
@@ -208,6 +209,16 @@ final class SystemStatsStore: ObservableObject {
         guard refreshInterval != interval else { return }
         refreshInterval = interval
         guard timer != nil else { return }
+        timer?.invalidate()
+        scheduleTimer()
+    }
+
+    func setRuntimeActivity(
+        _ activity: ModuleRuntimeActivity, lowPowerMode: Bool
+    ) {
+        guard refreshCadence.update(activity: activity, lowPowerMode: lowPowerMode),
+            timer != nil
+        else { return }
         timer?.invalidate()
         scheduleTimer()
     }
@@ -250,7 +261,9 @@ final class SystemStatsStore: ObservableObject {
     }
 
     private func scheduleTimer() {
-        timer = .moduleRefreshTimer(interval: refreshInterval) { [weak self] in self?.refresh() }
+        let interval = refreshCadence.effectiveInterval(
+            configuredInterval: refreshInterval)
+        timer = .moduleRefreshTimer(interval: interval) { [weak self] in self?.refresh() }
     }
 
     private static func percent(used: UInt64?, total: UInt64?) -> Double? {
