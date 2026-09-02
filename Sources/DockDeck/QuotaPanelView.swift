@@ -129,7 +129,7 @@ private struct QuotaRow: View {
             baseColor
         case .loading:
             Color(nsColor: .secondaryLabelColor)
-        case .stale, .signIn, .unavailable, .setupClaude:
+        case .stale, .signIn, .unavailable, .setupRequired:
             .orange
         }
     }
