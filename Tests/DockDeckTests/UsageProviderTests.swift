@@ -4,6 +4,25 @@ import XCTest
 @testable import DockDeck
 
 final class UsageProviderTests: XCTestCase {
+    func testResetFormatterShowsLocalTimeAndDate() {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 9 * 3_600)!
+        let now = calendar.date(
+            from: DateComponents(year: 2026, month: 9, day: 2, hour: 12))!
+        let sameDay = calendar.date(bySettingHour: 18, minute: 5, second: 0, of: now)!
+        let nextDay = calendar.date(byAdding: .day, value: 1, to: sameDay)!
+
+        XCTAssertEqual(
+            UsageResetFormatter.compactString(for: sameDay, now: now, calendar: calendar),
+            "18:05")
+        XCTAssertEqual(
+            UsageResetFormatter.compactString(for: nextDay, now: now, calendar: calendar),
+            "9/3 18:05")
+        XCTAssertEqual(
+            UsageResetFormatter.compactString(for: nil, now: now, calendar: calendar),
+            "--")
+    }
+
     func testUsageStorePublishesOnlySelectedProvidersBeforeStarting() {
         let store = UsageStore()
 
@@ -119,6 +138,9 @@ final class UsageProviderTests: XCTestCase {
 
         XCTAssertEqual(snapshot.windows.map(\.label), ["5h", "7d"])
         XCTAssertEqual(snapshot.windows.map(\.usedPercent), [25, 42])
+        XCTAssertEqual(
+            snapshot.windows.map(\.resetsAt),
+            [Date(timeIntervalSince1970: 2_000), Date(timeIntervalSince1970: 3_000)])
     }
 
     func testClaudeParserReadsOnlyRateLimitsAndMarksFreshCacheLive() throws {
@@ -150,6 +172,12 @@ final class UsageProviderTests: XCTestCase {
         XCTAssertEqual(snapshot.freshness, .live)
         XCTAssertEqual(snapshot.windows.map(\.label), ["5h", "7d", "FBL"])
         XCTAssertEqual(snapshot.windows.map(\.usedPercent), [35, 48, 62])
+        XCTAssertEqual(
+            snapshot.windows.map(\.resetsAt),
+            [
+                Date(timeIntervalSince1970: 3_000), Date(timeIntervalSince1970: 4_000),
+                Date(timeIntervalSince1970: 5_000),
+            ])
     }
 
     func testClaudeParserMarksExpiredWindowStale() throws {

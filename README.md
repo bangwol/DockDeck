@@ -130,6 +130,8 @@ gh attestation verify DockDeck-*-unsigned.zip -R bangwol/DockDeck
 
 Percentages and bars show **remaining** capacity by default. Select **Used** under **Settings → Usage → Values** to invert both the number and filled bar. For example, the same quota appears as either 22% remaining or 78% used.
 
+Each meter shows the provider-supplied reset time below its bar in the Mac's local time zone. Codex supplies `resetsAt` through its [app-server rate-limit response](https://learn.chatgpt.com/docs/app-server#6-rate-limits-chatgpt), while Claude Code supplies `resets_at` through its [status-line data](https://code.claude.com/docs/en/statusline#rate-limit-usage). Resets later today use `HH:mm`; a different day uses `M/D HH:mm`. `--` means that the provider did not supply a timestamp. The full localized date and time remain available by hovering the meter.
+
 Codex displays whichever 5-hour and weekly windows the signed-in account returns. DockDeck uses the returned durations instead of guessing the plan. OpenAI documents a shared 5-hour window for local and cloud tasks and notes that weekly limits may also apply in the [Codex pricing guide](https://learn.chatgpt.com/docs/pricing).
 
 Claude displays the officially documented 5-hour and weekly fields available in Claude Code's status-line payload. Anthropic does not currently document a separate Fable rate-limit field. For forward compatibility, DockDeck recognizes the experimental aliases `seven_day_fable` and `fable`; it adds an `FBL` meter only when the payload actually contains one of them and never estimates Fable usage. [Fable availability is plan-specific](https://support.claude.com/en/articles/15424964-claude-fable-5-on-your-plan), and Fable 5 requires Claude Code `2.1.170` or later.

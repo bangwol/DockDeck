@@ -1,4 +1,28 @@
+import Foundation
 import SwiftUI
+
+enum UsageResetFormatter {
+    static func compactString(
+        for resetAt: Date?, now: Date = Date(), calendar: Calendar = .current
+    ) -> String {
+        guard let resetAt else { return "--" }
+        let components = calendar.dateComponents([.month, .day, .hour, .minute], from: resetAt)
+        guard let month = components.month, let day = components.day,
+            let hour = components.hour, let minute = components.minute
+        else { return "--" }
+
+        let time = String(format: "%02d:%02d", hour, minute)
+        return calendar.isDate(resetAt, inSameDayAs: now)
+            ? time
+            : "\(month)/\(day) \(time)"
+    }
+
+    static func helpText(for window: UsageWindow) -> String {
+        let prefix = window.customLabel == "FBL" ? "Fable weekly limit" : window.label
+        guard let resetsAt = window.resetsAt else { return "\(prefix) reset time unavailable" }
+        return "\(prefix) resets \(resetsAt.formatted(date: .abbreviated, time: .shortened))"
+    }
+}
 
 struct UsagePanelConfiguration: Equatable {
     let displayMode: UsageDisplayMode
@@ -42,7 +66,7 @@ struct QuotaPanelView: View {
                 }
             }
             .padding(.horizontal, compact ? 6 : 8)
-            .padding(.vertical, compact ? 4 : 5)
+            .padding(.vertical, compact ? 3 : 5)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .background(Color.black.opacity(0.001))
@@ -67,6 +91,7 @@ private struct QuotaRow: View {
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
                 .frame(width: providerWidth, alignment: .leading)
+                .help(provider.detail ?? provider.freshness.label ?? provider.name)
 
             if windows.isEmpty {
                 Text(provider.freshness.label ?? "WAITING")
@@ -78,32 +103,19 @@ private struct QuotaRow: View {
                     .minimumScaleFactor(0.75)
                     .frame(maxWidth: .infinity, alignment: .leading)
             } else {
-                VStack(spacing: 2) {
-                    HStack(spacing: spacing) {
-                        ForEach(windows) { window in
-                            MeterLabel(
-                                window: window,
-                                configuration: configuration,
-                                baseColor: baseColor,
-                                meterColor: meterColor(for: window),
-                                dense: windows.count > 2)
-                            .frame(maxWidth: .infinity)
-                        }
-                    }
-
-                    HStack(spacing: spacing) {
-                        ForEach(windows) { window in
-                            MeterBar(
-                                value: configuration.displayMode.value(for: window),
-                                baseColor: baseColor,
-                                meterColor: meterColor(for: window))
-                            .frame(maxWidth: .infinity)
-                        }
+                HStack(spacing: spacing) {
+                    ForEach(windows) { window in
+                        UsageMeter(
+                            window: window,
+                            configuration: configuration,
+                            baseColor: baseColor,
+                            meterColor: meterColor(for: window),
+                            dense: windows.count > 2)
+                        .frame(maxWidth: .infinity)
                     }
                 }
             }
         }
-        .help(provider.detail ?? provider.freshness.label ?? provider.name)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(accessibilityLabel)
     }
@@ -118,7 +130,8 @@ private struct QuotaRow: View {
         }
         let description = configuration.displayMode.accessibilityDescription
         let windows = provider.windows.map {
-            "\($0.label) \(Int(configuration.displayMode.value(for: $0).rounded())) percent \(description)"
+            "\($0.label) \(Int(configuration.displayMode.value(for: $0).rounded())) percent "
+                + "\(description), \(UsageResetFormatter.helpText(for: $0))"
         }.joined(separator: ", ")
         return "\(provider.name), \(windows)"
     }
@@ -142,6 +155,34 @@ private struct QuotaRow: View {
     }
 }
 
+private struct UsageMeter: View {
+    let window: UsageWindow
+    let configuration: UsagePanelConfiguration
+    let baseColor: Color
+    let meterColor: Color
+    let dense: Bool
+
+    var body: some View {
+        VStack(spacing: 1) {
+            MeterLabel(
+                window: window,
+                configuration: configuration,
+                baseColor: baseColor,
+                meterColor: meterColor,
+                dense: dense)
+            MeterBar(
+                value: configuration.displayMode.value(for: window),
+                baseColor: baseColor,
+                meterColor: meterColor)
+            ResetLabel(
+                window: window,
+                configuration: configuration,
+                baseColor: baseColor,
+                dense: dense)
+        }
+    }
+}
+
 private struct MeterLabel: View {
     let window: UsageWindow
     let configuration: UsagePanelConfiguration
@@ -159,13 +200,34 @@ private struct MeterLabel: View {
                     weight: .medium))
             .lineLimit(1)
             .minimumScaleFactor(0.68)
-            .help("\(value)% \(configuration.displayMode.title.lowercased()) · \(resetHelp)")
+            .help(
+                "\(value)% \(configuration.displayMode.title.lowercased()) · "
+                    + UsageResetFormatter.helpText(for: window))
+    }
+}
+
+private struct ResetLabel: View {
+    let window: UsageWindow
+    let configuration: UsagePanelConfiguration
+    let baseColor: Color
+    let dense: Bool
+
+    var body: some View {
+        HStack(spacing: 1.5) {
+            Image(systemName: "arrow.clockwise")
+                .font(.system(size: max(fontSize - 1, 5.5), weight: .semibold))
+            Text(UsageResetFormatter.compactString(for: window.resetsAt))
+                .font(configuration.font(size: fontSize, weight: .medium))
+                .monospacedDigit()
+        }
+        .foregroundStyle(baseColor.opacity(window.resetsAt == nil ? 0.38 : 0.68))
+        .lineLimit(1)
+        .minimumScaleFactor(0.68)
+        .help(UsageResetFormatter.helpText(for: window))
     }
 
-    private var resetHelp: String {
-        let prefix = window.customLabel == "FBL" ? "Fable weekly limit" : window.label
-        guard let resetsAt = window.resetsAt else { return "\(prefix) reset time unavailable" }
-        return "\(prefix) resets \(resetsAt.formatted(date: .abbreviated, time: .shortened))"
+    private var fontSize: CGFloat {
+        min(max(configuration.fontSize - (dense ? 3.5 : 2.5), 6.5), 8)
     }
 }
 
@@ -183,6 +245,6 @@ private struct MeterBar: View {
                     .frame(width: proxy.size.width * min(max(value / 100, 0), 1))
             }
         }
-        .frame(height: 3)
+        .frame(height: 2.5)
     }
 }
