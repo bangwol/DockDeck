@@ -181,11 +181,7 @@ final class NetworkStore: ObservableObject {
     }
 
     private func scheduleTimer() {
-        let timer = Timer(timeInterval: refreshInterval, repeats: true) { [weak self] _ in
-            self?.refresh()
-        }
-        RunLoop.main.add(timer, forMode: .common)
-        self.timer = timer
+        timer = .moduleRefreshTimer(interval: refreshInterval) { [weak self] in self?.refresh() }
     }
 
     private static func resolvedRefreshInterval(_ interval: TimeInterval) -> TimeInterval {

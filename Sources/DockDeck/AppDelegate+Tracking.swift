@@ -56,6 +56,8 @@ extension AppDelegate {
         let timer = Timer(timeInterval: interval, repeats: true) { [weak self] _ in
             self?.tick()
         }
+        // Coarse polling can drift; the 0.1 s auto-hide tracker stays exact for responsiveness.
+        timer.tolerance = interval >= 1 ? interval * 0.1 : 0
         RunLoop.main.add(timer, forMode: .common)
         trackingTimer = timer
         debugLog("timer", "tracking at \(interval)s")

@@ -140,11 +140,7 @@ final class UsageStore: ObservableObject {
         if enabledProviderIDs.contains(.codex) { startCodex() }
         if enabledProviderIDs.contains(.claude) { refreshClaude() }
 
-        let timer = Timer(timeInterval: 60, repeats: true) { [weak self] _ in
-            self?.refresh()
-        }
-        RunLoop.main.add(timer, forMode: .common)
-        refreshTimer = timer
+        refreshTimer = .moduleRefreshTimer(interval: 60) { [weak self] in self?.refresh() }
     }
 
     func refresh() {

@@ -332,11 +332,7 @@ final class ServiceMonitorStore: ObservableObject {
             timer = nil
             return
         }
-        let timer = Timer(timeInterval: refreshInterval, repeats: true) { [weak self] _ in
-            self?.refresh()
-        }
-        RunLoop.main.add(timer, forMode: .common)
-        self.timer = timer
+        timer = .moduleRefreshTimer(interval: refreshInterval) { [weak self] in self?.refresh() }
     }
 
     private func scheduleConfigurationRefresh() {
