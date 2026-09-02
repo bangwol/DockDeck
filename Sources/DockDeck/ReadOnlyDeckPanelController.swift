@@ -6,6 +6,16 @@ private final class ReadOnlyPanel: NSPanel {
     override var canBecomeMain: Bool { false }
 }
 
+enum DeckScrollDirection: Equatable {
+    case previous
+    case next
+
+    static func resolved(deltaX: CGFloat, deltaY: CGFloat) -> Self? {
+        guard abs(deltaY) > abs(deltaX), deltaY != 0 else { return nil }
+        return deltaY > 0 ? .previous : .next
+    }
+}
+
 final class ReadOnlyDeckPanelController: NSObject, NSMenuDelegate {
     let panel: NSPanel
     let side: PanelSide
@@ -23,6 +33,7 @@ final class ReadOnlyDeckPanelController: NSObject, NSMenuDelegate {
     private weak var menuTarget: AnyObject?
     private var theme: Theme
     private let onSelectionChange: (PanelSide) -> Void
+    private var lastScrollSelectionTime: TimeInterval = 0
 
     init(
         initialFrame: NSRect,
@@ -95,6 +106,9 @@ final class ReadOnlyDeckPanelController: NSObject, NSMenuDelegate {
         self.surfaceView = surfaceView
         self.hostingView = hostingView
         super.init()
+        surfaceView.onScrollWheel = { [weak self] event in
+            self?.handleScrollWheel(event) ?? false
+        }
         menu.delegate = self
         applySettings()
     }
@@ -141,6 +155,15 @@ final class ReadOnlyDeckPanelController: NSObject, NSMenuDelegate {
                 enabledModules: PanelSettings.enabledModules(on: side))
         else { return }
         select(next)
+    }
+
+    func selectPrevious() {
+        guard
+            let previous = ReadOnlyDeckSelection.previous(
+                before: activeModule,
+                enabledModules: PanelSettings.enabledModules(on: side))
+        else { return }
+        select(previous)
     }
 
     func applyCornerRadius() {
@@ -211,6 +234,26 @@ final class ReadOnlyDeckPanelController: NSObject, NSMenuDelegate {
             let rawValue = item.representedObject as? String
         else { return }
         select(PanelModuleID(rawValue: rawValue))
+    }
+
+    private func handleScrollWheel(_ event: NSEvent) -> Bool {
+        let enabledModules = PanelSettings.enabledModules(on: side)
+        guard enabledModules.count > 1,
+            let direction = DeckScrollDirection.resolved(
+                deltaX: event.scrollingDeltaX,
+                deltaY: event.scrollingDeltaY)
+        else { return false }
+
+        if !event.momentumPhase.isEmpty { return true }
+        let now = ProcessInfo.processInfo.systemUptime
+        guard now - lastScrollSelectionTime >= 0.35 else { return true }
+        lastScrollSelectionTime = now
+
+        switch direction {
+        case .previous: selectPrevious()
+        case .next: selectNext()
+        }
+        return true
     }
 
     private func addItem(

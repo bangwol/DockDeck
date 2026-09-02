@@ -37,7 +37,7 @@ enum SettingsPaneID: String, CaseIterable, Identifiable {
         case .decks: "Choose which modules appear beside the Dock."
         case .terminal: "Control terminal expansion and text."
         case .usage: "Choose how account limits are displayed."
-        case .systemStats: "Monitor local CPU, memory, and disk usage."
+        case .systemStats: "Choose compact local performance metrics."
         case .serviceMonitor: "Check the availability of your services."
         case .weather: "Show current conditions for a selected city."
         case .schedule: "Show the current or next calendar event."
@@ -84,7 +84,7 @@ enum PanelModuleRegistry {
             id: .usage, title: "Usage", subtitle: "Codex and Claude limits",
             symbolName: "chart.bar", settingsPane: .usage),
         PanelModuleDefinition(
-            id: .systemStats, title: "System Stats", subtitle: "CPU, memory, and disk",
+            id: .systemStats, title: "System Stats", subtitle: "Selectable local metrics",
             symbolName: "gauge.with.dots.needle.67percent", settingsPane: .systemStats),
         PanelModuleDefinition(
             id: .serviceMonitor, title: "Service Monitor", subtitle: "HTTPS availability",
@@ -131,6 +131,7 @@ struct UsageSettingsState: Equatable {
 
 struct SystemStatsSettingsState: Equatable {
     var refreshInterval: TimeInterval
+    var metrics: [SystemStatsMetric]
 }
 
 struct ServiceMonitorSettingsState: Equatable {
@@ -184,6 +185,7 @@ struct SettingsPanelValues: Equatable {
     func normalized() -> Self {
         var values = self
         values.deckConfiguration = deckConfiguration.normalized()
+        values.systemStats.metrics = SystemStatsMetric.normalized(systemStats.metrics)
         return values
     }
 }
@@ -203,6 +205,7 @@ enum UsageSettingsChange {
 
 enum SystemStatsSettingsChange {
     case refreshInterval(TimeInterval)
+    case metrics([SystemStatsMetric])
 }
 
 enum ServiceMonitorSettingsChange {
@@ -466,6 +469,25 @@ final class SettingsPanelModel: ObservableObject {
         }) ?? PanelSettings.defaultSystemStatsRefreshInterval
         updateValues { $0.systemStats.refreshInterval = selected }
         onChange?(.systemStats(.refreshInterval(selected)))
+    }
+
+    func isSystemStatsMetricEnabled(_ metric: SystemStatsMetric) -> Bool {
+        values.systemStats.metrics.contains(metric)
+    }
+
+    func canSetSystemStatsMetric(_ metric: SystemStatsMetric, enabled: Bool) -> Bool {
+        let count = values.systemStats.metrics.count
+        if enabled { return !isSystemStatsMetricEnabled(metric) && count < SystemStatsMetric.maximumSelectionCount }
+        return isSystemStatsMetricEnabled(metric) && count > SystemStatsMetric.minimumSelectionCount
+    }
+
+    func setSystemStatsMetric(_ metric: SystemStatsMetric, enabled: Bool) {
+        guard canSetSystemStatsMetric(metric, enabled: enabled) else { return }
+        var metrics = values.systemStats.metrics.filter { $0 != metric }
+        if enabled { metrics.append(metric) }
+        metrics = SystemStatsMetric.normalized(metrics)
+        updateValues { $0.systemStats.metrics = metrics }
+        onChange?(.systemStats(.metrics(metrics)))
     }
 
     func addServiceMonitorEndpoint() {

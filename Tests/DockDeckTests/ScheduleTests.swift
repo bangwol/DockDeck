@@ -155,7 +155,8 @@ final class ScheduleTests: XCTestCase {
                 enabledProviders: UsageProviderID.allCases,
                 fontName: "Menlo", fontSize: 10,
                 displayMode: .remaining, textColor: .theme),
-            systemStats: SystemStatsSettingsState(refreshInterval: 2),
+            systemStats: SystemStatsSettingsState(
+                refreshInterval: 2, metrics: SystemStatsMetric.defaultSelection),
             serviceMonitor: ServiceMonitorSettingsState(
                 endpoints: [], refreshInterval: 30),
             weather: WeatherSettingsState(

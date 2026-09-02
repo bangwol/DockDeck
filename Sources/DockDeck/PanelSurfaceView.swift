@@ -19,6 +19,7 @@ enum PanelAppearance {
 
 final class PanelSurfaceView: NSView {
     let contentContainer: NSView
+    var onScrollWheel: ((NSEvent) -> Bool)?
 
     private let backdropView: NSView
     private let fallbackTintView: NSView?
@@ -81,6 +82,11 @@ final class PanelSurfaceView: NSView {
     @available(*, unavailable)
     required init?(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
+    }
+
+    override func scrollWheel(with event: NSEvent) {
+        if onScrollWheel?(event) == true { return }
+        super.scrollWheel(with: event)
     }
 
     func apply(theme: Theme, presentation: PanelPresentation) {

@@ -24,7 +24,7 @@ DockDeck uses the space beside a bottom-aligned Dock for up to two compact modul
 
 - Persistent [SwiftTerm](https://github.com/migueldeicaza/SwiftTerm) login shell with a compact `% ` prompt that does not change user shell files.
 - Remaining or used Codex and Claude capacity from their supported local interfaces; either provider can be selected independently, with no browser cookies or private web endpoints.
-- Local CPU, memory, and disk utilization with a configurable 1–10 second sampling interval.
+- Two to four selectable local CPU, memory, disk, network-I/O, and temperature tiles with a configurable 1–10 second sampling interval.
 - HTTPS service availability and latency checks for up to four user-configured endpoints.
 - Current temperature, daily high and low, and conditions for a user-selected city.
 - Current or next macOS Calendar event with a live elapsed-time bar.
@@ -51,9 +51,9 @@ Keyboard shortcuts:
 
 DockDeck reserves the Command-key shortcuts above plus the standard `⌘C`, `⌘V`, and `⌘A` editing shortcuts. `Ctrl` combinations, Option/Meta, Esc, Tab, arrow keys, Home/End, Delete, and F1–F12 continue through SwiftTerm's normal terminal input handling. Option acts as Meta by default. Page Up and Page Down follow SwiftTerm's terminal scrolling behavior unless the running terminal application requests cursor-key handling.
 
-Click the terminal to expand it, then click elsewhere to return it to the Dock. Drag any edge to resize it; DockDeck restores those proportions the next time it expands. Right-click either Deck to switch among its enabled modules. Open the shared **Settings…** panel from either panel. `⌘E` selects Terminal and toggles a separate, fixed 75% large-terminal mode; its menu action is labeled **Return Terminal to Dock** while active. Running `exit` starts a fresh DockDeck login shell; use `⌘Q` to quit the app.
+Click the terminal to expand it, then click elsewhere to return it to the Dock. Drag any edge to resize it; DockDeck restores those proportions the next time it expands. Hover a visible non-terminal Deck and scroll up or down to cycle through its enabled modules, or right-click either Deck to select one directly. Modules never rotate automatically. Terminal scrolling remains normal terminal scrollback. Open the shared **Settings…** panel from either panel. `⌘E` selects Terminal and toggles a separate, fixed 75% large-terminal mode; its menu action is labeled **Return Terminal to Dock** while active. Running `exit` starts a fresh DockDeck login shell; use `⌘Q` to quit the app.
 
-Settings are organized into **Decks**, module-specific pages, and **Appearance**. Drag module cards within a Deck to set its cycle order or between Decks to change sides. Enabled modules stay above disabled modules; the same moves are available from each card's context menu. Move every card to one Deck if you want the other side completely empty and hidden. You can also swap the complete left and right Decks. At least one module remains enabled so Settings stays reachable. Disabled modules stop sampling and subprocesses. DockDeck remembers each Deck's selected module and the last Settings section you opened.
+Settings are organized into **Decks**, module-specific pages, and **Appearance**. Drag a card from its `≡` handle within a Deck to set its cycle order or into the other Deck to change sides. Enabled modules stay above disabled modules; the same moves are available from each card's context menu. Move every card to one Deck if you want the other side completely empty and hidden. You can also swap the complete left and right Decks. At least one module remains enabled so Settings stays reachable. Disabled modules stop sampling and subprocesses. DockDeck remembers each Deck's selected module and the last Settings section you opened.
 
 <p align="center">
   <a href="assets/dockdeck-decks-settings.png">
@@ -67,7 +67,11 @@ Settings are organized into **Decks**, module-specific pages, and **Appearance**
 
 ## Reading System Stats
 
-System Stats reports CPU utilization since the previous sample, physical memory in use, and startup-volume disk space in use. It uses local macOS host and file-system APIs, requires no additional permission, and performs no network requests. Enable it under **Settings → Decks**, then right-click its Deck to switch modules.
+System Stats fits two to four equal-width tiles in the compact panel. Choose CPU utilization, Activity Monitor-style physical memory in use, startup-volume disk space in use, primary-interface download and upload rates, or temperature under **Settings → System Stats**. Percentage metrics use progress bars, Network I/O uses compact down/up rates, and Temperature combines a numeric value with a color-coded macOS thermal-pressure bar. Only selected metrics are sampled, and disabling the module stops all of its sampling.
+
+Memory excludes inactive file cache and uses the VM internal, wired, and compressed page counts so its percentage follows Activity Monitor more closely. The other built-in readings use local macOS host, file-system, routing, and `ProcessInfo` APIs, require no additional permission, and perform no network requests.
+
+Apple exposes only nominal/fair/serious/critical thermal pressure to ordinary apps, not sensor degrees. When the separately installed [Stats](https://github.com/exelban/stats) app has its expected Apple-signed identity, DockDeck can run Stats's bundled read-only `smc list -t` command at most once every 15 seconds and display the hottest available CPU-core value for the detected Apple-chip generation. DockDeck neither bundles nor modifies Stats, never invokes its fan-control commands, and shows `--°` when the validated tool is unavailable. This optional adapter relies on Stats's undocumented SMC source and may need adjustment after a macOS or Stats update. DockDeck does not report system-wide GPU utilization because no supported public source is available.
 
 ## Monitoring services
 
@@ -81,7 +85,7 @@ On macOS 15 or later, the first local-network check can show Apple's Local Netwo
 
 Weather uses the [Open-Meteo Forecast API](https://open-meteo.com/en/docs) and [Geocoding API](https://open-meteo.com/en/docs/geocoding-api). Search for a city under **Settings → Weather**, select one result, and enable the module. DockDeck does not use IP geolocation or request macOS Location permission. It stores the selected city and coordinates in local preferences; search text and coordinates are sent over HTTPS only when searching or while the enabled module refreshes. Requests use an ephemeral session without persistent caches, cookies, or credential storage.
 
-The built-in `api.open-meteo.com` service is keyless and limited to non-commercial use. Its weather and location data are [CC BY 4.0](https://open-meteo.com/en/license), so the compact panel and Settings include the required Open-Meteo attribution link. DockDeck rounds temperatures and maps weather codes to labels and SF Symbols for display. Review [Open-Meteo's terms and privacy details](https://open-meteo.com/en/terms) before enabling the module; commercial distributions need a suitable commercial API arrangement and are not supported by the current keyless provider.
+The built-in `api.open-meteo.com` service is keyless and limited to non-commercial use. Its weather and location data are [CC BY 4.0](https://open-meteo.com/en/license); attribution and licence links remain under **Settings → Weather** and in the packaged third-party notices. DockDeck rounds temperatures and maps weather codes to labels and SF Symbols for display. Review [Open-Meteo's terms and privacy details](https://open-meteo.com/en/terms) before enabling the module; commercial distributions need a suitable commercial API arrangement and are not supported by the current keyless provider.
 
 ## Reading your schedule
 
@@ -192,7 +196,7 @@ DockDeck does not read browser cookies, browser credential stores, or private we
 | --- | --- | --- |
 | Codex | `codex app-server` using `account/rateLimits/read` | Runs the locally installed official Codex CLI as a long-lived subprocess |
 | Claude | Claude Code status-line JSON | Stores only `rate_limits` and an observation timestamp in a local cache |
-| System Stats | macOS host and file-system APIs | Samples CPU, physical memory, and startup-volume capacity locally |
+| System Stats | macOS host, file-system, routing, and `ProcessInfo` APIs; optional validated local Stats SMC tool | Samples only selected CPU, memory, disk, network-counter, and temperature values locally; makes no network request |
 | Service Monitor | User-configured HTTPS or local HTTP URLs | Sends cookie-free `HEAD` requests; rejects common URL credential fields before local storage |
 | Weather | Open-Meteo forecast and geocoding APIs | Sends submitted searches and selected coordinates over HTTPS only while used; stores the selected city locally |
 | Schedule | Apple EventKit | Reads selected calendars into memory after explicit permission; never saves, edits, logs, or uploads events |

@@ -5,6 +5,17 @@ import XCTest
 @testable import DockDeck
 
 final class SystemStatsTests: XCTestCase {
+    func testMetricSelectionUsesStableTwoToFourTileBounds() {
+        XCTAssertEqual(SystemStatsMetric.normalized([]), [.cpu, .memory, .disk, .network])
+        XCTAssertEqual(SystemStatsMetric.normalized([.thermal]), [.cpu, .thermal])
+        XCTAssertEqual(
+            SystemStatsMetric.normalized(SystemStatsMetric.allCases),
+            [.cpu, .memory, .disk, .network])
+        XCTAssertEqual(
+            SystemStatsMetric.normalized([.thermal, .network, .network]),
+            [.network, .thermal])
+    }
+
     func testCPUPercentUsesCounterDeltas() throws {
         let previous = CPUCounters(user: 100, system: 50, idle: 850, nice: 0)
         let current = CPUCounters(user: 160, system: 90, idle: 950, nice: 0)
@@ -21,8 +32,41 @@ final class SystemStatsTests: XCTestCase {
         XCTAssertNil(SystemStatsCalculator.boundedPercent(used: 0, total: 0))
     }
 
+    func testMemoryUsedExcludesInactiveFileCache() {
+        XCTAssertEqual(
+            SystemStatsCalculator.activityMonitorMemoryUsedPages(
+                internalPages: 600, wiredPages: 100, compressorPages: 50),
+            750)
+    }
+
+    func testSMCTemperatureParserUsesHottestCPUCoreForChipGeneration() {
+        let output = """
+            [INFO] found
+            [TC0P] 54.5
+            [Tp00] 57.25
+            [Tp0C] 61.25
+            [Tf16] 95.0
+            [TG0B] 0.0
+            [TBAD] 130.0
+            """
+
+        XCTAssertEqual(
+            SMCTemperatureOutputParser.hottestCPUCelsius(
+                from: output, chipGeneration: 5),
+            61.25)
+    }
+
+    func testInstalledTemperatureReaderReturnsPlausibleValueWhenAvailable() throws {
+        guard InstalledTemperatureReader.isAvailable else {
+            throw XCTSkip("Signed Stats SMC tool is not installed")
+        }
+        let value = try XCTUnwrap(InstalledTemperatureReader.readHottestCPUCelsius())
+        XCTAssertTrue((5...125).contains(value))
+    }
+
     func testStoreReadsLocalMemoryAndDiskMetrics() {
-        let store = SystemStatsStore(refreshInterval: 10)
+        let store = SystemStatsStore(
+            refreshInterval: 10, metrics: [.cpu, .memory, .disk])
 
         store.start()
         defer { store.stop() }
@@ -33,8 +77,14 @@ final class SystemStatsTests: XCTestCase {
 
     func testPanelRendersAtCompactSize() throws {
         let store = SystemStatsStore(
+            metrics: [.cpu, .memory, .network, .thermal],
             initialSnapshot: SystemStatsSnapshot(
-                cpuPercent: 18, memoryPercent: 64, diskPercent: 82))
+                cpuPercent: 18,
+                memoryPercent: 64,
+                downloadBytesPerSecond: 1_572_864,
+                uploadBytesPerSecond: 131_072,
+                temperatureCelsius: 57.5,
+                thermalPressure: .fair))
         let size = NSSize(width: 214, height: 59)
         let view = NSHostingView(
             rootView: SystemStatsPanelView(store: store, theme: Theme.theme(id: "")))

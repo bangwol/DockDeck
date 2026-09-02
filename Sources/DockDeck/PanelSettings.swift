@@ -246,6 +246,7 @@ enum PanelSettings {
     private static let enabledUsageProvidersKey = "DockDeck.settings.enabledUsageProviders"
     private static let systemStatsRefreshIntervalKey =
         "DockDeck.settings.systemStatsRefreshInterval"
+    private static let systemStatsMetricsKey = "DockDeck.settings.systemStatsMetrics"
     private static let activeReadOnlyModuleKey = "DockDeck.settings.activeReadOnlyModule"
     private static let activeLeftModuleKey = "DockDeck.settings.activeLeftModule"
     private static let activeRightModuleKey = "DockDeck.settings.activeRightModule"
@@ -422,6 +423,19 @@ enum PanelSettings {
                 abs($0 - newValue) < abs($1 - newValue)
             }) ?? defaultSystemStatsRefreshInterval
             UserDefaults.standard.set(value, forKey: systemStatsRefreshIntervalKey)
+        }
+    }
+
+    static var systemStatsMetrics: [SystemStatsMetric] {
+        get {
+            guard let values = UserDefaults.standard.stringArray(forKey: systemStatsMetricsKey)
+            else { return SystemStatsMetric.defaultSelection }
+            return SystemStatsMetric.normalized(values.compactMap(SystemStatsMetric.init(rawValue:)))
+        }
+        set {
+            UserDefaults.standard.set(
+                SystemStatsMetric.normalized(newValue).map(\.rawValue),
+                forKey: systemStatsMetricsKey)
         }
     }
 
@@ -692,6 +706,7 @@ enum PanelSettings {
         defaults.removeObject(forKey: usageTextColorKey)
         defaults.removeObject(forKey: enabledUsageProvidersKey)
         defaults.removeObject(forKey: systemStatsRefreshIntervalKey)
+        defaults.removeObject(forKey: systemStatsMetricsKey)
         defaults.removeObject(forKey: activeReadOnlyModuleKey)
         defaults.removeObject(forKey: activeLeftModuleKey)
         defaults.removeObject(forKey: activeRightModuleKey)

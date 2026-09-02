@@ -2,21 +2,31 @@ import Cocoa
 import SwiftUI
 import UniformTypeIdentifiers
 
-private let deckModuleType = UTType(
-    exportedAs: "com.bangwol.dockdeck.module", conformingTo: .data)
+enum DeckModuleDragPayload {
+    static let contentType = UTType.utf8PlainText
+
+    private static let prefix = "dockdeck-module:"
+
+    static func itemProvider(for module: PanelModuleID) -> NSItemProvider {
+        NSItemProvider(object: "\(prefix)\(module.rawValue)" as NSString)
+    }
+
+    static func moduleID(from text: String) -> PanelModuleID? {
+        guard text.hasPrefix(prefix) else { return nil }
+        let module = PanelModuleID(rawValue: String(text.dropFirst(prefix.count)))
+        return PanelModuleRegistry.definition(for: module) == nil ? nil : module
+    }
+}
 
 struct DecksSettingsView: View {
     @ObservedObject var model: SettingsPanelModel
-    @State private var draggedModule: PanelModuleID?
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
                 HStack(alignment: .top, spacing: 14) {
-                    DeckPreviewCard(
-                        side: .left, model: model, draggedModule: $draggedModule)
-                    DeckPreviewCard(
-                        side: .right, model: model, draggedModule: $draggedModule)
+                    DeckPreviewCard(side: .left, model: model)
+                    DeckPreviewCard(side: .right, model: model)
                 }
 
                 HStack {
@@ -25,7 +35,7 @@ struct DecksSettingsView: View {
                     }
                     .buttonStyle(.bordered)
                     Spacer()
-                    Text("Drag to arrange. Enabled modules stay above hidden modules.")
+                    Text("Drag the ≡ handle to arrange. Enabled modules stay above hidden modules.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -217,11 +227,55 @@ struct SystemStatsSettingsView: View {
                 }
 
                 GroupBox {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Label("CPU", systemImage: "cpu")
-                        Label("Memory", systemImage: "memorychip")
-                        Label("Disk", systemImage: "internaldrive")
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack {
+                            Text("Choose 2–4 tiles")
+                                .foregroundStyle(.secondary)
+                            Spacer()
+                            Text("\(model.values.systemStats.metrics.count) selected")
+                                .font(.caption.monospacedDigit())
+                                .foregroundStyle(.secondary)
+                        }
+
+                        LazyVGrid(
+                            columns: [
+                                GridItem(.flexible(), alignment: .leading),
+                                GridItem(.flexible(), alignment: .leading),
+                            ],
+                            alignment: .leading,
+                            spacing: 10
+                        ) {
+                            ForEach(SystemStatsMetric.allCases) { metric in
+                                let enabled = model.isSystemStatsMetricEnabled(metric)
+                                Toggle(
+                                    isOn: Binding(
+                                        get: { model.isSystemStatsMetricEnabled(metric) },
+                                        set: { model.setSystemStatsMetric(metric, enabled: $0) })
+                                ) {
+                                    Label(metric.title, systemImage: metric.symbolName)
+                                }
+                                .toggleStyle(.checkbox)
+                                .disabled(
+                                    !model.canSetSystemStatsMetric(metric, enabled: !enabled))
+                            }
+                        }
+
+                        Divider()
+
+                        Label(
+                            InstalledTemperatureReader.isAvailable
+                                ? "Temperature source: signed Stats SMC tool (read-only)."
+                                : "Temperature source unavailable; the tile shows --°.",
+                            systemImage: InstalledTemperatureReader.isAvailable
+                                ? "checkmark.shield" : "thermometer.medium")
+                        Label(
+                            "The temperature bar uses the public macOS thermal-pressure state.",
+                            systemImage: "gauge.with.dots.needle.33percent")
+                        Label(
+                            "GPU load still needs a private or privileged source and is not sampled.",
+                            systemImage: "lock.shield")
                     }
+                    .font(.callout)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.vertical, 4)
                 } label: {
@@ -229,9 +283,26 @@ struct SystemStatsSettingsView: View {
                         .font(.headline)
                 }
 
+                GroupBox {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Label("Percent bars for CPU, memory, and disk", systemImage: "chart.bar.fill")
+                        Label("Compact download and upload rates for Network I/O", systemImage: "arrow.up.arrow.down")
+                        Label(
+                            "Numeric hottest-CPU-core value with a pressure bar",
+                            systemImage: "thermometer.medium")
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.vertical, 4)
+                } label: {
+                    Label("Compact Layout", systemImage: "rectangle.split.3x1")
+                        .font(.headline)
+                }
+
                 Text(
-                    "All values are sampled locally with macOS system APIs. "
-                        + "Sampling stops completely while this module is disabled.")
+                    "Only selected values are sampled with local macOS APIs. The four-tile limit "
+                        + "keeps labels readable at the 214 × 59 point compact panel size. "
+                        + "Temperature is checked at most every 15 seconds. Sampling stops "
+                        + "completely while this module is disabled.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -376,7 +447,6 @@ struct AppearanceSettingsView: View {
 private struct DeckPreviewCard: View {
     let side: PanelSide
     @ObservedObject var model: SettingsPanelModel
-    @Binding var draggedModule: PanelModuleID?
 
     private var title: String { side == .left ? "Left Deck" : "Right Deck" }
 
@@ -391,8 +461,7 @@ private struct DeckPreviewCard: View {
                         DeckModuleCard(
                             definition: definition,
                             side: side,
-                            model: model,
-                            draggedModule: $draggedModule)
+                            model: model)
                     }
                 }
             }
@@ -403,9 +472,8 @@ private struct DeckPreviewCard: View {
         }
         .frame(maxWidth: .infinity)
         .onDrop(
-            of: [deckModuleType.identifier],
-            delegate: DeckModuleDropDelegate(
-                side: side, target: nil, model: model, draggedModule: $draggedModule))
+            of: [DeckModuleDragPayload.contentType],
+            delegate: DeckModuleDropDelegate(side: side, target: nil, model: model))
     }
 }
 
@@ -438,14 +506,18 @@ private struct DeckModuleCard: View {
     let definition: PanelModuleDefinition
     let side: PanelSide
     @ObservedObject var model: SettingsPanelModel
-    @Binding var draggedModule: PanelModuleID?
 
     var body: some View {
         HStack(spacing: 10) {
             Image(systemName: "line.3.horizontal")
                 .font(.caption)
                 .foregroundStyle(.tertiary)
-                .accessibilityHidden(true)
+                .frame(width: 18, height: 28)
+                .contentShape(Rectangle())
+                .onDrag {
+                    DeckModuleDragPayload.itemProvider(for: definition.id)
+                }
+                .accessibilityLabel("Drag \(definition.title)")
             Image(systemName: definition.symbolName)
                 .frame(width: 18)
             VStack(alignment: .leading, spacing: 1) {
@@ -478,23 +550,10 @@ private struct DeckModuleCard: View {
                 .stroke(Color.primary.opacity(0.08)))
         .opacity(model.isEnabled(definition.id) ? 1 : 0.55)
         .contentShape(Rectangle())
-        .onDrag {
-            draggedModule = definition.id
-            let provider = NSItemProvider()
-            provider.registerDataRepresentation(
-                forTypeIdentifier: deckModuleType.identifier,
-                visibility: .ownProcess
-            ) { completion in
-                completion(Data(definition.id.rawValue.utf8), nil)
-                return nil
-            }
-            return provider
-        }
         .onDrop(
-            of: [deckModuleType.identifier],
+            of: [DeckModuleDragPayload.contentType],
             delegate: DeckModuleDropDelegate(
-                side: side, target: definition.id, model: model,
-                draggedModule: $draggedModule))
+                side: side, target: definition.id, model: model))
         .contextMenu {
             if let pane = definition.settingsPane {
                 Button("Configure \(definition.title)…") { model.selectPane(pane) }
@@ -515,7 +574,7 @@ private struct DeckModuleCard: View {
         ) {
             model.moveModule(definition.id, to: side.opposite)
         }
-        .help("Drag to move or reorder \(definition.title)")
+        .help("Drag the ≡ handle to move or reorder \(definition.title)")
     }
 }
 
@@ -523,18 +582,30 @@ private struct DeckModuleDropDelegate: DropDelegate {
     let side: PanelSide
     let target: PanelModuleID?
     let model: SettingsPanelModel
-    @Binding var draggedModule: PanelModuleID?
 
-    func validateDrop(info: DropInfo) -> Bool { draggedModule != nil }
+    func validateDrop(info: DropInfo) -> Bool {
+        info.hasItemsConforming(to: [DeckModuleDragPayload.contentType])
+    }
 
     func dropUpdated(info: DropInfo) -> DropProposal? {
         DropProposal(operation: .move)
     }
 
     func performDrop(info: DropInfo) -> Bool {
-        guard let module = draggedModule else { return false }
-        model.moveModule(module, to: side, before: target)
-        draggedModule = nil
+        guard
+            let provider = info.itemProviders(
+                for: [DeckModuleDragPayload.contentType]
+            ).first
+        else { return false }
+
+        provider.loadObject(ofClass: NSString.self) { object, _ in
+            guard let text = object as? NSString,
+                let module = DeckModuleDragPayload.moduleID(from: text as String)
+            else { return }
+            DispatchQueue.main.async {
+                model.moveModule(module, to: side, before: target)
+            }
+        }
         return true
     }
 }

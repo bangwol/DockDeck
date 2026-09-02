@@ -112,6 +112,7 @@ extension AppDelegate {
             self.usageStore.setEnabledProviders(PanelSettings.enabledUsageProviders)
             self.systemStatsStore.setRefreshInterval(
                 PanelSettings.systemStatsRefreshInterval)
+            self.systemStatsStore.setMetrics(PanelSettings.systemStatsMetrics)
             self.serviceMonitorStore.updateConfiguration(
                 endpoints: PanelSettings.serviceMonitorEndpoints,
                 refreshInterval: PanelSettings.serviceMonitorRefreshInterval)
@@ -141,7 +142,7 @@ extension AppDelegate {
             contentRect: NSRect(
                 origin: settingsOrigin(anchor: anchor, size: SettingsPanelView.preferredSize),
                 size: SettingsPanelView.preferredSize),
-            styleMask: [.titled, .closable, .nonactivatingPanel],
+            styleMask: [.titled, .closable],
             backing: .buffered,
             defer: false)
         settingsPanelWindow.title = pane.windowTitle
@@ -159,6 +160,7 @@ extension AppDelegate {
 
         settingsPanelRestoresTerminalFocus = restoreTerminalFocus
         settingsPanel = settingsPanelWindow
+        NSApp.activate(ignoringOtherApps: true)
         settingsPanelWindow.makeKeyAndOrderFront(nil)
     }
 
@@ -176,7 +178,8 @@ extension AppDelegate {
                 displayMode: PanelSettings.usageDisplayMode,
                 textColor: PanelSettings.usageTextColor),
             systemStats: SystemStatsSettingsState(
-                refreshInterval: PanelSettings.systemStatsRefreshInterval),
+                refreshInterval: PanelSettings.systemStatsRefreshInterval,
+                metrics: PanelSettings.systemStatsMetrics),
             serviceMonitor: ServiceMonitorSettingsState(
                 endpoints: PanelSettings.serviceMonitorEndpoints,
                 refreshInterval: PanelSettings.serviceMonitorRefreshInterval),
@@ -240,6 +243,10 @@ extension AppDelegate {
         case .systemStats(.refreshInterval(let interval)):
             PanelSettings.systemStatsRefreshInterval = interval
             systemStatsStore.setRefreshInterval(interval)
+        case .systemStats(.metrics(let metrics)):
+            PanelSettings.systemStatsMetrics = metrics
+            systemStatsStore.setMetrics(metrics)
+            for controller in readOnlyDeckPanelControllers { controller.applySettings() }
         case .serviceMonitor(.endpoints(let endpoints)):
             PanelSettings.serviceMonitorEndpoints = endpoints
             serviceMonitorStore.updateConfiguration(

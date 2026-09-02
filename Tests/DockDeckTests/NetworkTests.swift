@@ -21,6 +21,9 @@ final class NetworkTests: XCTestCase {
         XCTAssertEqual(ByteRateFormatter.string(1_536), "1.50 KB/s")
         XCTAssertEqual(ByteRateFormatter.string(12 * 1_024), "12.0 KB/s")
         XCTAssertEqual(ByteRateFormatter.string(120 * 1_024), "120 KB/s")
+        XCTAssertEqual(ByteRateFormatter.compactString(nil), "--")
+        XCTAssertEqual(ByteRateFormatter.compactString(1_536), "1.5K")
+        XCTAssertEqual(ByteRateFormatter.compactString(120 * 1_024), "120K")
     }
 
     func testReaderReturnsMonotonicCountersWhenNetworkIsAvailable() {

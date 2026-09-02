@@ -36,6 +36,19 @@ enum ByteRateFormatter {
         let precision = scaled >= 100 || index == 0 ? 0 : scaled >= 10 ? 1 : 2
         return String(format: "%.*f %@", precision, scaled, units[index])
     }
+
+    static func compactString(_ bytesPerSecond: Double?) -> String {
+        guard let value = bytesPerSecond, value.isFinite, value >= 0 else { return "--" }
+        let units = ["B", "K", "M", "G"]
+        var scaled = value
+        var index = 0
+        while scaled >= 1_024, index < units.count - 1 {
+            scaled /= 1_024
+            index += 1
+        }
+        let precision = scaled >= 100 || index == 0 ? 0 : 1
+        return String(format: "%.*f%@", precision, scaled, units[index])
+    }
 }
 
 enum NetworkCounterReader {

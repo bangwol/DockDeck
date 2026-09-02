@@ -17,54 +17,50 @@ struct WeatherPanelView: View {
     }
 
     private func weather(_ snapshot: WeatherSnapshot) -> some View {
-        HStack(spacing: 8) {
-            Image(
-                systemName: WeatherCondition.symbolName(
-                    code: snapshot.weatherCode, isDay: snapshot.isDay))
-                .symbolRenderingMode(.hierarchical)
-                .font(.system(size: 24, weight: .semibold))
-                .foregroundStyle(snapshot.isDay ? Color.orange : Color.cyan)
-                .frame(width: 28)
+        VStack(spacing: 2) {
+            HStack(alignment: .lastTextBaseline, spacing: 6) {
+                Image(
+                    systemName: WeatherCondition.symbolName(
+                        code: snapshot.weatherCode, isDay: snapshot.isDay))
+                    .symbolRenderingMode(.hierarchical)
+                    .font(.system(size: 21, weight: .semibold))
+                    .foregroundStyle(snapshot.isDay ? Color.orange : Color.cyan)
 
-            Text(temperature(snapshot.temperature, unit: snapshot.temperatureUnit))
-                .font(.system(size: 21, weight: .bold, design: .rounded))
-                .foregroundStyle(baseColor)
-                .monospacedDigit()
-                .lineLimit(1)
-
-            VStack(alignment: .leading, spacing: 1) {
-                HStack(spacing: 4) {
-                    Text(snapshot.location.name)
-                        .font(.system(size: 9.5, weight: .semibold, design: .rounded))
-                        .foregroundStyle(baseColor)
-                        .lineLimit(1)
-                    Spacer(minLength: 1)
-                    Link("Open-Meteo", destination: WeatherAPI.attributionURL)
-                        .font(.system(size: 6.5, weight: .medium, design: .rounded))
-                        .foregroundStyle(baseColor.opacity(0.62))
-                        .help("Weather data by Open-Meteo.com")
-                }
+                Text(temperature(snapshot.temperature, unit: snapshot.temperatureUnit))
+                    .font(.system(size: 21, weight: .bold, design: .rounded))
+                    .foregroundStyle(baseColor)
+                    .monospacedDigit()
+                    .lineLimit(1)
 
                 Text(WeatherCondition.title(code: snapshot.weatherCode))
-                    .font(.system(size: 8.5, weight: .medium, design: .rounded))
+                    .font(.system(size: 9, weight: .medium, design: .rounded))
                     .foregroundStyle(baseColor.opacity(0.78))
                     .lineLimit(1)
 
-                HStack(spacing: 4) {
-                    Text(highLow(snapshot))
-                        .font(.system(size: 7.5, weight: .semibold, design: .monospaced))
-                        .foregroundStyle(baseColor.opacity(0.7))
-                        .lineLimit(1)
-                    Spacer(minLength: 1)
-                    if case .failed = store.status {
-                        Image(systemName: "exclamationmark.triangle.fill")
-                            .font(.system(size: 7))
-                            .foregroundStyle(.orange)
-                    }
+                if case .failed = store.status {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .font(.system(size: 7))
+                        .foregroundStyle(.orange)
                 }
             }
-            .frame(maxWidth: .infinity)
+
+            HStack(spacing: 5) {
+                Text(snapshot.location.name)
+                    .font(.system(size: 9, weight: .semibold, design: .rounded))
+                    .foregroundStyle(baseColor)
+                    .lineLimit(1)
+
+                Circle()
+                    .fill(baseColor.opacity(0.35))
+                    .frame(width: 2.5, height: 2.5)
+
+                Text(highLow(snapshot))
+                    .font(.system(size: 7.5, weight: .semibold, design: .monospaced))
+                    .foregroundStyle(baseColor.opacity(0.7))
+                    .lineLimit(1)
+            }
         }
+        .frame(maxWidth: .infinity, alignment: .center)
         .padding(.horizontal, 9)
         .padding(.vertical, 5)
         .help(accessibilitySummary(snapshot))

@@ -17,6 +17,16 @@ enum ReadOnlyDeckSelection {
         }
         return enabledModules[(index + 1) % enabledModules.count]
     }
+
+    static func previous(
+        before current: PanelModuleID?, enabledModules: [PanelModuleID]
+    ) -> PanelModuleID? {
+        guard !enabledModules.isEmpty else { return nil }
+        guard let current, let index = enabledModules.firstIndex(of: current) else {
+            return enabledModules.last
+        }
+        return enabledModules[(index - 1 + enabledModules.count) % enabledModules.count]
+    }
 }
 
 struct ReadOnlyDeckPanelView: View {

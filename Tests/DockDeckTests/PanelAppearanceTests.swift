@@ -154,6 +154,19 @@ final class PanelAppearanceTests: XCTestCase {
         XCTAssertTrue(model.moduleDefinitions(on: .right).isEmpty)
     }
 
+    func testDeckDragPayloadUsesPlainTextAndRejectsExternalText() {
+        let provider = DeckModuleDragPayload.itemProvider(for: .weather)
+
+        XCTAssertTrue(
+            provider.hasItemConformingToTypeIdentifier(
+                DeckModuleDragPayload.contentType.identifier))
+        XCTAssertEqual(
+            DeckModuleDragPayload.moduleID(from: "dockdeck-module:weather"),
+            .weather)
+        XCTAssertNil(DeckModuleDragPayload.moduleID(from: "weather"))
+        XCTAssertNil(DeckModuleDragPayload.moduleID(from: "dockdeck-module:unknown"))
+    }
+
     func testSettingsModelKeepsTheLastModuleVisible() {
         let unavailableModule = PanelModuleID(rawValue: "future-module")
         let model = makeSettingsModel(
@@ -252,6 +265,27 @@ final class PanelAppearanceTests: XCTestCase {
         XCTAssertEqual(emittedInterval, 5)
     }
 
+    func testSettingsModelKeepsTwoToFourSystemStatsMetrics() {
+        let model = makeSettingsModel(
+            configuration: .legacy(order: .terminalLeft, enabledPanels: .all))
+        var emittedMetrics: [SystemStatsMetric]?
+        model.onChange = {
+            if case .systemStats(.metrics(let metrics)) = $0 { emittedMetrics = metrics }
+        }
+
+        model.setSystemStatsMetric(.thermal, enabled: true)
+        XCTAssertEqual(model.values.systemStats.metrics, SystemStatsMetric.defaultSelection)
+
+        model.setSystemStatsMetric(.disk, enabled: false)
+        model.setSystemStatsMetric(.thermal, enabled: true)
+        XCTAssertEqual(model.values.systemStats.metrics, [.cpu, .memory, .network, .thermal])
+        XCTAssertEqual(emittedMetrics, [.cpu, .memory, .network, .thermal])
+
+        model.setSystemStatsMetric(.network, enabled: false)
+        model.setSystemStatsMetric(.thermal, enabled: false)
+        XCTAssertEqual(model.values.systemStats.metrics, [.cpu, .memory])
+    }
+
     func testSettingsModelEmitsNormalizedWeatherChanges() {
         let model = makeSettingsModel(
             configuration: .legacy(order: .terminalLeft, enabledPanels: .all))
@@ -287,6 +321,21 @@ final class PanelAppearanceTests: XCTestCase {
             ReadOnlyDeckSelection.next(after: .usage, enabledModules: modules), .systemStats)
         XCTAssertEqual(
             ReadOnlyDeckSelection.next(after: .systemStats, enabledModules: modules), .usage)
+        XCTAssertEqual(
+            ReadOnlyDeckSelection.previous(before: .usage, enabledModules: modules),
+            .systemStats)
+        XCTAssertEqual(
+            ReadOnlyDeckSelection.previous(before: .systemStats, enabledModules: modules),
+            .usage)
+    }
+
+    func testDeckScrollDirectionUsesVerticalAxis() {
+        XCTAssertEqual(
+            DeckScrollDirection.resolved(deltaX: 0, deltaY: 1), .previous)
+        XCTAssertEqual(
+            DeckScrollDirection.resolved(deltaX: 0, deltaY: -1), .next)
+        XCTAssertNil(DeckScrollDirection.resolved(deltaX: 2, deltaY: 1))
+        XCTAssertNil(DeckScrollDirection.resolved(deltaX: 0, deltaY: 0))
     }
 
     func testDeckSelectionsAreIndependentBySide() {
@@ -521,7 +570,8 @@ final class PanelAppearanceTests: XCTestCase {
                 enabledProviders: UsageProviderID.allCases,
                 fontName: "Menlo", fontSize: 10,
                 displayMode: .remaining, textColor: .theme),
-            systemStats: SystemStatsSettingsState(refreshInterval: 2),
+            systemStats: SystemStatsSettingsState(
+                refreshInterval: 2, metrics: SystemStatsMetric.defaultSelection),
             serviceMonitor: ServiceMonitorSettingsState(
                 endpoints: [], refreshInterval: 30),
             weather: WeatherSettingsState(
