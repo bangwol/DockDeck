@@ -19,7 +19,6 @@ struct NetworkSettingsView: View {
                             }
                         }
                         .labelsHidden()
-                        .frame(width: 230)
                     }
                     .padding(.top, 4)
                 } label: {

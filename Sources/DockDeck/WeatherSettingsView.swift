@@ -117,9 +117,7 @@ struct WeatherSettingsView: View {
 
     private var displaySection: some View {
         GroupBox {
-            HStack {
-                Text("Temperature")
-                Spacer()
+            SettingsPickerRow(title: "Temperature") {
                 Picker(
                     "Temperature unit",
                     selection: Binding(
@@ -132,7 +130,6 @@ struct WeatherSettingsView: View {
                 }
                 .labelsHidden()
                 .pickerStyle(.segmented)
-                .frame(width: 230)
             }
             .padding(.top, 4)
         } label: {
@@ -143,9 +140,7 @@ struct WeatherSettingsView: View {
 
     private var refreshSection: some View {
         GroupBox {
-            HStack {
-                Text("Refresh")
-                Spacer()
+            SettingsPickerRow(title: "Refresh") {
                 Picker(
                     "Weather refresh interval",
                     selection: Binding(
@@ -157,7 +152,6 @@ struct WeatherSettingsView: View {
                     }
                 }
                 .labelsHidden()
-                .frame(width: 230)
             }
             .padding(.top, 4)
         } label: {

@@ -95,7 +95,6 @@ struct TerminalSettingsView: View {
                             ForEach(model.fontNames, id: \.self) { Text($0).tag($0) }
                         }
                         .labelsHidden()
-                        .frame(width: 230)
                     }
                     .padding(.top, 4)
                 } label: {
@@ -141,7 +140,6 @@ struct UsageSettingsView: View {
                         }
                         .labelsHidden()
                         .pickerStyle(.segmented)
-                        .frame(width: 230)
                     }
                     .padding(.top, 4)
                 } label: {
@@ -161,7 +159,6 @@ struct UsageSettingsView: View {
                                 ForEach(model.fontNames, id: \.self) { Text($0).tag($0) }
                             }
                             .labelsHidden()
-                            .frame(width: 230)
                         }
                         SettingsSliderRow(
                             title: "Size",
@@ -185,7 +182,6 @@ struct UsageSettingsView: View {
                                 }
                             }
                             .labelsHidden()
-                            .frame(width: 230)
                         }
                     }
                     .padding(.top, 4)
@@ -218,7 +214,6 @@ struct SystemStatsSettingsView: View {
                             }
                         }
                         .labelsHidden()
-                        .frame(width: 230)
                     }
                     .padding(.top, 4)
                 } label: {
@@ -367,7 +362,6 @@ struct ServiceMonitorSettingsView: View {
                             }
                         }
                         .labelsHidden()
-                        .frame(width: 230)
                     }
                     .padding(.top, 4)
                 } label: {
@@ -708,6 +702,8 @@ private struct SettingsSliderRow: View {
     }
 }
 
+/// Label on the leading edge, control on the trailing edge, matching System Settings. Controls
+/// keep their intrinsic width so every row's control shares the same right edge as the sliders.
 struct SettingsPickerRow<Content: View>: View {
     let title: String
     @ViewBuilder let content: () -> Content
@@ -715,8 +711,9 @@ struct SettingsPickerRow<Content: View>: View {
     var body: some View {
         HStack {
             Text(title)
-            Spacer()
+            Spacer(minLength: 16)
             content()
+                .frame(maxWidth: 260, alignment: .trailing)
         }
     }
 }

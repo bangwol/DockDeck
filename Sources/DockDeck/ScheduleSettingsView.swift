@@ -121,9 +121,7 @@ struct ScheduleSettingsView: View {
 
     private var refreshSection: some View {
         GroupBox {
-            HStack {
-                Text("Refresh")
-                Spacer()
+            SettingsPickerRow(title: "Refresh") {
                 Picker(
                     "Schedule refresh interval",
                     selection: Binding(
@@ -135,7 +133,6 @@ struct ScheduleSettingsView: View {
                     }
                 }
                 .labelsHidden()
-                .frame(width: 230)
             }
             .padding(.top, 4)
         } label: {

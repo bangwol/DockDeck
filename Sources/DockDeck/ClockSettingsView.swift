@@ -23,7 +23,6 @@ struct ClockSettingsView: View {
                             }
                         }
                         .labelsHidden()
-                        .frame(width: 260)
                     }
                     .padding(.top, 4)
                 } label: {
@@ -45,7 +44,6 @@ struct ClockSettingsView: View {
                         }
                         .labelsHidden()
                         .pickerStyle(.segmented)
-                        .frame(width: 260)
                     }
                     .padding(.top, 4)
                 } label: {
