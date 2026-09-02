@@ -39,20 +39,21 @@ DockDeck uses the space beside a bottom-aligned Dock for up to two compact modul
 - Native Liquid Glass on macOS 26, with a translucent fallback and stronger terminal tint on earlier macOS.
 - Manual large-terminal mode plus 20 themes with configurable fonts, tint, corner radius, and panel placement.
 
-Keyboard shortcuts:
+## Modules
 
-| Shortcut | Action |
-| --- | --- |
-| `⌘E` | Toggle the manual large terminal mode |
-| `⌘T` | Open the theme picker |
-| `⌘,` | Open the shared settings panel |
-| `⌘R` | Refresh active module data and Dock layout |
-| `⌘W` | Close the Settings window or theme picker |
-| `⌘Q` | Quit DockDeck |
+| Module | Summary | Guide |
+| --- | --- | --- |
+| Terminal | Persistent login shell with compact, focused, and large modes | [Terminal](docs/modules/terminal.md) |
+| Usage | Codex and Claude capacity, reset times, and data freshness | [Usage](docs/modules/usage.md) |
+| System Stats | CPU, memory, disk, network I/O, and temperature | [System Stats](docs/modules/system-stats.md) |
+| Service Monitor | Availability and latency for configured endpoints | [Module catalog](docs/modules/catalog.md#service-monitor) |
+| Weather | Current conditions for a selected city | [Module catalog](docs/modules/catalog.md#weather) |
+| Schedule | Current or next event from macOS Calendar | [Module catalog](docs/modules/catalog.md#schedule) |
+| World Clock | Local or selected time zone | [Module catalog](docs/modules/catalog.md#world-clock) |
+| Battery | Charge, power state, and time estimate | [Module catalog](docs/modules/catalog.md#battery) |
+| Network | Primary-interface download and upload throughput | [Module catalog](docs/modules/catalog.md#network) |
 
-DockDeck reserves the Command-key shortcuts above plus the standard `⌘C`, `⌘V`, and `⌘A` editing shortcuts. `Ctrl` combinations, Option/Meta, Esc, Tab, arrow keys, Home/End, Delete, and F1–F12 continue through SwiftTerm's normal terminal input handling. Option acts as Meta by default. Page Up and Page Down follow SwiftTerm's terminal scrolling behavior unless the running terminal application requests cursor-key handling.
-
-Click the terminal to expand it, then click elsewhere to return it to the Dock. Drag within 8 points of any expanded edge or corner to resize it; DockDeck restores those proportions the next time it expands. While a Deck is compact, hover it and scroll up or down to cycle through its enabled modules, including Terminal. Focused and large Terminal modes keep the wheel for normal terminal scrollback. Right-click either compact Deck to select a module directly. Modules never rotate automatically. Open the shared **Settings…** panel from either panel. `⌘E` selects Terminal and toggles a separate, fixed 75% large-terminal mode; its menu action is labeled **Return Terminal to Dock** while active. Running `exit` starts a fresh DockDeck login shell; use `⌘Q` to quit the app.
+## Decks and settings
 
 Settings are organized into **Decks**, module-specific pages, and **Appearance**. Drag a card from its `≡` handle within a Deck to set its cycle order or into the other Deck to change sides. Enabled modules stay above disabled modules; the same moves are available from each card's context menu. Move every card to one Deck if you want the other side completely empty and hidden. You can also swap the complete left and right Decks. At least one module remains enabled so Settings stays reachable. Disabled modules stop sampling and subprocesses. DockDeck remembers each Deck's selected module and the last Settings section you opened.
 
@@ -66,45 +67,13 @@ Settings are organized into **Decks**, module-specific pages, and **Appearance**
   <sub>An empty Deck remains a drop target in Settings and is hidden beside the Dock.</sub>
 </p>
 
-## Reading System Stats
+## Documentation
 
-System Stats fits two to four equal-width tiles in the compact panel. Choose CPU utilization, Activity Monitor-style physical memory in use, startup-volume disk space in use, primary-interface download and upload rates, or temperature under **Settings → System Stats**. Percentage metrics use progress bars, Network I/O uses compact down/up rates, and Temperature combines a numeric value with a color-coded macOS thermal-pressure bar. Only selected metrics are sampled, and disabling the module stops all of its sampling.
-
-Memory excludes inactive file cache and uses the VM internal, wired, and compressed page counts so its percentage follows Activity Monitor more closely. The other built-in readings use local macOS host, file-system, routing, and `ProcessInfo` APIs, require no additional permission, and perform no network requests.
-
-Apple exposes only nominal/fair/serious/critical thermal pressure to ordinary apps, not sensor degrees. When the separately installed [Stats](https://github.com/exelban/stats) app has its expected Apple-signed identity, DockDeck can run Stats's bundled read-only `smc list -t` command at most once every 15 seconds and display the hottest available CPU-core value for the detected Apple-chip generation. DockDeck neither bundles nor modifies Stats, never invokes its fan-control commands, and shows `--°` when the validated tool is unavailable. This optional adapter relies on Stats's undocumented SMC source and may need adjustment after a macOS or Stats update. DockDeck does not report system-wide GPU utilization because no supported public source is available.
-
-## Monitoring services
-
-Service Monitor sends a `HEAD` request every 15–120 seconds to up to four URLs. Public endpoints must use HTTPS. Plain HTTP is accepted only for local names and private or loopback addresses; the packaged app declares Apple's narrow `NSAllowsLocalNetworking` exception instead of disabling App Transport Security globally. See Apple's [App Transport Security guidance](https://developer.apple.com/documentation/security/preventing-insecure-network-connections) and [`NSAllowsLocalNetworking` reference](https://developer.apple.com/documentation/bundleresources/information-property-list/nsapptransportsecurity/nsallowslocalnetworking).
-
-Checks use an ephemeral `URLSession` with caches, cookies, and credential storage disabled. DockDeck stores service names and URLs in local preferences, rejects URL user-info and common secret query fields, and does not use response bodies. Do not place secrets in URL paths. Enable and configure the module under **Settings → Decks → Service Monitor**.
-
-On macOS 15 or later, the first local-network check can show Apple's Local Network permission prompt. DockDeck includes a purpose string and waits for the decision; public HTTPS checks do not require this permission. The permission can be changed later under **System Settings → Privacy & Security → Local Network**. See Apple's [local network privacy technote](https://developer.apple.com/documentation/technotes/tn3179-understanding-local-network-privacy).
-
-## Checking weather
-
-Weather uses the [Open-Meteo Forecast API](https://open-meteo.com/en/docs) and [Geocoding API](https://open-meteo.com/en/docs/geocoding-api). Search for a city under **Settings → Weather**, select one result, and enable the module. DockDeck does not use IP geolocation or request macOS Location permission. It stores the selected city and coordinates in local preferences; search text and coordinates are sent over HTTPS only when searching or while the enabled module refreshes. Requests use an ephemeral session without persistent caches, cookies, or credential storage.
-
-The built-in `api.open-meteo.com` service is keyless and limited to non-commercial use. Its weather and location data are [CC BY 4.0](https://open-meteo.com/en/license); attribution and licence links remain under **Settings → Weather** and in the packaged third-party notices. DockDeck rounds temperatures and maps weather codes to labels and SF Symbols for display. Review [Open-Meteo's terms and privacy details](https://open-meteo.com/en/terms) before enabling the module; commercial distributions need a suitable commercial API arrangement and are not supported by the current keyless provider.
-
-## Reading your schedule
-
-Schedule reads upcoming events through Apple's EventKit framework and shows the current event, elapsed progress, or the next event. Enable **Settings → Decks → Schedule**, then press **Request Access** under **Settings → Schedule**. DockDeck never triggers the system Calendar permission prompt merely by launching or enabling the module. On current macOS releases, Apple requires full Calendar access to fetch events even for a read-only app; DockDeck never calls EventKit's save, edit, or delete APIs. See Apple's [EventKit access guidance](https://developer.apple.com/documentation/eventkit/ekeventstore/requestfullaccesstoevents%28completion%3A%29) and [calendar purpose-string reference](https://developer.apple.com/documentation/bundleresources/information-property-list/nscalendarsfullaccessusagedescription).
-
-DockDeck retains only event title, start and end times, all-day state, and calendar name in memory. It persists only selected calendar identifiers and module settings, does not store or log events, and makes no calendar-related network request. Disabling Schedule stops its timer, removes its EventKit observer, releases the event store, and clears the in-memory event list. Google and other accounts appear only when their calendars are enabled for macOS under **System Settings → Internet Accounts**; signing into a provider in Safari alone does not connect it to EventKit.
-
-## Showing another time zone
-
-World Clock uses the macOS time-zone database and makes no network request. Select the system time zone or an IANA time-zone identifier, listed with its current GMT offset, under **Settings → World Clock**, then choose the system, 12-hour, or 24-hour format. It refreshes at minute boundaries and stops its timer while disabled.
-
-## Checking battery status
-
-Battery reads the internal power source through macOS IOKit and shows charge level, charging state, and the system-provided time estimate when available. It requires no permission or network access. Select a 30-second, 60-second, or 5-minute interval under **Settings → Battery**; sampling stops while the module is disabled. Macs without an internal battery show a neutral unavailable state.
-
-## Watching network throughput
-
-Network calculates download and upload rates from macOS's 64-bit byte counters for the current primary interface. It does not open a connection or inspect traffic, IP addresses, hostnames, or packet contents. Select a 1-second, 2-second, or 5-second interval under **Settings → Network**; sampling and counter retention stop while the module is disabled. The primary interface name remains available in the panel help and accessibility text.
+- [Terminal controls and shortcuts](docs/modules/terminal.md)
+- [Usage values, reset times, and provider states](docs/modules/usage.md)
+- [System Stats metrics and macOS memory semantics](docs/modules/system-stats.md)
+- [Service Monitor, Weather, Schedule, World Clock, Battery, and Network](docs/modules/catalog.md)
+- [Claude Code bridge setup and troubleshooting](docs/integrations/claude-code.md)
 
 ## Requirements
 
@@ -115,40 +84,6 @@ Network calculates download and upload rates from macOS's 64-bit byte counters f
 - Swift 5.9 or later when building from source
 
 Without Accessibility permission, DockDeck remains usable in fixed fallback positions. Only a bottom-aligned Dock is tracked precisely; side-aligned Docks use the fallback layout.
-
-## Preview distribution
-
-DockDeck does not yet publish a Developer ID-signed and notarized stable binary. Until that is available, installing from source with `./scripts/install.sh` is the recommended preview path.
-
-Tagged GitHub preview releases may include an explicitly labeled `unsigned` ZIP for technical evaluation. Manually dispatched preview builds appear as GitHub Actions artifacts and expire after 14 days; they are not GitHub Releases. Both are ad-hoc signed, so macOS requires manual approval in **System Settings → Privacy & Security → Open Anyway**, and an update may require Accessibility approval again. Preview artifacts built by GitHub Actions include a SHA-256 file and build-provenance attestation:
-
-```bash
-gh attestation verify DockDeck-*-unsigned.zip -R bangwol/DockDeck
-```
-
-## Reading the usage panel
-
-Percentages and bars show **remaining** capacity by default. Select **Used** under **Settings → Usage → Values** to invert both the number and filled bar. For example, the same quota appears as either 22% remaining or 78% used.
-
-Each meter shows the provider-supplied reset time in the Mac's local time zone. A provider with one returned window uses a two-column header: usage is centered in the first column and its reset time in the second. Providers with two or three windows place each reset below its matching bar. Codex supplies `resetsAt` through its [app-server rate-limit response](https://learn.chatgpt.com/docs/app-server#6-rate-limits-chatgpt), while Claude Code supplies `resets_at` through its [status-line data](https://code.claude.com/docs/en/statusline#rate-limit-usage). Resets later today use `HH:mm`; a different day uses `M/D HH:mm`. `--` means that the provider did not supply a timestamp. The full localized date and time remain available by hovering the meter.
-
-Codex displays whichever 5-hour and weekly windows the signed-in account returns. DockDeck uses the returned durations instead of guessing the plan. OpenAI documents a shared 5-hour window for local and cloud tasks and notes that weekly limits may also apply in the [Codex pricing guide](https://learn.chatgpt.com/docs/pricing).
-
-Claude displays the officially documented 5-hour and weekly fields available in Claude Code's status-line payload. The bridge receives new account data after a normal Claude assistant response; an idle session, `/status`, `/usage`, and `refreshInterval` callbacks do not fetch new quota data for DockDeck. `⌘R` rereads the local cache but does not contact Anthropic. A cache older than ten minutes is shown as stale.
-
-Anthropic does not currently expose the Fable meter shown by Claude Code's interactive `/usage` screen through the documented status-line payload. For forward compatibility, DockDeck recognizes the experimental aliases `seven_day_fable` and `fable`; it adds an `FBL` meter only when the payload actually contains one of them and never estimates Fable usage. [Fable availability is plan-specific](https://support.claude.com/en/articles/15424964-claude-fable-models-on-your-plan), and Fable 5 requires Claude Code `2.1.170` or later.
-
-Provider marks show data state without adding a detached status dot:
-
-- Full-color mark: current data
-- Muted mark: loading or cached data past its freshness window
-- Muted mark with a diagonal slash: sign-in, setup, or connection required
-
-Hover a provider mark for its exact status and source detail. The same status is included in VoiceOver labels.
-
-- More than 50% remaining (less than 50% used): selected text color
-- 20–50% remaining (50–80% used): orange
-- Less than 20% remaining (more than 80% used): red
 
 ## Run from source
 
@@ -201,6 +136,16 @@ Public binary distribution requires [Developer ID signing](https://developer.app
 DOCKDECK_SIGNING_IDENTITY="Developer ID Application: Example" ./scripts/package.sh
 ```
 
+## Preview distribution
+
+DockDeck does not yet publish a Developer ID-signed and notarized stable binary. Until that is available, installing from source with `./scripts/install.sh` is the recommended preview path.
+
+Tagged GitHub preview releases may include an explicitly labeled `unsigned` ZIP for technical evaluation. Manually dispatched preview builds appear as GitHub Actions artifacts and expire after 14 days; they are not GitHub Releases. Both are ad-hoc signed, so macOS requires manual approval in **System Settings → Privacy & Security → Open Anyway**, and an update may require Accessibility approval again. Preview artifacts built by GitHub Actions include a SHA-256 file and build-provenance attestation:
+
+```bash
+gh attestation verify DockDeck-*-unsigned.zip -R bangwol/DockDeck
+```
+
 ## Usage data and privacy
 
 DockDeck does not read browser cookies, browser credential stores, or private web endpoints. It observes only mouse-down occurrence to collapse the focused terminal; it does not record global keystrokes, pointer coordinates, or clicked content.
@@ -217,148 +162,9 @@ DockDeck does not read browser cookies, browser credential stores, or private we
 | Battery | macOS IOKit | Reads the internal power source locally; does not read battery identifiers or serial numbers |
 | Network | macOS routing and configuration APIs | Reads only primary-interface byte counters; does not inspect network traffic or destinations |
 
-The Claude cache is written atomically to:
-
-```text
-~/Library/Application Support/DockDeck/claude-rate-limits.json
-```
-
-The cache directory uses `0700` permissions and the file uses `0600` permissions.
-
-DockDeck also writes a small zsh startup hook to `~/Library/Caches/DockDeck/Shell/.zshenv`. It preserves the user's normal zsh startup files and changes only the DockDeck terminal prompt. The directory uses `0700` permissions and the hook uses `0600` permissions.
-
-## Configure Claude Code
-
-Claude quota data reaches DockDeck through Claude Code's supported `statusLine` JSON input. See Anthropic's [Claude Code installation guide](https://code.claude.com/docs/en/installation), [status-line reference](https://code.claude.com/docs/en/statusline), and [settings reference](https://code.claude.com/docs/en/settings).
-
-### 1. Install or update Claude Code
-
-On macOS with Homebrew:
-
-```bash
-brew install --cask claude-code
-```
-
-For an existing Homebrew installation:
-
-```bash
-brew upgrade --cask claude-code
-```
-
-Native installations can update themselves:
-
-```bash
-claude update
-```
-
-Update to the current Claude Code release, then start it once and complete sign-in:
-
-```bash
-claude --version
-claude
-```
-
-Anthropic documents status-line `rate_limits` as requiring Claude Code `2.1.251` or later. DockDeck follows the documented `five_hour` and `seven_day` fields and recommends the current Claude Code release because the schema and account availability can change. The object is available to supported Claude.ai Pro and Max accounts only after the first API response in a session. Each window can be absent independently or disappear after its reset time.
-
-### 2. Locate the DockDeck bridge
-
-After running `./scripts/install.sh`, the bridge is inside the installed app bundle:
-
-```bash
-BRIDGE_PATH="$HOME/Applications/DockDeck.app/Contents/Resources/bin/dockdeck-claude-bridge"
-test -x "$BRIDGE_PATH" && printf '%s\n' "$BRIDGE_PATH"
-```
-
-For a system-wide copy, use `/Applications/DockDeck.app/Contents/Resources/bin/dockdeck-claude-bridge` instead.
-
-### 3. Add the status line
-
-DockDeck never edits `~/.claude/settings.json` automatically. Preserve its existing keys and check for an existing `statusLine` before adding this entry:
-
-```json
-{
-  "statusLine": {
-    "type": "command",
-    "command": "\"/Users/your-name/Applications/DockDeck.app/Contents/Resources/bin/dockdeck-claude-bridge\""
-  }
-}
-```
-
-Use the absolute path printed in step 2. `~` and shell variables are intentionally avoided inside the JSON command so paths containing spaces remain unambiguous.
-
-To preserve an existing executable status-line script, pass the same JSON input through it:
-
-```json
-{
-  "statusLine": {
-    "type": "command",
-    "command": "\"/absolute/path/to/dockdeck-claude-bridge\" -- /absolute/path/to/existing-statusline"
-  }
-}
-```
-
-For an existing inline shell command, use `--passthrough-shell`:
-
-```json
-{
-  "statusLine": {
-    "type": "command",
-    "command": "\"/absolute/path/to/dockdeck-claude-bridge\" --passthrough-shell 'YOUR EXISTING COMMAND'"
-  }
-}
-```
-
-### 4. Verify the bridge
-
-Start a new `claude` session and send one normal request. Opening `/status` or `/usage` alone does not update the bridge. The right panel updates within 60 seconds, or immediately after `⌘R` rereads the cache. Verify that the privacy-filtered cache exists:
-
-```bash
-test -f "$HOME/Library/Application Support/DockDeck/claude-rate-limits.json" \
-  && echo "Claude bridge ready"
-```
-
-If the cache is missing, confirm the Claude Code version and run `/status` inside Claude Code to verify that user settings were loaded.
-
-Do not add `refreshInterval` solely for DockDeck. Timed status-line callbacks replay the last session payload without fetching account usage and do not improve its freshness. DockDeck already watches the cache on its own timer. The bridge derives freshness from the local transcript modification time but never stores the transcript path or contents.
-
-### 5. Understand day-to-day updates
-
-DockDeck does not keep a hidden Claude process running and does not poll Anthropic account endpoints. Claude Code invokes the bridge locally and supplies the supported quota fields as part of its status-line JSON.
-
-| Claude Code activity | DockDeck behavior |
-| --- | --- |
-| Start or resume a session | The status line runs, but a new session may not contain `rate_limits` until its first API response. |
-| Receive a normal assistant response | Claude Code runs the status line with its latest supported 5-hour and 7-day fields. The bridge updates the local cache automatically. |
-| Run `/usage` | Claude Code shows its interactive plan-usage view. Those screen values, including the separate Fable meter, are not copied into the documented status-line payload. |
-| Run `/status`, change permission or Vim mode, or finish `/compact` | The status line may run again, but this is not a new account-usage request and can repeat the previous quota values. |
-| Leave Claude Code idle or close it | No new payload arrives. DockDeck keeps the last cache and marks it stale after ten minutes. Keeping an unused session open does not improve freshness. |
-| Use Claude Desktop, claude.ai, or another machine | Shared account usage can change without a local status-line event. DockDeck catches up after the next normal response in local Claude Code. |
-| Press `⌘R` in DockDeck | DockDeck rereads the cache immediately. It does not start Claude Code or contact Anthropic. |
-
-You do not need to type `/usage` for DockDeck or leave a terminal session open solely as a monitor. Use Claude Code normally; each real local response updates the bridge. If most Claude usage happens in Desktop, a browser, or another machine, use that surface's usage view when exact current account usage is required. DockDeck intentionally does not use OAuth tokens, browser sessions, or undocumented account APIs to fill that gap.
-
-Fable remains a known limitation. The interactive `/usage` screen can show a Fable-specific weekly allowance, but the documented status-line schema currently exposes only `five_hour`, `seven_day`, and gateway `spend_limit` windows. DockDeck therefore does not estimate or scrape Fable usage.
-
-### 6. Troubleshoot Claude data
-
-1. Run `claude --version` and update if it is older than `2.1.251`.
-2. Confirm `~/.claude/settings.json` still contains the DockDeck bridge under `statusLine.command`. A global `disableAllHooks: true` setting also disables the status line.
-3. Confirm the installed bridge is executable:
-
-   ```bash
-   test -x "$HOME/Applications/DockDeck.app/Contents/Resources/bin/dockdeck-claude-bridge" \
-     && echo "DockDeck bridge ready"
-   ```
-
-4. Start or resume Claude Code and send one normal request. `/usage` or `/status` alone is not a bridge refresh test.
-5. Confirm the privacy-filtered cache exists, then press `⌘R` in DockDeck:
-
-   ```bash
-   test -f "$HOME/Library/Application Support/DockDeck/claude-rate-limits.json" \
-     && echo "Claude cache ready"
-   ```
-
-6. If the status line itself is missing, run Claude Code with `claude --debug` and inspect the first status-line invocation error. A muted mark means the cache is merely old; a muted mark with a diagonal slash means setup, sign-in, or connectivity needs attention.
+Storage locations and permission details are documented in the
+[Usage](docs/modules/usage.md#local-cache) and
+[Terminal](docs/modules/terminal.md#settings-and-local-files) guides.
 
 ## Security
 
