@@ -28,9 +28,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     var terminalPanelController: TerminalPanelController!
     var leftReadOnlyDeckPanelController: ReadOnlyDeckPanelController!
     var rightReadOnlyDeckPanelController: ReadOnlyDeckPanelController!
-    lazy var usageStore = UsageStore { [weak self] message in
+    lazy var usageStore = UsageStore(logger: { [weak self] message in
         self?.debugLog("usage", message)
-    }
+    })
     lazy var systemStatsStore = SystemStatsStore()
     lazy var serviceMonitorStore = ServiceMonitorStore()
     lazy var weatherStore = WeatherStore()
@@ -95,6 +95,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     var lastPresenceUntracked = true
     var tickCount = 0
     var lastDebugLine: [String: String] = [:]
+    var usageDisplayAwake = true
+    var usageSessionActive = true
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         PanelSettings.migratePanelDeckIfNeeded()
@@ -147,6 +149,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 self?.terminalResizeDidEnd()
             })
         usageStore.setEnabledProviders(PanelSettings.enabledUsageProviders)
+        usageStore.setClaudeRefreshMode(PanelSettings.claudeUsageRefreshMode)
         leftReadOnlyDeckPanelController = ReadOnlyDeckPanelController(
             initialFrame: initialLeftFrame,
             theme: currentTheme,
@@ -200,6 +203,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSWorkspace.shared.notificationCenter.addObserver(
             self, selector: #selector(workspaceApplicationDidActivate(_:)),
             name: NSWorkspace.didActivateApplicationNotification, object: nil)
+        let workspaceNotifications = NSWorkspace.shared.notificationCenter
+        workspaceNotifications.addObserver(
+            self, selector: #selector(usageDisplayDidSleep(_:)),
+            name: NSWorkspace.screensDidSleepNotification, object: nil)
+        workspaceNotifications.addObserver(
+            self, selector: #selector(usageDisplayDidSleep(_:)),
+            name: NSWorkspace.willSleepNotification, object: nil)
+        workspaceNotifications.addObserver(
+            self, selector: #selector(usageDisplayDidWake(_:)),
+            name: NSWorkspace.screensDidWakeNotification, object: nil)
+        workspaceNotifications.addObserver(
+            self, selector: #selector(usageDisplayDidWake(_:)),
+            name: NSWorkspace.didWakeNotification, object: nil)
+        workspaceNotifications.addObserver(
+            self, selector: #selector(usageSessionDidResignActive(_:)),
+            name: NSWorkspace.sessionDidResignActiveNotification, object: nil)
+        workspaceNotifications.addObserver(
+            self, selector: #selector(usageSessionDidBecomeActive(_:)),
+            name: NSWorkspace.sessionDidBecomeActiveNotification, object: nil)
         terminalLocalMouseMonitor = NSEvent.addLocalMonitorForEvents(
             matching: [.leftMouseDown, .rightMouseDown]
         ) { [weak self] event in
@@ -379,5 +401,29 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func powerStateDidChange(_ notification: Notification) {
         synchronizeModuleRuntimes()
+    }
+
+    @objc private func usageDisplayDidSleep(_ notification: Notification) {
+        usageDisplayAwake = false
+        synchronizeUsageSystemActivity()
+    }
+
+    @objc private func usageDisplayDidWake(_ notification: Notification) {
+        usageDisplayAwake = true
+        synchronizeUsageSystemActivity()
+    }
+
+    @objc private func usageSessionDidResignActive(_ notification: Notification) {
+        usageSessionActive = false
+        synchronizeUsageSystemActivity()
+    }
+
+    @objc private func usageSessionDidBecomeActive(_ notification: Notification) {
+        usageSessionActive = true
+        synchronizeUsageSystemActivity()
+    }
+
+    private func synchronizeUsageSystemActivity() {
+        usageStore.setSystemRefreshActive(usageDisplayAwake && usageSessionActive)
     }
 }

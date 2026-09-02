@@ -295,6 +295,34 @@ struct UsageSettingsView: View {
                 }
 
                 GroupBox {
+                    VStack(alignment: .leading, spacing: 10) {
+                        SettingsPickerRow(title: "Mode") {
+                            Picker(
+                                "Claude refresh",
+                                selection: Binding(
+                                    get: { model.values.usage.claudeRefreshMode },
+                                    set: model.setClaudeUsageRefreshMode)
+                            ) {
+                                ForEach(ClaudeUsageRefreshMode.allCases, id: \.self) {
+                                    Text($0.title).tag($0)
+                                }
+                            }
+                            .labelsHidden()
+                            .pickerStyle(.segmented)
+                        }
+                        Divider()
+                        Text(model.values.usage.claudeRefreshMode.subtitle)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.top, 4)
+                } label: {
+                    Label("Claude Refresh", systemImage: "arrow.clockwise")
+                        .font(.headline)
+                }
+
+                GroupBox {
                     VStack(spacing: 12) {
                         SettingsPickerRow(title: "Values") {
                             Picker(

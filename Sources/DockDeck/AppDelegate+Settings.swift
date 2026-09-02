@@ -150,6 +150,7 @@ extension AppDelegate {
             PanelSettings.resetToDefaults()
             self.notificationCoordinator.updateSettings(PanelSettings.notifications)
             self.usageStore.setEnabledProviders(PanelSettings.enabledUsageProviders)
+            self.usageStore.setClaudeRefreshMode(PanelSettings.claudeUsageRefreshMode)
             self.systemStatsStore.setRefreshInterval(
                 PanelSettings.systemStatsRefreshInterval)
             self.systemStatsStore.setMetrics(PanelSettings.systemStatsMetrics)
@@ -221,6 +222,7 @@ extension AppDelegate {
                 fontName: PanelSettings.fontName ?? TerminalTheme.defaultFontName),
             usage: UsageSettingsState(
                 enabledProviders: PanelSettings.enabledUsageProviders,
+                claudeRefreshMode: PanelSettings.claudeUsageRefreshMode,
                 fontName: PanelSettings.usageFontName ?? TerminalTheme.defaultFontName,
                 fontSize: PanelSettings.usageFontSize,
                 displayMode: PanelSettings.usageDisplayMode,
@@ -294,6 +296,9 @@ extension AppDelegate {
             PanelSettings.enabledUsageProviders = providers
             usageStore.setEnabledProviders(providers)
             for controller in readOnlyDeckPanelControllers { controller.applySettings() }
+        case .usage(.claudeRefreshMode(let mode)):
+            PanelSettings.claudeUsageRefreshMode = mode
+            usageStore.setClaudeRefreshMode(mode)
         case .usage(.font(let name)):
             PanelSettings.usageFontName = name
             for controller in readOnlyDeckPanelControllers { controller.applySettings() }

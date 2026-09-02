@@ -197,6 +197,7 @@ final class ReadOnlyDeckPanelController: NSObject, NSMenuDelegate {
 
     func menuWillOpen(_ menu: NSMenu) {
         menu.removeAllItems()
+        if activeModule == .usage { usageStore.refreshClaudeUsageIfDue() }
 
         addItem(
             to: menu,

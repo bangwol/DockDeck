@@ -287,6 +287,7 @@ final class ScheduleTests: XCTestCase {
                 focusWidthMultiplier: 2, focusHeightMultiplier: 4, fontName: "Menlo"),
             usage: UsageSettingsState(
                 enabledProviders: UsageProviderID.allCases,
+                claudeRefreshMode: .automatic,
                 fontName: "Menlo", fontSize: 10,
                 displayMode: .remaining, textColor: .theme, showsPace: true),
             systemStats: SystemStatsSettingsState(

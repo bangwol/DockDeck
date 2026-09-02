@@ -1,4 +1,5 @@
-import Foundation
+import Cocoa
+import SwiftUI
 import XCTest
 
 @testable import DockDeck
@@ -268,4 +269,385 @@ final class UsageProviderTests: XCTestCase {
 
         XCTAssertEqual(snapshot.freshness, .stale)
     }
+
+    func testClaudeUsageCommandParserReadsSessionWeekAndFable() throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = try XCTUnwrap(TimeZone(identifier: "Asia/Seoul"))
+        let capturedAt = try XCTUnwrap(calendar.date(
+            from: DateComponents(year: 2026, month: 9, day: 2, hour: 20)))
+        let output = """
+            You are currently using your subscription to power your Claude Code usage
+
+            Current session: 0% used · resets Sep 2 at 11:19pm (Asia/Seoul)
+            Current week (all models): 19% used · resets Sep 4 at 4:59am (Asia/Seoul)
+            Current week (Fable): 31% used · resets Sep 4 at 4:59am (Asia/Seoul)
+            """
+
+        let snapshot = try ClaudeUsageCommandParser.parse(output, capturedAt: capturedAt)
+
+        XCTAssertEqual(snapshot.windows.map(\.label), ["5h", "7d", "FBL"])
+        XCTAssertEqual(snapshot.windows.map(\.usedPercent), [0, 19, 31])
+        XCTAssertEqual(
+            snapshot.windows[0].resetsAt,
+            calendar.date(from: DateComponents(
+                year: 2026, month: 9, day: 2, hour: 23, minute: 19)))
+        XCTAssertEqual(
+            snapshot.windows[1].resetsAt,
+            calendar.date(from: DateComponents(
+                year: 2026, month: 9, day: 4, hour: 4, minute: 59)))
+        XCTAssertEqual(snapshot.freshness, .live)
+        XCTAssertEqual(snapshot.observedAt, capturedAt)
+    }
+
+    func testClaudeUsageCommandParserReadsRenderedMultilineScreen() throws {
+        let capturedAt = Date(timeIntervalSince1970: 2_000)
+        let output = """
+            Current session
+            █████                                      12% used
+            Resets in 2h 30m
+
+            Current week (all models)
+            ███████████                                22% used
+            Resets in 3 days
+
+            Current week (Fable)
+            ███████████████                            30% used
+            Resets in 3 days
+            """
+
+        let snapshot = try ClaudeUsageCommandParser.parse(output, capturedAt: capturedAt)
+
+        XCTAssertEqual(snapshot.windows.map(\.usedPercent), [12, 22, 30])
+        XCTAssertEqual(
+            snapshot.windows[0].resetsAt,
+            capturedAt.addingTimeInterval((2 * 60 + 30) * 60))
+        XCTAssertEqual(
+            snapshot.windows[2].resetsAt,
+            capturedAt.addingTimeInterval(3 * 24 * 60 * 60))
+    }
+
+    func testClaudeUsageCommandParserRejectsAuthenticationScreen() {
+        XCTAssertThrowsError(
+            try ClaudeUsageCommandParser.parse("Not logged in. Please log in to continue.")) {
+                guard case UsageProviderError.authenticationRequired = $0 else {
+                    return XCTFail("Expected authenticationRequired, got \($0)")
+                }
+            }
+        XCTAssertThrowsError(
+            try ClaudeUsageCommandParser.parse(
+                "OAuth unavailable: Claude OAuth authorization expired; sign in again.")) {
+                guard case UsageProviderError.authenticationRequired = $0 else {
+                    return XCTFail("Expected authenticationRequired, got \($0)")
+                }
+            }
+    }
+
+    func testClaudeProviderFallsBackToHiddenPTY() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("DockDeckClaudePTY-\(UUID().uuidString)", isDirectory: true)
+        let executable = root.appendingPathComponent("claude")
+        let probeDirectory = root.appendingPathComponent("probe", isDirectory: true)
+        let homeDirectory = root.appendingPathComponent("home", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(
+            at: homeDirectory, withIntermediateDirectories: true)
+        try Data(
+            """
+            #!/bin/sh
+            case " $* " in
+              *" /usage "*) echo "direct mode unavailable"; exit 0 ;;
+            esac
+            printf '❯ '
+            while IFS= read -r line; do
+              case "$line" in
+                *"/usage"*)
+                  printf '\nCurrent session\n10%% used\nResets in 2h\n'
+                  printf '\nCurrent week (all models)\n20%% used\nResets in 3 days\n'
+                  printf '\nCurrent week (Fable)\n30%% used\nResets in 3 days\n'
+                  ;;
+              esac
+            done
+            """.utf8
+        ).write(to: executable)
+        try FileManager.default.setAttributes(
+            [.posixPermissions: 0o700], ofItemAtPath: executable.path)
+        let provider = ClaudeUsageCommandProvider(
+            environment: [
+                "DOCKDECK_CLAUDE_PATH": executable.path,
+                "PATH": "/usr/bin:/bin",
+            ],
+            homeDirectory: homeDirectory,
+            probeDirectory: probeDirectory)
+
+        let result = provider.read(now: Date(timeIntervalSince1970: 2_000))
+
+        guard case .success(let snapshot) = result else {
+            return XCTFail("Expected the hidden PTY fallback to return usage")
+        }
+        XCTAssertEqual(snapshot.windows.map(\.label), ["5h", "7d", "FBL"])
+        XCTAssertEqual(snapshot.windows.map(\.usedPercent), [10, 20, 30])
+    }
+
+    func testClaudeProviderRemovesLateSessionArtifact() throws {
+        let fileManager = FileManager.default
+        let root = fileManager.temporaryDirectory
+            .appendingPathComponent("DockDeckClaudeCleanup-\(UUID().uuidString)", isDirectory: true)
+        let executable = root.appendingPathComponent("claude")
+        let probeDirectory = root.appendingPathComponent("probe", isDirectory: true)
+        let homeDirectory = root.appendingPathComponent("home", isDirectory: true)
+        let encodedProbe = String(probeDirectory.path.unicodeScalars.map { scalar -> Character in
+            switch scalar.value {
+            case 48...57, 65...90, 97...122: Character(scalar)
+            default: "-"
+            }
+        })
+        let projectDirectory = homeDirectory
+            .appendingPathComponent(".claude/projects", isDirectory: true)
+            .appendingPathComponent(encodedProbe, isDirectory: true)
+        defer { try? fileManager.removeItem(at: root) }
+        try fileManager.createDirectory(at: homeDirectory, withIntermediateDirectories: true)
+        try Data(
+            """
+            #!/bin/sh
+            session_id=''
+            while [ "$#" -gt 0 ]; do
+              if [ "$1" = '--session-id' ]; then shift; session_id="$1"; fi
+              shift
+            done
+            (
+              sleep 0.15
+              mkdir -p "$TEST_PROJECT_DIR"
+              printf '{}\n' > "$TEST_PROJECT_DIR/$session_id.jsonl"
+            ) >/dev/null 2>&1 &
+            printf 'Current session\n10%% used\nResets in 2h\n'
+            """.utf8
+        ).write(to: executable)
+        try fileManager.setAttributes(
+            [.posixPermissions: 0o700], ofItemAtPath: executable.path)
+        let provider = ClaudeUsageCommandProvider(
+            environment: [
+                "DOCKDECK_CLAUDE_PATH": executable.path,
+                "PATH": "/usr/bin:/bin",
+                "TEST_PROJECT_DIR": projectDirectory.path,
+            ],
+            homeDirectory: homeDirectory,
+            probeDirectory: probeDirectory)
+
+        guard case .success = provider.read(now: Date(timeIntervalSince1970: 2_000)) else {
+            return XCTFail("Expected direct Claude usage output to parse")
+        }
+        XCTAssertFalse(fileManager.fileExists(atPath: projectDirectory.path))
+    }
+
+    func testClaudeProviderStripsCredentialOverrides() throws {
+        let fileManager = FileManager.default
+        let root = fileManager.temporaryDirectory
+            .appendingPathComponent("DockDeckClaudeEnvironment-\(UUID().uuidString)")
+        let executable = root.appendingPathComponent("claude")
+        let homeDirectory = root.appendingPathComponent("home", isDirectory: true)
+        defer { try? fileManager.removeItem(at: root) }
+        try fileManager.createDirectory(at: homeDirectory, withIntermediateDirectories: true)
+        try Data(
+            """
+            #!/bin/sh
+            if [ -n "${ANTHROPIC_API_KEY:-}" ] \
+              || [ -n "${CLAUDE_CODE_OAUTH_TOKEN_FUTURE:-}" ]; then
+              printf 'credential override leaked\n'
+              exit 1
+            fi
+            printf 'Current session\n10%% used\nResets in 2h\n'
+            """.utf8
+        ).write(to: executable)
+        try fileManager.setAttributes(
+            [.posixPermissions: 0o700], ofItemAtPath: executable.path)
+        let provider = ClaudeUsageCommandProvider(
+            environment: [
+                "ANTHROPIC_API_KEY": "sentinel",
+                "CLAUDE_CODE_OAUTH_TOKEN_FUTURE": "sentinel",
+                "DOCKDECK_CLAUDE_PATH": executable.path,
+                "PATH": "/usr/bin:/bin",
+            ],
+            homeDirectory: homeDirectory,
+            probeDirectory: root.appendingPathComponent("probe", isDirectory: true))
+
+        guard case .success = provider.read(now: Date(timeIntervalSince1970: 2_000)) else {
+            return XCTFail("Expected credential overrides to be stripped")
+        }
+    }
+
+    func testClaudeUsageSnapshotMergerKeepsProbeOnlyFableWindow() throws {
+        let older = Date(timeIntervalSince1970: 1_000)
+        let newer = Date(timeIntervalSince1970: 2_000)
+        let command = UsageProviderSnapshot(
+            windows: [
+                UsageWindow(durationMinutes: 300, usedPercent: 10, resetsAt: nil),
+                UsageWindow(
+                    durationMinutes: 0, usedPercent: 30, resetsAt: nil,
+                    customLabel: "FBL"),
+            ],
+            freshness: .live,
+            detail: "command",
+            observedAt: older)
+        let bridge = UsageProviderSnapshot(
+            windows: [
+                UsageWindow(durationMinutes: 300, usedPercent: 12, resetsAt: nil),
+                UsageWindow(durationMinutes: 10_080, usedPercent: 20, resetsAt: nil),
+            ],
+            freshness: .live,
+            detail: "bridge",
+            observedAt: newer)
+
+        let merged = try XCTUnwrap(ClaudeUsageSnapshotMerger.merge([bridge, command]))
+
+        XCTAssertEqual(merged.windows.map(\.label), ["5h", "7d", "FBL"])
+        XCTAssertEqual(merged.windows.map(\.usedPercent), [12, 20, 30])
+        XCTAssertEqual(merged.detail, "bridge")
+        XCTAssertEqual(merged.observedAt, newer)
+    }
+
+    func testClaudeProbeScheduleStaysWithinTenToTwentyMinutes() {
+        XCTAssertEqual(ClaudeUsageProbeSchedule.delay(unitValue: -1), 600)
+        XCTAssertEqual(ClaudeUsageProbeSchedule.delay(unitValue: 0.5), 900)
+        XCTAssertEqual(ClaudeUsageProbeSchedule.delay(unitValue: 2), 1_200)
+    }
+
+    func testUsageStorePausesProbeUntilSystemBecomesActive() {
+        let snapshot = UsageProviderSnapshot(
+            windows: [UsageWindow(durationMinutes: 300, usedPercent: 15, resetsAt: nil)],
+            freshness: .live,
+            detail: "command",
+            observedAt: Date())
+        let command = FakeClaudeUsageCommandProvider(result: .success(snapshot))
+        let cache = ClaudeStatuslineCacheProvider(cacheURL: missingCacheURL())
+        let queue = DispatchQueue(label: "DockDeckTests.ClaudeProbe")
+        let store = UsageStore(
+            claudeProvider: cache,
+            claudeCommandProvider: command,
+            nextClaudeProbeDelay: { 1_200 },
+            claudeProbeQueue: queue)
+        store.setEnabledProviders([.claude])
+        store.setSystemRefreshActive(false)
+        store.start()
+        queue.sync {}
+        XCTAssertEqual(command.readCount, 0)
+
+        let loaded = expectation(description: "Claude probe loaded")
+        var fulfilled = false
+        let cancellable = store.$providers.sink { providers in
+            guard !fulfilled, providers.first?.windows.first?.usedPercent == 15 else { return }
+            fulfilled = true
+            loaded.fulfill()
+        }
+        store.setSystemRefreshActive(true)
+        wait(for: [loaded], timeout: 2)
+
+        XCTAssertEqual(command.readCount, 1)
+        store.stop()
+        cancellable.cancel()
+    }
+
+    func testUsageStoreStatusLineModeDoesNotLaunchClaude() {
+        let command = FakeClaudeUsageCommandProvider(
+            result: .failure(.transport("Should not run")))
+        let queue = DispatchQueue(label: "DockDeckTests.ClaudeStatusLineOnly")
+        let store = UsageStore(
+            claudeProvider: ClaudeStatuslineCacheProvider(cacheURL: missingCacheURL()),
+            claudeCommandProvider: command,
+            nextClaudeProbeDelay: { 600 },
+            claudeProbeQueue: queue)
+        store.setEnabledProviders([.claude])
+        store.setClaudeRefreshMode(.statusLineOnly)
+        XCTAssertEqual(command.cancelCount, 1)
+        store.start()
+        store.refresh()
+        store.refreshClaudeUsageIfDue()
+        store.setSystemRefreshActive(false)
+        store.setSystemRefreshActive(true)
+        queue.sync {}
+
+        XCTAssertEqual(command.readCount, 0)
+        store.stop()
+    }
+
+    func testUsagePanelRendersThreeClaudeWindowsAtCompactSize() throws {
+        let snapshot = UsageProviderSnapshot(
+            windows: [
+                UsageWindow(durationMinutes: 300, usedPercent: 12, resetsAt: Date() + 7_200),
+                UsageWindow(
+                    durationMinutes: 10_080, usedPercent: 24, resetsAt: Date() + 259_200),
+                UsageWindow(
+                    durationMinutes: 0, usedPercent: 36, resetsAt: Date() + 259_200,
+                    customLabel: "FBL"),
+            ],
+            freshness: .live,
+            detail: "Claude /usage",
+            observedAt: Date())
+        let command = FakeClaudeUsageCommandProvider(result: .success(snapshot))
+        let queue = DispatchQueue(label: "DockDeckTests.ClaudeThreeWindowPanel")
+        let store = UsageStore(
+            claudeProvider: ClaudeStatuslineCacheProvider(cacheURL: missingCacheURL()),
+            claudeCommandProvider: command,
+            nextClaudeProbeDelay: { 1_200 },
+            claudeProbeQueue: queue)
+        store.setEnabledProviders([.claude])
+        let loaded = expectation(description: "Three Claude usage windows loaded")
+        var fulfilled = false
+        let cancellable = store.$providers.sink { providers in
+            guard !fulfilled, providers.first?.windows.count == 3 else { return }
+            fulfilled = true
+            loaded.fulfill()
+        }
+        defer {
+            store.stop()
+            cancellable.cancel()
+        }
+        store.start()
+        wait(for: [loaded], timeout: 2)
+        XCTAssertEqual(store.providers.first?.windows.map(\.label), ["5h", "7d", "FBL"])
+
+        let size = NSSize(width: 214, height: 59)
+        let view = NSHostingView(rootView:
+            QuotaPanelView(
+                store: store,
+                theme: Theme.theme(id: ""),
+                configuration: UsagePanelConfiguration(
+                    displayMode: .remaining, fontName: "Menlo", fontSize: 10,
+                    textColor: .theme, showsPace: true))
+                .frame(width: size.width, height: size.height))
+        view.frame = NSRect(origin: .zero, size: size)
+        view.layoutSubtreeIfNeeded()
+        let bitmap = try XCTUnwrap(view.bitmapImageRepForCachingDisplay(in: view.bounds))
+        view.cacheDisplay(in: view.bounds, to: bitmap)
+
+        XCTAssertEqual(view.frame.size, size)
+        XCTAssertGreaterThan(bitmap.pixelsWide, 0)
+        XCTAssertGreaterThan(bitmap.pixelsHigh, 0)
+    }
+
+    private func missingCacheURL() -> URL {
+        FileManager.default.temporaryDirectory
+            .appendingPathComponent("DockDeckTests-\(UUID().uuidString)")
+            .appendingPathComponent("claude-rate-limits.json")
+    }
+}
+
+private final class FakeClaudeUsageCommandProvider: ClaudeUsageCommandReading {
+    private let lock = NSLock()
+    private let result: Result<UsageProviderSnapshot, UsageProviderError>
+    private var storedReadCount = 0
+    private var storedCancelCount = 0
+
+    init(result: Result<UsageProviderSnapshot, UsageProviderError>) {
+        self.result = result
+    }
+
+    var readCount: Int { lock.withLock { storedReadCount } }
+    var cancelCount: Int { lock.withLock { storedCancelCount } }
+
+    func read(now: Date) -> Result<UsageProviderSnapshot, UsageProviderError> {
+        lock.withLock { storedReadCount += 1 }
+        return result
+    }
+
+    func cancel() { lock.withLock { storedCancelCount += 1 } }
 }

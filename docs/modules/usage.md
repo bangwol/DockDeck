@@ -45,23 +45,37 @@ subprocess. It does not read browser cookies or browser credential stores.
 
 ## Claude
 
-Claude Code supplies `resets_at` through its
-[status-line data](https://code.claude.com/docs/en/statusline#rate-limit-usage).
-The bridge receives new account data after a normal Claude assistant response.
-An idle session, `/status`, `/usage`, and `refreshInterval` callbacks do not
-fetch new quota data for DockDeck. `⌘R` rereads the local cache but does not
-contact Anthropic. A cache older than ten minutes is shown as stale.
+Choose a source under **Settings → Usage → Claude Refresh**:
 
-Anthropic does not currently expose the Fable meter shown by Claude Code's
-interactive `/usage` screen through the documented status-line payload. For
-forward compatibility, DockDeck recognizes the experimental aliases
-`seven_day_fable` and `fable`. It adds an `FBL` meter only when the payload
-actually contains one of them and never estimates Fable usage.
-[Fable availability is plan-specific](https://support.claude.com/en/articles/15424964-claude-fable-models-on-your-plan),
-and Fable 5 requires Claude Code `2.1.170` or later.
+| Mode | Behavior |
+| --- | --- |
+| **Automatic `/usage`** (default) | Runs the installed official Claude Code CLI briefly at launch, after `⌘R`, when a Deck menu opens, after the display or login session wakes, and at a randomized 10–20 minute interval. |
+| **Status line only** | Never starts Claude in the background. It reads only the optional bridge cache produced after normal responses in a local Claude Code session. |
 
-See [Configure the Claude Code bridge](../integrations/claude-code.md) for setup,
-normal update behavior, and troubleshooting.
+Automatic mode asks Claude Code's built-in
+[`/usage` command](https://code.claude.com/docs/en/commands) for the account
+windows. It first uses a bounded direct invocation and falls back to an
+off-screen pseudo-terminal when the installed version requires interactive
+rendering. No Terminal window appears, no Claude process is kept alive, and
+tools are disabled for the probe. The process exits after capture.
+
+Automatic probes stop while the display sleeps or the macOS login session is
+locked. An in-flight probe is cancelled and one fresh probe runs after the
+system becomes active. DockDeck does not install a global keyboard or pointer
+idle monitor.
+
+The command can return 5-hour, weekly, and plan-specific Fable windows. DockDeck
+shows `FBL` only when Claude returns that value and never estimates it.
+[Fable availability is plan-specific](https://support.claude.com/en/articles/15424964-claude-fable-models-on-your-plan).
+
+The optional bridge receives the documented 5-hour and 7-day
+[`rate_limits` fields](https://code.claude.com/docs/en/statusline#available-data)
+after a normal Claude assistant response. A cache older than ten minutes is
+stale. When both sources are present, the newer source wins matching windows;
+an `/usage`-only Fable window is retained.
+
+See [Configure Claude Code monitoring](../integrations/claude-code.md) for mode
+selection, optional bridge setup, privacy details, and troubleshooting.
 
 ## Provider states and colors
 
@@ -80,14 +94,28 @@ Capacity colors follow the remaining amount:
 - 20–50% remaining: orange
 - Less than 20% remaining: red
 
-## Local cache
+## Local files and process boundaries
 
-The Claude bridge stores only `rate_limits` and an observation timestamp in:
+The optional Claude bridge stores only `rate_limits` and an observation
+timestamp in:
 
 ```text
 ~/Library/Application Support/DockDeck/claude-rate-limits.json
 ```
 
 The cache directory uses `0700` permissions and the file uses `0600`
-permissions. DockDeck does not use OAuth tokens, browser sessions, or
-undocumented account APIs to update Claude usage.
+permissions.
+
+Automatic mode uses this private working directory:
+
+```text
+~/Library/Application Support/DockDeck/ClaudeProbe
+```
+
+The working directory uses `0700` permissions. DockDeck passes a unique session
+ID, removes that exact probe transcript after the process exits, caps captured
+output at 256 KiB, and does not persist or log the captured screen. It removes
+`ANTHROPIC_*` and `CLAUDE_CODE_OAUTH_TOKEN*` overrides from the child
+environment. Authentication remains owned by the installed Claude Code CLI;
+DockDeck does not read token files, browser sessions, or undocumented account
+endpoints.

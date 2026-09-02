@@ -308,6 +308,20 @@ final class PanelAppearanceTests: XCTestCase {
         XCTAssertEqual(emittedSize, 12)
     }
 
+    func testSettingsModelEmitsClaudeRefreshModeChange() {
+        let model = makeSettingsModel(
+            configuration: .legacy(order: .terminalLeft, enabledPanels: .all))
+        var emittedMode: ClaudeUsageRefreshMode?
+        model.onChange = {
+            if case .usage(.claudeRefreshMode(let mode)) = $0 { emittedMode = mode }
+        }
+
+        model.setClaudeUsageRefreshMode(.statusLineOnly)
+
+        XCTAssertEqual(model.values.usage.claudeRefreshMode, .statusLineOnly)
+        XCTAssertEqual(emittedMode, .statusLineOnly)
+    }
+
     func testSettingsModelRoundsSystemStatsRefreshInterval() {
         let model = makeSettingsModel(
             configuration: .legacy(order: .terminalLeft, enabledPanels: .all))
@@ -742,6 +756,7 @@ final class PanelAppearanceTests: XCTestCase {
                 fontName: "Menlo"),
             usage: UsageSettingsState(
                 enabledProviders: UsageProviderID.allCases,
+                claudeRefreshMode: .automatic,
                 fontName: "Menlo", fontSize: 10,
                 displayMode: .remaining, textColor: .theme, showsPace: true),
             systemStats: SystemStatsSettingsState(

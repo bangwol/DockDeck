@@ -87,7 +87,10 @@ enum ClaudeRateLimitParser {
         return UsageProviderSnapshot(
             windows: windows,
             freshness: freshness,
-            detail: observedAt.map { "Observed \($0.formatted(date: .abbreviated, time: .shortened))" })
+            detail: observedAt.map {
+                "Status line · \($0.formatted(date: .abbreviated, time: .shortened))"
+            },
+            observedAt: observedAt ?? now)
     }
 }
 

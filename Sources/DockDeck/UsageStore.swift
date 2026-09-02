@@ -17,7 +17,7 @@ enum UsageProviderID: String, CaseIterable, Codable, Identifiable {
     var subtitle: String {
         switch self {
         case .codex: "OpenAI account limits"
-        case .claude: "Claude Code status-line limits"
+        case .claude: "Claude Code account limits"
         }
     }
 }
@@ -76,6 +76,7 @@ struct UsageProviderSnapshot: Equatable {
     let windows: [UsageWindow]
     let freshness: UsageFreshness
     let detail: String?
+    let observedAt: Date
 }
 
 struct ProviderUsage: Identifiable, Equatable {
@@ -88,6 +89,7 @@ struct ProviderUsage: Identifiable, Equatable {
 
 enum UsageProviderError: LocalizedError {
     case executableNotFound
+    case claudeExecutableNotFound
     case bridgeNotInstalled
     case authenticationRequired(String)
     case invalidResponse(String)
@@ -97,6 +99,8 @@ enum UsageProviderError: LocalizedError {
         switch self {
         case .executableNotFound:
             "Codex CLI executable not found"
+        case .claudeExecutableNotFound:
+            "Claude Code executable not found"
         case .bridgeNotInstalled:
             "Claude Code status-line bridge cache not found"
         case .authenticationRequired(let message), .invalidResponse(let message),
@@ -108,21 +112,39 @@ enum UsageProviderError: LocalizedError {
 
 final class UsageStore: ObservableObject {
     private static let refreshInterval: TimeInterval = 60
+    private static let menuProbeMinimumAge: TimeInterval = 60
 
     @Published private(set) var providers: [ProviderUsage]
 
     private let codexProvider: CodexAppServerProvider
     private let claudeProvider: ClaudeStatuslineCacheProvider
+    private let claudeCommandProvider: ClaudeUsageCommandReading
+    private let nextClaudeProbeDelay: () -> TimeInterval
+    private let claudeProbeQueue: DispatchQueue
     private let logger: (String) -> Void
     private var providerSnapshots: [UsageProviderID: ProviderUsage]
+    private var claudeBridgeSnapshot: UsageProviderSnapshot?
+    private var claudeCommandSnapshot: UsageProviderSnapshot?
     private var enabledProviderIDs = Set(UsageProviderID.allCases)
     private var refreshTimer: Timer?
+    private var claudeProbeTimer: Timer?
+    private var claudeProbeInFlight = false
+    private var claudeProbeGeneration = 0
+    private var lastClaudeProbeUptime: TimeInterval?
     private var started = false
+    private var systemRefreshActive = true
+    private var claudeRefreshMode = ClaudeUsageRefreshMode.automatic
     private var refreshCadence = ModuleRefreshCadence(backgroundMultiplier: 5)
 
     init(
         codexProvider: CodexAppServerProvider = CodexAppServerProvider(),
         claudeProvider: ClaudeStatuslineCacheProvider = ClaudeStatuslineCacheProvider(),
+        claudeCommandProvider: ClaudeUsageCommandReading = ClaudeUsageCommandProvider(),
+        nextClaudeProbeDelay: @escaping () -> TimeInterval = {
+            ClaudeUsageProbeSchedule.delay(unitValue: Double.random(in: 0...1))
+        },
+        claudeProbeQueue: DispatchQueue = DispatchQueue(
+            label: "DockDeck.ClaudeUsageProbe", qos: .utility),
         logger: @escaping (String) -> Void = { _ in }
     ) {
         let initialProviders = UsageProviderID.allCases.map {
@@ -134,6 +156,9 @@ final class UsageStore: ObservableObject {
         providerSnapshots = Dictionary(uniqueKeysWithValues: initialProviders.map { ($0.id, $0) })
         self.codexProvider = codexProvider
         self.claudeProvider = claudeProvider
+        self.claudeCommandProvider = claudeCommandProvider
+        self.nextClaudeProbeDelay = nextClaudeProbeDelay
+        self.claudeProbeQueue = claudeProbeQueue
         self.logger = logger
     }
 
@@ -141,15 +166,29 @@ final class UsageStore: ObservableObject {
         guard !started else { return }
         started = true
         if enabledProviderIDs.contains(.codex) { startCodex() }
-        if enabledProviderIDs.contains(.claude) { refreshClaude() }
+        if enabledProviderIDs.contains(.claude), systemRefreshActive {
+            refreshClaudeBridge()
+            if claudeRefreshMode == .automatic { requestClaudeProbe(force: true) }
+        }
 
         scheduleRefreshTimer()
     }
 
     func refresh() {
-        guard started else { return }
+        guard started, systemRefreshActive else { return }
         if enabledProviderIDs.contains(.codex) { codexProvider.refresh() }
-        if enabledProviderIDs.contains(.claude) { refreshClaude() }
+        if enabledProviderIDs.contains(.claude) {
+            refreshClaudeBridge()
+            if claudeRefreshMode == .automatic { requestClaudeProbe(force: true) }
+        }
+    }
+
+    func refreshClaudeUsageIfDue() {
+        guard started, systemRefreshActive, enabledProviderIDs.contains(.claude) else {
+            return
+        }
+        refreshClaudeBridge()
+        if claudeRefreshMode == .automatic { requestClaudeProbe(force: false) }
     }
 
     func stop() {
@@ -157,6 +196,7 @@ final class UsageStore: ObservableObject {
         started = false
         refreshTimer?.invalidate()
         refreshTimer = nil
+        cancelClaudeProbe()
         codexProvider.stop()
     }
 
@@ -172,9 +212,51 @@ final class UsageStore: ObservableObject {
         } else if !previous.contains(.codex) && resolved.contains(.codex) {
             startCodex()
         }
-        if !previous.contains(.claude) && resolved.contains(.claude) {
-            refreshClaude()
+        if previous.contains(.claude) && !resolved.contains(.claude) {
+            cancelClaudeProbe()
+        } else if !previous.contains(.claude) && resolved.contains(.claude),
+            systemRefreshActive
+        {
+            refreshClaudeBridge()
+            if claudeRefreshMode == .automatic { requestClaudeProbe(force: true) }
         }
+    }
+
+    func setClaudeRefreshMode(_ mode: ClaudeUsageRefreshMode) {
+        guard claudeRefreshMode != mode else { return }
+        claudeRefreshMode = mode
+        if mode == .statusLineOnly {
+            cancelClaudeProbe()
+            claudeCommandSnapshot = nil
+            if let claudeBridgeSnapshot {
+                apply(.success(claudeBridgeSnapshot), providerID: .claude)
+            } else {
+                resetClaudeProviderForBridge()
+            }
+            if started, systemRefreshActive, enabledProviderIDs.contains(.claude) {
+                refreshClaudeBridge()
+            }
+        } else if started, systemRefreshActive, enabledProviderIDs.contains(.claude) {
+            refreshClaudeBridge()
+            requestClaudeProbe(force: true)
+        }
+    }
+
+    func setSystemRefreshActive(_ active: Bool) {
+        guard systemRefreshActive != active else { return }
+        systemRefreshActive = active
+        if !active {
+            refreshTimer?.invalidate()
+            refreshTimer = nil
+            cancelClaudeProbe()
+            return
+        }
+        if enabledProviderIDs.contains(.codex) { codexProvider.refresh() }
+        if enabledProviderIDs.contains(.claude) {
+            refreshClaudeBridge()
+            if claudeRefreshMode == .automatic { requestClaudeProbe(force: true) }
+        }
+        scheduleRefreshTimer()
     }
 
     func setRuntimeActivity(
@@ -197,16 +279,112 @@ final class UsageStore: ObservableObject {
         }
     }
 
-    private func refreshClaude() {
+    private func refreshClaudeBridge() {
         guard started, enabledProviderIDs.contains(.claude) else { return }
         DispatchQueue.global(qos: .utility).async { [weak self] in
             guard let self else { return }
             let result = self.claudeProvider.read()
             DispatchQueue.main.async {
-                guard self.started, self.enabledProviderIDs.contains(.claude) else { return }
-                self.apply(result, providerID: .claude)
+                guard self.started, self.systemRefreshActive,
+                    self.enabledProviderIDs.contains(.claude)
+                else { return }
+                switch result {
+                case .success(let snapshot):
+                    self.claudeBridgeSnapshot = snapshot
+                    self.publishClaudeSources()
+                case .failure(let error):
+                    self.claudeBridgeSnapshot = nil
+                    self.publishClaudeSources(fallbackError: error)
+                }
             }
         }
+    }
+
+    private func requestClaudeProbe(force: Bool) {
+        guard started, systemRefreshActive, claudeRefreshMode == .automatic,
+            enabledProviderIDs.contains(.claude),
+            !claudeProbeInFlight
+        else { return }
+        let uptime = ProcessInfo.processInfo.systemUptime
+        if !force, let lastClaudeProbeUptime,
+            uptime - lastClaudeProbeUptime < Self.menuProbeMinimumAge
+        {
+            return
+        }
+
+        claudeProbeTimer?.invalidate()
+        claudeProbeTimer = nil
+        claudeProbeInFlight = true
+        lastClaudeProbeUptime = uptime
+        let generation = claudeProbeGeneration
+        claudeProbeQueue.async { [weak self] in
+            guard let self else { return }
+            let result = self.claudeCommandProvider.read(now: Date())
+            DispatchQueue.main.async {
+                guard self.started, self.systemRefreshActive,
+                    self.enabledProviderIDs.contains(.claude),
+                    self.claudeProbeGeneration == generation
+                else { return }
+                self.claudeProbeInFlight = false
+                switch result {
+                case .success(let snapshot):
+                    self.claudeCommandSnapshot = snapshot
+                    self.publishClaudeSources()
+                case .failure(let error):
+                    self.claudeCommandSnapshot = nil
+                    self.publishClaudeSources(fallbackError: error)
+                }
+                self.scheduleClaudeProbe()
+            }
+        }
+    }
+
+    private func publishClaudeSources(fallbackError: UsageProviderError? = nil) {
+        let snapshots = [claudeBridgeSnapshot, claudeCommandSnapshot].compactMap { $0 }
+        if let snapshot = ClaudeUsageSnapshotMerger.merge(snapshots) {
+            apply(.success(snapshot), providerID: .claude)
+        } else if let fallbackError {
+            apply(.failure(fallbackError), providerID: .claude)
+        }
+    }
+
+    private func cancelClaudeProbe() {
+        claudeProbeTimer?.invalidate()
+        claudeProbeTimer = nil
+        claudeProbeGeneration += 1
+        claudeProbeInFlight = false
+        claudeCommandProvider.cancel()
+    }
+
+    private func resetClaudeProviderForBridge() {
+        guard let previous = providerSnapshots[.claude] else { return }
+        providerSnapshots[.claude] = ProviderUsage(
+            id: previous.id, name: previous.name, windows: [],
+            freshness: .loading, detail: nil)
+        publishProviders()
+    }
+
+    private func scheduleClaudeProbe() {
+        claudeProbeTimer?.invalidate()
+        guard started, systemRefreshActive, claudeRefreshMode == .automatic,
+            enabledProviderIDs.contains(.claude),
+            !claudeProbeInFlight
+        else {
+            claudeProbeTimer = nil
+            return
+        }
+        let proposed = nextClaudeProbeDelay()
+        let interval = proposed.isFinite
+            ? min(max(proposed, ClaudeUsageProbeSchedule.delayRange.lowerBound),
+                ClaudeUsageProbeSchedule.delayRange.upperBound)
+            : ClaudeUsageProbeSchedule.delayRange.lowerBound
+        let timer = Timer(timeInterval: interval, repeats: false) { [weak self] _ in
+            self?.claudeProbeTimer = nil
+            self?.requestClaudeProbe(force: true)
+        }
+        timer.tolerance = min(interval * 0.05, 30)
+        RunLoop.main.add(timer, forMode: .common)
+        claudeProbeTimer = timer
     }
 
     private func apply(
@@ -225,7 +403,7 @@ final class UsageStore: ObservableObject {
         case .failure(let error):
             let freshness: UsageFreshness
             switch error {
-            case .bridgeNotInstalled, .executableNotFound:
+            case .bridgeNotInstalled, .executableNotFound, .claudeExecutableNotFound:
                 freshness = .setupRequired
             case .authenticationRequired:
                 freshness = .signIn
@@ -255,14 +433,16 @@ final class UsageStore: ObservableObject {
 
     private func scheduleRefreshTimer() {
         refreshTimer?.invalidate()
-        guard started else {
+        guard started, systemRefreshActive else {
             refreshTimer = nil
             return
         }
         let interval = refreshCadence.effectiveInterval(
             configuredInterval: Self.refreshInterval)
         refreshTimer = .moduleRefreshTimer(interval: interval) { [weak self] in
-            self?.refresh()
+            guard let self, self.systemRefreshActive else { return }
+            if self.enabledProviderIDs.contains(.codex) { self.codexProvider.refresh() }
+            if self.enabledProviderIDs.contains(.claude) { self.refreshClaudeBridge() }
         }
     }
 }

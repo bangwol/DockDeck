@@ -17,7 +17,13 @@ swift test
 - Hide a panel when its side lacks space; never extend it across the Dock.
 - Pass the explicit `ShellEnvironment` to SwiftTerm.
 - Keep Codex usage on the official `codex app-server` protocol.
-- Store only `rate_limits` from Claude Code's official status-line payload.
+- Keep Claude usage on the official local Claude Code `/usage` command and its
+  documented status-line `rate_limits` payload. Automatic probes must use safe
+  mode with tools disabled, bounded time and output, an isolated `0700` working
+  directory, and an exact per-probe session ID. Cancel them when Claude is
+  deselected, Status Line Only is selected, or the display/session is inactive;
+  remove only the matching probe transcript afterward. Never auto-accept a
+  workspace trust prompt.
 - Do not add browser-cookie, browser-keychain, Full Disk Access, Screen
   Recording, or private usage-endpoint providers.
 - Preserve macOS 13 support and avoid new dependencies when the platform or

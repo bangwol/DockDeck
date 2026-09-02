@@ -21,6 +21,27 @@ enum UsageDisplayMode: String, CaseIterable {
     }
 }
 
+enum ClaudeUsageRefreshMode: String, CaseIterable {
+    case automatic
+    case statusLineOnly
+
+    var title: String {
+        switch self {
+        case .automatic: "Automatic /usage"
+        case .statusLineOnly: "Status line only"
+        }
+    }
+
+    var subtitle: String {
+        switch self {
+        case .automatic:
+            "Refresh at launch, on demand, after wake, and every 10–20 minutes."
+        case .statusLineOnly:
+            "Never launch Claude in the background; update after Claude responses."
+        }
+    }
+}
+
 enum UsageTextColor: String, CaseIterable {
     case theme
     case white
@@ -307,6 +328,8 @@ enum PanelSettings {
     private static let usageTextColorKey = "DockDeck.settings.usageTextColor"
     private static let usageShowsPaceKey = "DockDeck.settings.usageShowsPace"
     private static let enabledUsageProvidersKey = "DockDeck.settings.enabledUsageProviders"
+    private static let claudeUsageRefreshModeKey =
+        "DockDeck.settings.claudeUsageRefreshMode"
     private static let systemStatsRefreshIntervalKey =
         "DockDeck.settings.systemStatsRefreshInterval"
     private static let systemStatsMetricsKey = "DockDeck.settings.systemStatsMetrics"
@@ -430,6 +453,14 @@ enum PanelSettings {
             let resolved = providers.isEmpty ? UsageProviderID.allCases : providers
             UserDefaults.standard.set(resolved.map(\.rawValue), forKey: enabledUsageProvidersKey)
         }
+    }
+
+    static var claudeUsageRefreshMode: ClaudeUsageRefreshMode {
+        get {
+            UserDefaults.standard.string(forKey: claudeUsageRefreshModeKey)
+                .flatMap(ClaudeUsageRefreshMode.init(rawValue:)) ?? .automatic
+        }
+        set { UserDefaults.standard.set(newValue.rawValue, forKey: claudeUsageRefreshModeKey) }
     }
 
     static var panelOrder: PanelOrder {
@@ -869,6 +900,7 @@ enum PanelSettings {
         defaults.removeObject(forKey: usageTextColorKey)
         defaults.removeObject(forKey: usageShowsPaceKey)
         defaults.removeObject(forKey: enabledUsageProvidersKey)
+        defaults.removeObject(forKey: claudeUsageRefreshModeKey)
         defaults.removeObject(forKey: systemStatsRefreshIntervalKey)
         defaults.removeObject(forKey: systemStatsMetricsKey)
         defaults.removeObject(forKey: activeReadOnlyModuleKey)

@@ -66,7 +66,8 @@ enum CodexRateLimitParser {
         return UsageProviderSnapshot(
             windows: windows,
             freshness: .live,
-            detail: detail.isEmpty ? nil : detail)
+            detail: detail.isEmpty ? nil : detail,
+            observedAt: Date())
     }
 
     private static func makeUsageWindow(_ window: Window) -> UsageWindow? {

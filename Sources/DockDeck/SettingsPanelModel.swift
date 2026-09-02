@@ -153,6 +153,7 @@ struct TerminalSettingsState: Equatable {
 
 struct UsageSettingsState: Equatable {
     var enabledProviders: [UsageProviderID]
+    var claudeRefreshMode: ClaudeUsageRefreshMode
     var fontName: String
     var fontSize: CGFloat
     var displayMode: UsageDisplayMode
@@ -235,6 +236,7 @@ enum TerminalSettingsChange {
 
 enum UsageSettingsChange {
     case providers([UsageProviderID])
+    case claudeRefreshMode(ClaudeUsageRefreshMode)
     case displayMode(UsageDisplayMode)
     case font(String)
     case fontSize(CGFloat)
@@ -537,6 +539,11 @@ final class SettingsPanelModel: ObservableObject {
         providers = UsageProviderID.allCases.filter(Set(providers).contains)
         updateValues { $0.usage.enabledProviders = providers }
         onChange?(.usage(.providers(providers)))
+    }
+
+    func setClaudeUsageRefreshMode(_ value: ClaudeUsageRefreshMode) {
+        updateValues { $0.usage.claudeRefreshMode = value }
+        onChange?(.usage(.claudeRefreshMode(value)))
     }
 
     func setUsageFontSize(_ value: CGFloat) {

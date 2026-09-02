@@ -3,6 +3,9 @@ import Cocoa
 extension AppDelegate {
     @objc func showPanelMenu(_ sender: Any?) {
         guard let button = sender as? NSButton else { return }
+        if PanelSettings.deckConfiguration.enabled.contains(.usage) {
+            usageStore.refreshClaudeUsageIfDue()
+        }
 
         let menu = NSMenu()
 

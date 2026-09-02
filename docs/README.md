@@ -19,7 +19,7 @@ front page harder to scan.
 
 ## Integrations
 
-- [Claude Code bridge](integrations/claude-code.md)
+- [Claude Code monitoring and optional bridge](integrations/claude-code.md)
 
 Short modules remain together in the catalog. Move a module into its own guide
 when it needs substantial setup, privacy, data-source, or troubleshooting

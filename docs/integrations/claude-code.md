@@ -1,10 +1,14 @@
-# Configure Claude Code
+# Configure Claude Code monitoring
 
-Claude quota data reaches DockDeck through Claude Code's supported `statusLine`
-JSON input. See Anthropic's
-[Claude Code installation guide](https://code.claude.com/docs/en/installation),
-[status-line reference](https://code.claude.com/docs/en/statusline), and
-[settings reference](https://code.claude.com/docs/en/settings).
+DockDeck can read Claude account limits in two modes. **Automatic `/usage`** is
+the default and needs only a signed-in Claude Code installation. **Status line
+only** preserves the original bridge-only behavior and never launches Claude in
+the background.
+
+Anthropic documents `/usage` as a built-in command for viewing plan limits and
+reset times. See the official [command reference](https://code.claude.com/docs/en/commands),
+[cost and usage guide](https://code.claude.com/docs/en/costs), and
+[status-line reference](https://code.claude.com/docs/en/statusline).
 
 ## 1. Install or update Claude Code
 
@@ -26,27 +30,71 @@ Native installations can update themselves:
 claude update
 ```
 
-Update to the current Claude Code release, then start it once and complete
-sign-in:
+Confirm the version, then start Claude Code once and complete sign-in:
 
 ```bash
 claude --version
 claude
 ```
 
-Anthropic documents status-line `rate_limits` as requiring Claude Code
-`2.1.251` or later. DockDeck follows the documented `five_hour` and `seven_day`
-fields and recommends the current Claude Code release because the schema and
-account availability can change.
+Use a current release. Command output and account-specific windows can change,
+and each 5-hour, weekly, or Fable window can be absent independently.
 
-The object is available to supported Claude.ai Pro and Max accounts only after
-the first API response in a session. Each window can be absent independently or
-disappear after its reset time.
+## 2. Choose a refresh mode
 
-## 2. Locate the DockDeck bridge
+Open **DockDeck Settings → Usage → Claude Refresh**.
 
-After running `./scripts/install.sh` from the repository root, the bridge is
-inside the installed app bundle:
+### Automatic `/usage`
+
+DockDeck briefly runs the installed official CLI:
+
+- when the Usage module starts;
+- after `⌘R`;
+- when a Deck menu opens, unless the previous probe began less than one minute
+  ago;
+- once after the display or macOS login session wakes; and
+- every 10–20 minutes, with a new randomized delay after each completion.
+
+The probe pauses while the display sleeps or the login session is locked. It is
+cancelled immediately if Claude is disabled or **Status line only** is selected.
+
+DockDeck first passes `/usage` directly to Claude Code. If that version requires
+interactive rendering, it falls back to a hidden pseudo-terminal backed by the
+same SwiftTerm library as DockDeck's visible terminal. It never opens
+Terminal.app, keeps no idle Claude process, and exits after parsing the screen.
+The separate Fable allowance appears as `FBL` when Claude returns it.
+
+The probe uses Claude safe mode, exposes no tools, runs in a private app-owned
+directory, caps output and runtime, and does not accept workspace trust prompts.
+It strips `ANTHROPIC_*` and `CLAUDE_CODE_OAUTH_TOKEN*` overrides from the child
+environment. Claude Code still uses its own existing local sign-in and may
+contact Anthropic to render `/usage`; DockDeck never reads that credential or
+calls a private account endpoint itself.
+
+The hidden-PTY fallback is not unique to DockDeck. Community implementations
+such as [claude-code-usage-overlay](https://github.com/MattPears1/claude-code-usage-overlay)
+and [Agents Deck](https://github.com/vulonviing/agents-deck) use the same general
+Claude `/usage` capture pattern.
+
+### Status line only
+
+This mode never starts a background Claude process. DockDeck rereads only its
+local cache. The cache changes after a normal assistant response in a configured
+local Claude Code session. Usage from Claude Desktop, claude.ai, another Mac, or
+an idle local session is not reflected until another local response supplies a
+new status-line payload.
+
+The documented status-line payload contains 5-hour and 7-day `rate_limits`.
+Fable is shown only if Claude later adds a recognized Fable field to that
+payload; DockDeck never estimates it.
+
+## 3. Optionally configure the status-line bridge
+
+The bridge is optional in Automatic mode and required in Status Line Only mode.
+It adds immediate 5-hour and 7-day updates after local Claude responses.
+
+After running `./scripts/install.sh` from the repository root, locate the
+installed bridge:
 
 ```bash
 BRIDGE_PATH="$HOME/Applications/DockDeck.app/Contents/Resources/bin/dockdeck-claude-bridge"
@@ -54,10 +102,7 @@ test -x "$BRIDGE_PATH" && printf '%s\n' "$BRIDGE_PATH"
 ```
 
 For a system-wide copy, use
-`/Applications/DockDeck.app/Contents/Resources/bin/dockdeck-claude-bridge`
-instead.
-
-## 3. Add the status line
+`/Applications/DockDeck.app/Contents/Resources/bin/dockdeck-claude-bridge`.
 
 DockDeck never edits `~/.claude/settings.json` automatically. Preserve its
 existing keys and check for an existing `statusLine` before adding this entry:
@@ -71,8 +116,9 @@ existing keys and check for an existing `statusLine` before adding this entry:
 }
 ```
 
-Use the absolute path printed in step 2. `~` and shell variables are avoided
-inside the JSON command so paths containing spaces remain unambiguous.
+Replace `your-name` with the macOS account folder name. Use the absolute path
+printed above; `~` and shell variables are avoided inside the JSON command so
+paths containing spaces remain unambiguous.
 
 To preserve an existing executable status-line script, pass the same JSON input
 through it:
@@ -97,83 +143,78 @@ For an existing inline shell command, use `--passthrough-shell`:
 }
 ```
 
-## 4. Verify the bridge
+Claude Code runs the status-line command locally after relevant session events;
+the status-line command itself does not consume API tokens. A periodic
+`refreshInterval` only replays the last session payload, so adding one solely
+for DockDeck does not fetch fresher account data.
 
-Start a new `claude` session and send one normal request. Opening `/status` or
-`/usage` alone does not update the bridge. The Usage panel updates within
-60 seconds, or immediately after `⌘R` rereads the cache.
+## 4. Verify each mode
 
-Verify that the privacy-filtered cache exists:
+For Automatic `/usage`:
 
-```bash
-test -f "$HOME/Library/Application Support/DockDeck/claude-rate-limits.json" \
-  && echo "Claude bridge ready"
+1. Enable Claude under **Settings → Usage** and select **Automatic `/usage`**.
+2. Press `⌘R` in DockDeck.
+3. Hover the Claude mark. Its source detail should begin with `Claude /usage`.
+4. If the account exposes Fable, confirm an `FBL` meter appears.
+
+For Status Line Only:
+
+1. Send one normal request in a new or existing local Claude Code session.
+   Opening `/status` or `/usage` alone does not create a new status-line quota
+   payload.
+2. Confirm the privacy-filtered cache exists:
+
+   ```bash
+   test -f "$HOME/Library/Application Support/DockDeck/claude-rate-limits.json" \
+     && echo "Claude bridge ready"
+   ```
+
+3. Press `⌘R` in DockDeck. Hover detail should begin with `Status line`.
+
+When both sources are enabled, DockDeck uses the newer observation for matching
+5-hour and 7-day windows while retaining an `/usage`-only Fable window.
+
+## 5. Local files and cleanup
+
+The bridge cache contains only `rate_limits` and an observation timestamp:
+
+```text
+~/Library/Application Support/DockDeck/claude-rate-limits.json
 ```
 
-If the cache is missing, confirm the Claude Code version and run `/status`
-inside Claude Code to verify that user settings were loaded.
+Automatic probes use:
 
-Do not add `refreshInterval` solely for DockDeck. Timed status-line callbacks
-replay the last session payload without fetching account usage and do not
-improve its freshness. DockDeck already watches the cache on its own timer. The
-bridge derives freshness from the local transcript modification time but never
-stores the transcript path or contents.
+```text
+~/Library/Application Support/DockDeck/ClaudeProbe
+```
 
-## 5. Understand day-to-day updates
-
-DockDeck does not keep a hidden Claude process running and does not poll
-Anthropic account endpoints. Claude Code invokes the bridge locally and supplies
-the supported quota fields as part of its status-line JSON.
-
-| Claude Code activity | DockDeck behavior |
-| --- | --- |
-| Start or resume a session | The status line runs, but a new session may not contain `rate_limits` until its first API response. |
-| Receive a normal assistant response | Claude Code runs the status line with its latest supported 5-hour and 7-day fields. The bridge updates the local cache automatically. |
-| Run `/usage` | Claude Code shows its interactive plan-usage view. Those screen values, including the separate Fable meter, are not copied into the documented status-line payload. |
-| Run `/status`, change permission or Vim mode, or finish `/compact` | The status line may run again, but this is not a new account-usage request and can repeat the previous quota values. |
-| Leave Claude Code idle or close it | No new payload arrives. DockDeck keeps the last cache and marks it stale after ten minutes. Keeping an unused session open does not improve freshness. |
-| Use Claude Desktop, claude.ai, or another machine | Shared account usage can change without a local status-line event. DockDeck catches up after the next normal response in local Claude Code. |
-| Press `⌘R` in DockDeck | DockDeck rereads the cache immediately. It does not start Claude Code or contact Anthropic. |
-
-You do not need to type `/usage` or leave a terminal session open solely as a
-monitor. Use Claude Code normally; each real local response updates the bridge.
-If most Claude usage happens in Desktop, a browser, or another machine, use that
-surface's usage view when exact current account usage is required.
-
-DockDeck intentionally does not use OAuth tokens, browser sessions, or
-undocumented account APIs to fill that gap.
-
-Fable remains a known limitation. The interactive `/usage` screen can show a
-Fable-specific weekly allowance, but the documented status-line schema currently
-exposes only `five_hour`, `seven_day`, and gateway `spend_limit` windows.
-DockDeck therefore does not estimate or scrape Fable usage.
+Both directories use `0700` permissions; the bridge cache uses `0600`.
+Automatic mode creates a unique Claude session ID and removes only that exact
+probe transcript from Claude Code's local session directory after exit. Captured
+output is limited to 256 KiB, kept in memory, and never logged or saved by
+DockDeck.
 
 ## 6. Troubleshoot Claude data
 
-1. Run `claude --version` and update if it is older than `2.1.251`.
-2. Confirm `~/.claude/settings.json` still contains the DockDeck bridge under
-   `statusLine.command`. A global `disableAllHooks: true` setting also disables
-   the status line.
-3. Confirm the installed bridge is executable:
+1. Run `claude --version` and update to the current release.
+2. Run `claude`, then `/usage`, to confirm the signed-in account itself returns
+   plan limits.
+3. In Automatic mode, press `⌘R`, wait up to 20 seconds, and hover the Claude
+   mark. `SIGN IN` means the local CLI needs authentication. `OFFLINE` indicates
+   a command, timeout, or parsing failure.
+4. If only Automatic mode fails, select **Status line only** and configure the
+   bridge as a fallback. DockDeck does not bypass a Claude workspace trust
+   screen.
+5. For bridge failures, confirm `~/.claude/settings.json` still contains the
+   bridge under `statusLine.command`. A global `disableAllHooks: true` also
+   disables the status line.
+6. Confirm the installed bridge is executable:
 
    ```bash
    test -x "$HOME/Applications/DockDeck.app/Contents/Resources/bin/dockdeck-claude-bridge" \
      && echo "DockDeck bridge ready"
    ```
 
-4. Start or resume Claude Code and send one normal request. `/usage` or
-   `/status` alone is not a bridge refresh test.
-5. Confirm the privacy-filtered cache exists, then press `⌘R` in DockDeck:
-
-   ```bash
-   test -f "$HOME/Library/Application Support/DockDeck/claude-rate-limits.json" \
-     && echo "Claude cache ready"
-   ```
-
-6. If the status line itself is missing, run Claude Code with `claude --debug`
-   and inspect the first status-line invocation error. A muted mark means the
-   cache is merely old; a muted mark with a diagonal slash means setup, sign-in,
-   or connectivity needs attention.
-
-See [Usage](../modules/usage.md) for meter layout, provider states, and cache
-privacy details.
+A muted mark means cached data is old. A muted mark with a diagonal slash means
+setup, sign-in, or connectivity needs attention. See [Usage](../modules/usage.md)
+for meter layout and provider-state details.

@@ -23,7 +23,7 @@ DockDeck uses the space beside a bottom-aligned Dock for up to two compact modul
 ## Features
 
 - Persistent [SwiftTerm](https://github.com/migueldeicaza/SwiftTerm) login shell with a compact `% ` prompt that does not change user shell files.
-- Remaining or used Codex and Claude capacity, reset times, and an optional even-use pace marker from their supported local interfaces; either provider can be selected independently, with no browser cookies or private web endpoints.
+- Remaining or used Codex and Claude capacity, reset times, and an optional even-use pace marker from their supported local CLIs. Claude can refresh automatically or use only its optional status-line bridge; neither mode reads browser cookies or private web endpoints.
 - Two to four selectable local CPU, memory, disk, network-I/O, and temperature tiles with a configurable 1–10 second sampling interval.
 - HTTPS service availability and latency checks for up to four user-configured endpoints.
 - Current temperature, daily high and low, and conditions for a user-selected city.
@@ -81,14 +81,14 @@ Settings are organized into **General**, **Modules**, and **Interface** sections
 - [Project Pulse](docs/modules/project-pulse.md)
 - [Service Monitor, Weather, World Clock, Battery, Network, and Focus Timer](docs/modules/catalog.md)
 - [Local notifications](docs/notifications.md)
-- [Claude Code bridge setup and troubleshooting](docs/integrations/claude-code.md)
+- [Claude Code monitoring modes, bridge setup, and troubleshooting](docs/integrations/claude-code.md)
 
 ## Requirements
 
 - macOS 13 or later
 - Accessibility permission for Dock geometry tracking
 - [Codex CLI](https://github.com/openai/codex) signed in locally for Codex usage data
-- Claude Code `2.1.251` or later with the optional bridge configured for Claude usage data
+- A current [Claude Code](https://code.claude.com/docs/en/installation) release signed in locally for Claude usage data; the status-line bridge is optional
 - Swift 5.9 or later when building from source
 
 Without Accessibility permission, DockDeck remains usable in fixed fallback positions. Only a bottom-aligned Dock is tracked precisely; side-aligned Docks use the fallback layout.
@@ -161,7 +161,7 @@ DockDeck does not read browser cookies, browser credential stores, or private we
 | Provider | Source | Local behavior |
 | --- | --- | --- |
 | Codex | `codex app-server` using `account/rateLimits/read` | Runs the locally installed official Codex CLI as a long-lived subprocess |
-| Claude | Claude Code status-line JSON | Stores only `rate_limits` and an observation timestamp in a local cache |
+| Claude | Official Claude Code `/usage`; optional status-line JSON | In Automatic mode, briefly launches the signed-in local CLI in safe mode, captures bounded usage text in memory, then exits. Status Line Only stores only `rate_limits` and an observation timestamp in a local cache. DockDeck never reads Claude OAuth credentials. |
 | System Stats | macOS host, file-system, routing, and `ProcessInfo` APIs; optional validated local Stats SMC tool | Samples only selected CPU, memory, disk, network-counter, and temperature values locally; makes no network request |
 | Service Monitor | User-configured HTTPS or local HTTP URLs | Sends cookie-free `HEAD` requests; rejects common URL credential fields before local storage |
 | Weather | Open-Meteo forecast and geocoding APIs | Sends submitted searches and selected coordinates over HTTPS only while used; stores the selected city locally |
@@ -174,7 +174,7 @@ DockDeck does not read browser cookies, browser credential stores, or private we
 | Notifications | macOS UserNotifications | Evaluates enabled rules locally and sends no notification data to an external service |
 
 Storage locations and permission details are documented in the
-[Usage](docs/modules/usage.md#local-cache) and
+[Usage](docs/modules/usage.md#local-files-and-process-boundaries) and
 [Terminal](docs/modules/terminal.md#settings-and-local-files) guides.
 
 ## Security
