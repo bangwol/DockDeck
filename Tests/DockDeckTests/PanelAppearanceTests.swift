@@ -338,6 +338,32 @@ final class PanelAppearanceTests: XCTestCase {
         XCTAssertNil(DeckScrollDirection.resolved(deltaX: 0, deltaY: 0))
     }
 
+    func testTerminalScrollUsesDeckOnlyWhileDocked() {
+        XCTAssertEqual(TerminalScrollRoute.resolved(for: .docked), .deck)
+        XCTAssertEqual(TerminalScrollRoute.resolved(for: .focused), .terminal)
+        XCTAssertEqual(TerminalScrollRoute.resolved(for: .large), .terminal)
+    }
+
+    func testFocusedTerminalResizeUsesEightPointHitArea() {
+        let bounds = NSRect(x: 0, y: 0, width: 400, height: 200)
+
+        XCTAssertEqual(
+            WindowResizeGeometry.edges(at: NSPoint(x: 7, y: 100), in: bounds), .left)
+        XCTAssertEqual(
+            WindowResizeGeometry.edges(at: NSPoint(x: 399, y: 199), in: bounds),
+            [.right, .top])
+        XCTAssertTrue(
+            WindowResizeGeometry.edges(at: NSPoint(x: 9, y: 100), in: bounds).isEmpty)
+
+        let frame = WindowResizeGeometry.frame(
+            from: NSRect(x: 100, y: 100, width: 400, height: 200),
+            mouseDelta: NSPoint(x: -40, y: 30),
+            edges: [.left, .top],
+            minSize: NSSize(width: 300, height: 150),
+            maxSize: NSSize(width: 800, height: 600))
+        XCTAssertEqual(frame, NSRect(x: 60, y: 100, width: 440, height: 230))
+    }
+
     func testDeckSelectionsAreIndependentBySide() {
         let previousConfiguration = PanelSettings.deckConfiguration
         let previousLeft = PanelSettings.activeModule(on: .left)

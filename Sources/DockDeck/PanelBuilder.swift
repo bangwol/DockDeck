@@ -43,7 +43,7 @@ enum PanelBuilder {
         terminal.layer?.backgroundColor = NSColor.clear.cgColor
         terminal.installColors(theme.ansiPalette)
         terminal.toolTip =
-            "Click to expand · click elsewhere to return · ⌘E large terminal · ⌘T theme"
+            "Scroll to switch modules · click to expand · ⌘E large terminal · ⌘T theme"
 
         surfaceView.contentContainer.addSubview(terminal)
 

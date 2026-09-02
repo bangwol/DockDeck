@@ -9,6 +9,18 @@ enum TerminalPanelMode {
     case large
 }
 
+enum TerminalScrollRoute: Equatable {
+    case deck
+    case terminal
+
+    static func resolved(for mode: TerminalPanelMode) -> Self {
+        switch mode {
+        case .docked: .deck
+        case .focused, .large: .terminal
+        }
+    }
+}
+
 final class AppDelegate: NSObject, NSApplicationDelegate {
     static let accessibilityWarmupDelay: TimeInterval = 3
 
@@ -43,6 +55,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     var trackingTimer: Timer!
     var terminalLocalMouseMonitor: Any?
     var terminalGlobalMouseMonitor: Any?
+    var terminalScrollMonitor: Any?
+    var lastTerminalDeckScrollSelectionTime: TimeInterval = 0
     var currentTheme = Theme.theme(
         id: UserDefaults.standard.string(forKey: AppPreferences.themeIDKey) ?? "")
     var themePickerPanel: KeyablePanel?
@@ -116,6 +130,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             menuAction: #selector(showPanelMenu(_:)),
             onShellEvent: { [weak self] message in
                 self?.debugLog("shell", message)
+            },
+            onResizeEnd: { [weak self] in
+                self?.terminalResizeDidEnd()
             })
         usageStore.setEnabledProviders(PanelSettings.enabledUsageProviders)
         leftReadOnlyDeckPanelController = ReadOnlyDeckPanelController(
@@ -184,6 +201,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 self?.collapseTerminalAfterFocus()
             }
         }
+        terminalScrollMonitor = NSEvent.addLocalMonitorForEvents(matching: .scrollWheel) {
+            [weak self] event in
+            guard let self, event.window === self.panel else { return event }
+            return self.handleTerminalScrollWheel(event) ? nil : event
+        }
 
         startTrackingTimer()
 
@@ -217,6 +239,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSWorkspace.shared.notificationCenter.removeObserver(self)
         if let terminalLocalMouseMonitor { NSEvent.removeMonitor(terminalLocalMouseMonitor) }
         if let terminalGlobalMouseMonitor { NSEvent.removeMonitor(terminalGlobalMouseMonitor) }
+        if let terminalScrollMonitor { NSEvent.removeMonitor(terminalScrollMonitor) }
         trackingTimer?.invalidate()
         moduleRuntimeCoordinator.stopAll()
     }

@@ -51,6 +51,37 @@ extension AppDelegate {
         deckSelectionDidChange(on: side)
     }
 
+    func handleTerminalScrollWheel(_ event: NSEvent) -> Bool {
+        guard TerminalScrollRoute.resolved(for: terminalPanelMode) == .deck,
+            let side = PanelSettings.deckConfiguration.side(containing: .terminal)
+        else { return false }
+        let enabledModules = PanelSettings.enabledModules(on: side)
+        guard enabledModules.count > 1,
+            let direction = DeckScrollDirection.resolved(
+                deltaX: event.scrollingDeltaX,
+                deltaY: event.scrollingDeltaY)
+        else { return false }
+
+        if !event.momentumPhase.isEmpty { return true }
+        let now = ProcessInfo.processInfo.systemUptime
+        guard now - lastTerminalDeckScrollSelectionTime >= 0.35 else { return true }
+        lastTerminalDeckScrollSelectionTime = now
+
+        let module: PanelModuleID?
+        switch direction {
+        case .previous:
+            module = ReadOnlyDeckSelection.previous(
+                before: .terminal, enabledModules: enabledModules)
+        case .next:
+            module = ReadOnlyDeckSelection.next(
+                after: .terminal, enabledModules: enabledModules)
+        }
+        guard let module else { return false }
+        PanelSettings.setActiveModule(module, on: side)
+        deckSelectionDidChange(on: side)
+        return true
+    }
+
     @objc func toggleUsageDisplayMode(_ sender: Any?) {
         PanelSettings.usageDisplayMode =
             PanelSettings.usageDisplayMode == .remaining ? .used : .remaining
