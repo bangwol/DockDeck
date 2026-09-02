@@ -56,10 +56,19 @@ final class TerminalPanelController: NSObject, LocalProcessTerminalViewDelegate 
         self.onShellEvent = onShellEvent
         super.init()
         terminalView.processDelegate = self
+        applyAppearance(theme, presentation: .compact)
     }
 
     func applyAppearance(_ theme: Theme, presentation: PanelPresentation) {
         surfaceView.apply(theme: theme, presentation: presentation)
+        // ponytail: SwiftTerm's standalone overlay scroller keeps its knob visible even with no
+        // scrollback, which reads as a stray bar under the menu button at the three-row compact
+        // size. Hide it there; switch to a SwiftTerm scroller-visibility API once one exists.
+        terminalScroller?.isHidden = presentation == .compact
+    }
+
+    private var terminalScroller: NSScroller? {
+        terminalView.subviews.lazy.compactMap { $0 as? NSScroller }.first
     }
 
     func applyCornerRadius() {

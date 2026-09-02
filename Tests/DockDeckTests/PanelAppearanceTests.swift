@@ -538,6 +538,23 @@ final class PanelAppearanceTests: XCTestCase {
             ])
     }
 
+    func testCompactTerminalHidesIdleScrollerUntilExpanded() throws {
+        let theme = Theme.theme(id: "")
+        let controller = TerminalPanelController(
+            initialFrame: NSRect(x: 0, y: 0, width: 214, height: 59),
+            theme: theme, menuTarget: NSObject(),
+            menuAction: #selector(NSObject.isEqual(_:)))
+        let scroller = try XCTUnwrap(controller.terminalView.subviews.first { $0 is NSScroller })
+
+        XCTAssertTrue(scroller.isHidden)
+
+        controller.applyAppearance(theme, presentation: .readable)
+        XCTAssertFalse(scroller.isHidden)
+
+        controller.applyAppearance(theme, presentation: .compact)
+        XCTAssertTrue(scroller.isHidden)
+    }
+
     func testReadOnlyDeckRebuildsOnlyWhenActiveModuleChanges() {
         let previousConfiguration = PanelSettings.deckConfiguration
         let previousRight = PanelSettings.activeModule(on: .right)
