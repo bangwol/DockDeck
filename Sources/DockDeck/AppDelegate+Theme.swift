@@ -31,7 +31,9 @@ extension AppDelegate {
             return
         }
 
-        guard panel.isVisible else { return }
+        let anchor: NSWindow? =
+            panel.isVisible ? panel : readOnlyDeckPanels.first(where: \.isVisible)
+        guard let anchor else { return }
 
         let picker = ThemePickerView(themes: Theme.all, selectedID: currentTheme.id)
         picker.onCommit = { [weak self] theme in
@@ -41,8 +43,8 @@ extension AppDelegate {
         picker.onCancel = { [weak self] in self?.toggleThemePicker(nil) }
 
         let origin = NSPoint(
-            x: panel.frame.maxX - picker.frame.width - 10,
-            y: panel.frame.minY)
+            x: anchor.frame.maxX - picker.frame.width - 10,
+            y: anchor.frame.minY)
         let pickerPanel = KeyablePanel(
             contentRect: NSRect(origin: origin, size: picker.frame.size),
             styleMask: [.borderless, .nonactivatingPanel],
