@@ -114,6 +114,7 @@ struct WeatherPanelView: View {
             + "\(WeatherCondition.title(code: snapshot.weatherCode)), "
             + "\(Int(snapshot.temperature.rounded())) degrees "
             + snapshot.temperatureUnit.title
+            + ", feels like \(Int(snapshot.apparentTemperature.rounded()))"
         if case .failed(let reason) = store.status { summary += ". Last refresh failed: \(reason)" }
         return summary
     }
