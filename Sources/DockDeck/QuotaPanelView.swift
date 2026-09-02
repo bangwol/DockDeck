@@ -34,6 +34,46 @@ enum UsageResetPlacement: Equatable {
     }
 }
 
+struct UsagePace: Equatable {
+    let expectedUsedPercent: Double
+    let differenceFromEvenPace: Double
+
+    func markerValue(for displayMode: UsageDisplayMode) -> Double {
+        switch displayMode {
+        case .used: expectedUsedPercent
+        case .remaining: 100 - expectedUsedPercent
+        }
+    }
+
+    var helpText: String {
+        let expected = Int(expectedUsedPercent.rounded())
+        let difference = Int(abs(differenceFromEvenPace).rounded())
+        if difference <= 4 {
+            return "Even-use guide: \(expected)% used expected now; usage is near pace"
+        }
+        let relation = differenceFromEvenPace > 0 ? "above" : "below"
+        return "Even-use guide: \(expected)% used expected now; usage is "
+            + "\(difference) points \(relation) pace"
+    }
+
+    static func calculate(for window: UsageWindow, now: Date = Date()) -> Self? {
+        guard window.durationMinutes > 0, window.usedPercent.isFinite,
+            let resetsAt = window.resetsAt
+        else { return nil }
+        let duration = TimeInterval(window.durationMinutes) * 60
+        guard duration.isFinite, duration > 0,
+            resetsAt.timeIntervalSinceReferenceDate.isFinite
+        else { return nil }
+        let startsAt = resetsAt.addingTimeInterval(-duration)
+        guard now >= startsAt, now < resetsAt else { return nil }
+        let elapsed = min(max(now.timeIntervalSince(startsAt) / duration, 0), 1)
+        let expected = elapsed * 100
+        return Self(
+            expectedUsedPercent: expected,
+            differenceFromEvenPace: window.usedPercent - expected)
+    }
+}
+
 enum UsageProviderMarkAsset {
     static func resourceName(for providerID: UsageProviderID, dark: Bool) -> String {
         switch providerID {
@@ -88,13 +128,15 @@ struct UsagePanelConfiguration: Equatable {
     let fontName: String
     let fontSize: CGFloat
     let textColor: UsageTextColor
+    let showsPace: Bool
 
     static var current: UsagePanelConfiguration {
         UsagePanelConfiguration(
             displayMode: PanelSettings.usageDisplayMode,
             fontName: PanelSettings.usageFontName ?? TerminalTheme.defaultFontName,
             fontSize: PanelSettings.usageFontSize,
-            textColor: PanelSettings.usageTextColor)
+            textColor: PanelSettings.usageTextColor,
+            showsPace: PanelSettings.usageShowsPace)
     }
 
     func font(size: CGFloat? = nil, weight: Font.Weight) -> Font {
@@ -165,6 +207,7 @@ private struct QuotaRow: View {
             } else {
                 HStack(spacing: spacing) {
                     ForEach(windows) { window in
+                        let pace = usagePace(for: window)
                         UsageMeter(
                             window: window,
                             configuration: configuration,
@@ -172,7 +215,8 @@ private struct QuotaRow: View {
                             meterColor: meterColor(for: window),
                             dense: windows.count > 2,
                             resetPlacement: resetPlacement,
-                            columnSpacing: spacing)
+                            columnSpacing: spacing,
+                            pace: pace)
                         .frame(maxWidth: .infinity)
                     }
                 }
@@ -193,8 +237,9 @@ private struct QuotaRow: View {
         }
         let description = configuration.displayMode.accessibilityDescription
         let windows = provider.windows.map {
-            "\($0.label) \(Int(configuration.displayMode.value(for: $0).rounded())) percent "
-                + "\(description), \(UsageResetFormatter.helpText(for: $0))"
+            let pace = usagePace(for: $0).map { ", \($0.helpText)" } ?? ""
+            return "\($0.label) \(Int(configuration.displayMode.value(for: $0).rounded())) "
+                + "percent \(description), \(UsageResetFormatter.helpText(for: $0))\(pace)"
         }.joined(separator: ", ")
         return "\(provider.name)\(status), \(windows)"
     }
@@ -219,6 +264,11 @@ private struct QuotaRow: View {
         if remaining < 20 { return .red }
         if remaining <= 50 { return .orange }
         return baseColor
+    }
+
+    private func usagePace(for window: UsageWindow) -> UsagePace? {
+        guard configuration.showsPace, provider.freshness == .live else { return nil }
+        return UsagePace.calculate(for: window)
     }
 }
 
@@ -290,6 +340,7 @@ private struct UsageMeter: View {
     let dense: Bool
     let resetPlacement: UsageResetPlacement
     let columnSpacing: CGFloat
+    let pace: UsagePace?
 
     var body: some View {
         VStack(spacing: resetPlacement == .splitHeader ? 2 : 1) {
@@ -300,7 +351,8 @@ private struct UsageMeter: View {
                         configuration: configuration,
                         baseColor: baseColor,
                         meterColor: meterColor,
-                        dense: dense)
+                        dense: dense,
+                        pace: pace)
                         .frame(maxWidth: .infinity, alignment: .center)
                     ResetLabel(
                         window: window,
@@ -316,10 +368,12 @@ private struct UsageMeter: View {
                     configuration: configuration,
                     baseColor: baseColor,
                     meterColor: meterColor,
-                    dense: dense)
+                    dense: dense,
+                    pace: pace)
             }
             MeterBar(
                 value: configuration.displayMode.value(for: window),
+                paceValue: pace?.markerValue(for: configuration.displayMode),
                 baseColor: baseColor,
                 meterColor: meterColor)
             if resetPlacement == .below {
@@ -340,6 +394,7 @@ private struct MeterLabel: View {
     let baseColor: Color
     let meterColor: Color
     let dense: Bool
+    let pace: UsagePace?
 
     var body: some View {
         let value = Int(configuration.displayMode.value(for: window).rounded())
@@ -353,7 +408,8 @@ private struct MeterLabel: View {
             .minimumScaleFactor(0.68)
             .help(
                 "\(value)% \(configuration.displayMode.title.lowercased()) · "
-                    + UsageResetFormatter.helpText(for: window))
+                    + UsageResetFormatter.helpText(for: window)
+                    + (pace.map { " · \($0.helpText)" } ?? ""))
     }
 }
 
@@ -390,6 +446,7 @@ private struct ResetLabel: View {
 
 private struct MeterBar: View {
     let value: Double
+    let paceValue: Double?
     let baseColor: Color
     let meterColor: Color
 
@@ -400,6 +457,16 @@ private struct MeterBar: View {
                 Capsule()
                     .fill(meterColor)
                     .frame(width: proxy.size.width * min(max(value / 100, 0), 1))
+                if let paceValue {
+                    Capsule()
+                        .fill(Color(nsColor: .labelColor).opacity(0.9))
+                        .frame(width: 1, height: 4)
+                        .offset(
+                            x: min(
+                                max(proxy.size.width * paceValue / 100 - 0.5, 0),
+                                max(proxy.size.width - 1, 0)))
+                        .accessibilityHidden(true)
+                }
             }
         }
         .frame(height: 2.5)

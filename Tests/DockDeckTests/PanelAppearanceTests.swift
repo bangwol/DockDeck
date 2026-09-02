@@ -669,7 +669,7 @@ final class PanelAppearanceTests: XCTestCase {
             usage: UsageSettingsState(
                 enabledProviders: UsageProviderID.allCases,
                 fontName: "Menlo", fontSize: 10,
-                displayMode: .remaining, textColor: .theme),
+                displayMode: .remaining, textColor: .theme, showsPace: true),
             systemStats: SystemStatsSettingsState(
                 refreshInterval: 2, metrics: SystemStatsMetric.defaultSelection),
             serviceMonitor: ServiceMonitorSettingsState(

@@ -78,6 +78,44 @@ final class UsageProviderTests: XCTestCase {
         XCTAssertEqual(UsageDisplayMode.used.value(for: window), 22)
     }
 
+    func testUsagePaceComparesUsageWithElapsedWindowTime() throws {
+        let now = Date(timeIntervalSince1970: 10_000)
+        let window = UsageWindow(
+            durationMinutes: 100,
+            usedPercent: 40,
+            resetsAt: now.addingTimeInterval(75 * 60))
+
+        let pace = try XCTUnwrap(UsagePace.calculate(for: window, now: now))
+
+        XCTAssertEqual(pace.expectedUsedPercent, 25, accuracy: 0.001)
+        XCTAssertEqual(pace.differenceFromEvenPace, 15, accuracy: 0.001)
+        XCTAssertEqual(pace.markerValue(for: .used), 25, accuracy: 0.001)
+        XCTAssertEqual(pace.markerValue(for: .remaining), 75, accuracy: 0.001)
+        XCTAssertTrue(pace.helpText.contains("15 points above pace"))
+    }
+
+    func testUsagePaceRequiresAnActiveKnownDurationWindow() {
+        let now = Date(timeIntervalSince1970: 10_000)
+
+        XCTAssertNil(
+            UsagePace.calculate(
+                for: UsageWindow(
+                    durationMinutes: 300, usedPercent: 10, resetsAt: nil),
+                now: now))
+        XCTAssertNil(
+            UsagePace.calculate(
+                for: UsageWindow(
+                    durationMinutes: 0, usedPercent: 10,
+                    resetsAt: now.addingTimeInterval(60), customLabel: "FBL"),
+                now: now))
+        XCTAssertNil(
+            UsagePace.calculate(
+                for: UsageWindow(
+                    durationMinutes: 300, usedPercent: 10,
+                    resetsAt: now.addingTimeInterval(-1)),
+                now: now))
+    }
+
     func testCodexLaunchEnvironmentIncludesExecutableDirectory() {
         let executable = URL(fileURLWithPath: "/opt/codex/bin/codex")
 

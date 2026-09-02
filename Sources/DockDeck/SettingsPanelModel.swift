@@ -131,6 +131,7 @@ struct UsageSettingsState: Equatable {
     var fontSize: CGFloat
     var displayMode: UsageDisplayMode
     var textColor: UsageTextColor
+    var showsPace: Bool
 }
 
 struct SystemStatsSettingsState: Equatable {
@@ -206,6 +207,7 @@ enum UsageSettingsChange {
     case font(String)
     case fontSize(CGFloat)
     case textColor(UsageTextColor)
+    case showsPace(Bool)
 }
 
 enum SystemStatsSettingsChange {
@@ -496,6 +498,11 @@ final class SettingsPanelModel: ObservableObject {
     func setUsageTextColor(_ value: UsageTextColor) {
         updateValues { $0.usage.textColor = value }
         onChange?(.usage(.textColor(value)))
+    }
+
+    func setUsageShowsPace(_ value: Bool) {
+        updateValues { $0.usage.showsPace = value }
+        onChange?(.usage(.showsPace(value)))
     }
 
     func setSystemStatsRefreshInterval(_ value: TimeInterval) {

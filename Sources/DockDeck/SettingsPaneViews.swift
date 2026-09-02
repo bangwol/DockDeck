@@ -76,7 +76,7 @@ struct NotificationSettingsView: View {
 
                 GroupBox {
                     VStack(spacing: 12) {
-                        NotificationRuleRow(
+                        SettingsSwitchRow(
                             title: "Usage limits",
                             subtitle: "Alert when a live quota window reaches the threshold.",
                             isOn: Binding(
@@ -108,7 +108,7 @@ struct NotificationSettingsView: View {
 
                 GroupBox {
                     VStack(spacing: 12) {
-                        NotificationRuleRow(
+                        SettingsSwitchRow(
                             title: "Service failures",
                             subtitle: "Alert once when a configured endpoint goes down.",
                             isOn: Binding(
@@ -117,7 +117,7 @@ struct NotificationSettingsView: View {
                                 },
                                 set: model.setServiceFailureAlertsEnabled))
                         Divider()
-                        NotificationRuleRow(
+                        SettingsSwitchRow(
                             title: "Service recoveries",
                             subtitle: "Alert when a failed endpoint responds again.",
                             isOn: Binding(
@@ -135,7 +135,7 @@ struct NotificationSettingsView: View {
 
                 GroupBox {
                     VStack(spacing: 12) {
-                        NotificationRuleRow(
+                        SettingsSwitchRow(
                             title: "Low battery",
                             subtitle: "Alert on battery power when charge reaches the threshold.",
                             isOn: Binding(
@@ -178,7 +178,7 @@ struct NotificationSettingsView: View {
     }
 }
 
-private struct NotificationRuleRow: View {
+private struct SettingsSwitchRow: View {
     let title: String
     let subtitle: String
     @Binding var isOn: Bool
@@ -281,19 +281,28 @@ struct UsageSettingsView: View {
                 }
 
                 GroupBox {
-                    SettingsPickerRow(title: "Values") {
-                        Picker(
-                            "Usage values",
-                            selection: Binding(
-                                get: { model.values.usage.displayMode },
-                                set: model.setUsageDisplayMode)
-                        ) {
-                            ForEach(UsageDisplayMode.allCases, id: \.self) {
-                                Text($0.title).tag($0)
+                    VStack(spacing: 12) {
+                        SettingsPickerRow(title: "Values") {
+                            Picker(
+                                "Usage values",
+                                selection: Binding(
+                                    get: { model.values.usage.displayMode },
+                                    set: model.setUsageDisplayMode)
+                            ) {
+                                ForEach(UsageDisplayMode.allCases, id: \.self) {
+                                    Text($0.title).tag($0)
+                                }
                             }
+                            .labelsHidden()
+                            .pickerStyle(.segmented)
                         }
-                        .labelsHidden()
-                        .pickerStyle(.segmented)
+                        Divider()
+                        SettingsSwitchRow(
+                            title: "Even-use marker",
+                            subtitle: "Compare quota use with elapsed time in each window.",
+                            isOn: Binding(
+                                get: { model.values.usage.showsPace },
+                                set: model.setUsageShowsPace))
                     }
                     .padding(.top, 4)
                 } label: {

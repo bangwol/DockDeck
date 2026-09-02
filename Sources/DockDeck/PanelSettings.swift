@@ -297,6 +297,7 @@ enum PanelSettings {
     private static let usageFontNameKey = "DockDeck.settings.usageFontName"
     private static let usageFontSizeKey = "DockDeck.settings.usageFontSize"
     private static let usageTextColorKey = "DockDeck.settings.usageTextColor"
+    private static let usageShowsPaceKey = "DockDeck.settings.usageShowsPace"
     private static let enabledUsageProvidersKey = "DockDeck.settings.enabledUsageProviders"
     private static let systemStatsRefreshIntervalKey =
         "DockDeck.settings.systemStatsRefreshInterval"
@@ -388,6 +389,15 @@ enum PanelSettings {
                 .flatMap(UsageTextColor.init(rawValue:)) ?? .theme
         }
         set { UserDefaults.standard.set(newValue.rawValue, forKey: usageTextColorKey) }
+    }
+
+    static var usageShowsPace: Bool {
+        get {
+            let defaults = UserDefaults.standard
+            guard defaults.object(forKey: usageShowsPaceKey) != nil else { return true }
+            return defaults.bool(forKey: usageShowsPaceKey)
+        }
+        set { UserDefaults.standard.set(newValue, forKey: usageShowsPaceKey) }
     }
 
     static var enabledUsageProviders: [UsageProviderID] {
@@ -776,6 +786,7 @@ enum PanelSettings {
         defaults.removeObject(forKey: usageFontNameKey)
         defaults.removeObject(forKey: usageFontSizeKey)
         defaults.removeObject(forKey: usageTextColorKey)
+        defaults.removeObject(forKey: usageShowsPaceKey)
         defaults.removeObject(forKey: enabledUsageProvidersKey)
         defaults.removeObject(forKey: systemStatsRefreshIntervalKey)
         defaults.removeObject(forKey: systemStatsMetricsKey)

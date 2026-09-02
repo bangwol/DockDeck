@@ -218,7 +218,8 @@ extension AppDelegate {
                 fontName: PanelSettings.usageFontName ?? TerminalTheme.defaultFontName,
                 fontSize: PanelSettings.usageFontSize,
                 displayMode: PanelSettings.usageDisplayMode,
-                textColor: PanelSettings.usageTextColor),
+                textColor: PanelSettings.usageTextColor,
+                showsPace: PanelSettings.usageShowsPace),
             systemStats: SystemStatsSettingsState(
                 refreshInterval: PanelSettings.systemStatsRefreshInterval,
                 metrics: PanelSettings.systemStatsMetrics),
@@ -291,6 +292,9 @@ extension AppDelegate {
             for controller in readOnlyDeckPanelControllers { controller.applySettings() }
         case .usage(.textColor(let color)):
             PanelSettings.usageTextColor = color
+            for controller in readOnlyDeckPanelControllers { controller.applySettings() }
+        case .usage(.showsPace(let showsPace)):
+            PanelSettings.usageShowsPace = showsPace
             for controller in readOnlyDeckPanelControllers { controller.applySettings() }
         case .systemStats(.refreshInterval(let interval)):
             PanelSettings.systemStatsRefreshInterval = interval
