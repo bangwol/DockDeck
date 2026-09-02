@@ -29,6 +29,35 @@ final class ClaudeBridgeTests: XCTestCase {
         XCTAssertNil(object["transcript_path"])
     }
 
+    func testObservationTimeUsesTranscriptModificationWithoutPersistingPath() {
+        let input = Data(
+            #"{"transcript_path":"/private/conversation.jsonl","rate_limits":{}}"#.utf8)
+
+        let observedAt = ClaudeBridgePayload.observationTime(
+            from: input,
+            fallback: 2_000,
+            fileModificationDate: { path in
+                XCTAssertEqual(path, "/private/conversation.jsonl")
+                return Date(timeIntervalSince1970: 1_900)
+            })
+
+        XCTAssertEqual(observedAt, 1_900)
+    }
+
+    func testObservationTimeFallsBackAndRejectsFutureModificationDate() {
+        let missingPath = ClaudeBridgePayload.observationTime(
+            from: Data(#"{"rate_limits":{}}"#.utf8),
+            fallback: 2_000,
+            fileModificationDate: { _ in XCTFail("Unexpected file lookup"); return nil })
+        let futurePath = ClaudeBridgePayload.observationTime(
+            from: Data(#"{"transcript_path":"/future"}"#.utf8),
+            fallback: 2_000,
+            fileModificationDate: { _ in Date(timeIntervalSince1970: 3_000) })
+
+        XCTAssertEqual(missingPath, 2_000)
+        XCTAssertEqual(futurePath, 2_000)
+    }
+
     func testStatusLineUsesAvailableQuotaWindows() {
         let input = Data(
             #"""

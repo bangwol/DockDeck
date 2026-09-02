@@ -134,7 +134,9 @@ Each meter shows the provider-supplied reset time in the Mac's local time zone. 
 
 Codex displays whichever 5-hour and weekly windows the signed-in account returns. DockDeck uses the returned durations instead of guessing the plan. OpenAI documents a shared 5-hour window for local and cloud tasks and notes that weekly limits may also apply in the [Codex pricing guide](https://learn.chatgpt.com/docs/pricing).
 
-Claude displays the officially documented 5-hour and weekly fields available in Claude Code's status-line payload. Anthropic does not currently document a separate Fable rate-limit field. For forward compatibility, DockDeck recognizes the experimental aliases `seven_day_fable` and `fable`; it adds an `FBL` meter only when the payload actually contains one of them and never estimates Fable usage. [Fable availability is plan-specific](https://support.claude.com/en/articles/15424964-claude-fable-models-on-your-plan), and Fable 5 requires Claude Code `2.1.170` or later.
+Claude displays the officially documented 5-hour and weekly fields available in Claude Code's status-line payload. The bridge receives new account data after a normal Claude assistant response; an idle session, `/status`, `/usage`, and `refreshInterval` callbacks do not fetch new quota data for DockDeck. `⌘R` rereads the local cache but does not contact Anthropic. A cache older than ten minutes is shown as stale.
+
+Anthropic does not currently expose the Fable meter shown by Claude Code's interactive `/usage` screen through the documented status-line payload. For forward compatibility, DockDeck recognizes the experimental aliases `seven_day_fable` and `fable`; it adds an `FBL` meter only when the payload actually contains one of them and never estimates Fable usage. [Fable availability is plan-specific](https://support.claude.com/en/articles/15424964-claude-fable-models-on-your-plan), and Fable 5 requires Claude Code `2.1.170` or later.
 
 Provider marks show data state without adding a detached status dot:
 
@@ -277,8 +279,7 @@ DockDeck never edits `~/.claude/settings.json` automatically. Preserve its exist
 {
   "statusLine": {
     "type": "command",
-    "command": "\"/Users/your-name/Applications/DockDeck.app/Contents/Resources/bin/dockdeck-claude-bridge\"",
-    "refreshInterval": 60
+    "command": "\"/Users/your-name/Applications/DockDeck.app/Contents/Resources/bin/dockdeck-claude-bridge\""
   }
 }
 ```
@@ -291,8 +292,7 @@ To preserve an existing executable status-line script, pass the same JSON input 
 {
   "statusLine": {
     "type": "command",
-    "command": "\"/absolute/path/to/dockdeck-claude-bridge\" -- /absolute/path/to/existing-statusline",
-    "refreshInterval": 60
+    "command": "\"/absolute/path/to/dockdeck-claude-bridge\" -- /absolute/path/to/existing-statusline"
   }
 }
 ```
@@ -303,15 +303,14 @@ For an existing inline shell command, use `--passthrough-shell`:
 {
   "statusLine": {
     "type": "command",
-    "command": "\"/absolute/path/to/dockdeck-claude-bridge\" --passthrough-shell 'YOUR EXISTING COMMAND'",
-    "refreshInterval": 60
+    "command": "\"/absolute/path/to/dockdeck-claude-bridge\" --passthrough-shell 'YOUR EXISTING COMMAND'"
   }
 }
 ```
 
 ### 4. Verify the bridge
 
-Start a new `claude` session and send one request. The right panel updates within 60 seconds, or immediately after `⌘R`. Verify that the privacy-filtered cache exists:
+Start a new `claude` session and send one normal request. Opening `/status` or `/usage` alone does not update the bridge. The right panel updates within 60 seconds, or immediately after `⌘R` rereads the cache. Verify that the privacy-filtered cache exists:
 
 ```bash
 test -f "$HOME/Library/Application Support/DockDeck/claude-rate-limits.json" \
@@ -319,6 +318,8 @@ test -f "$HOME/Library/Application Support/DockDeck/claude-rate-limits.json" \
 ```
 
 If the cache is missing, confirm the Claude Code version and run `/status` inside Claude Code to verify that user settings were loaded.
+
+Do not add `refreshInterval` solely for DockDeck. Timed status-line callbacks replay the last session payload without fetching account usage and do not improve its freshness. DockDeck already watches the cache on its own timer. The bridge derives freshness from the local transcript modification time but never stores the transcript path or contents.
 
 ## Security
 

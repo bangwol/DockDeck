@@ -2,6 +2,25 @@ import Darwin
 import Foundation
 
 enum ClaudeBridgePayload {
+    static func observationTime(
+        from input: Data,
+        fallback: TimeInterval,
+        fileModificationDate: (String) -> Date? = { path in
+            guard
+                let attributes = try? FileManager.default.attributesOfItem(atPath: path)
+            else { return nil }
+            return attributes[.modificationDate] as? Date
+        }
+    ) -> TimeInterval {
+        guard
+            let root = try? JSONSerialization.jsonObject(with: input) as? [String: Any],
+            let transcriptPath = root["transcript_path"] as? String,
+            !transcriptPath.isEmpty,
+            let modificationDate = fileModificationDate(transcriptPath)
+        else { return fallback }
+        return min(modificationDate.timeIntervalSince1970, fallback)
+    }
+
     static func cacheData(from input: Data, observedAt: TimeInterval) throws -> Data? {
         guard let root = try JSONSerialization.jsonObject(with: input) as? [String: Any],
             let rateLimits = root["rate_limits"] as? [String: Any]
@@ -114,8 +133,10 @@ guard input.count <= ClaudeBridgeRuntime.maximumInputBytes else {
 }
 
 do {
+    let now = Date().timeIntervalSince1970
     if let cache = try ClaudeBridgePayload.cacheData(
-        from: input, observedAt: Date().timeIntervalSince1970)
+        from: input,
+        observedAt: ClaudeBridgePayload.observationTime(from: input, fallback: now))
     {
         try ClaudeBridgeRuntime.writeCache(cache, to: ClaudeBridgeRuntime.cacheURL())
     }
