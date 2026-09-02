@@ -3,7 +3,7 @@ import Cocoa
 extension AppDelegate {
     @objc func toggleSettingsPanel(_ sender: Any?) {
         if let settingsPanel {
-            settingsPanel.makeKeyAndOrderFront(nil)
+            focusSettingsPanel(settingsPanel)
             return
         }
 
@@ -25,7 +25,7 @@ extension AppDelegate {
             .flatMap { PanelModuleRegistry.definition(for: $0)?.settingsPane } ?? .decks
         if let settingsPanel {
             (settingsPanel.contentView as? SettingsPanelView)?.selectPane(pane)
-            settingsPanel.makeKeyAndOrderFront(nil)
+            focusSettingsPanel(settingsPanel)
             return
         }
         presentSettingsPanel(pane: pane, anchor: controller?.panel ?? panel, restoreTerminalFocus: false)
@@ -75,6 +75,13 @@ extension AppDelegate {
         isFrozen = false
         refreshCoarseCaches()
         runEvaluation()
+    }
+
+    /// The accessory app may be inactive while its floating panel stays visible, in which
+    /// case ordering front alone leaves keyboard focus in the previous application.
+    private func focusSettingsPanel(_ settingsPanel: NSWindow) {
+        NSApp.activate(ignoringOtherApps: true)
+        settingsPanel.makeKeyAndOrderFront(nil)
     }
 
     private func readOnlyDeckController(from sender: Any?) -> ReadOnlyDeckPanelController? {
