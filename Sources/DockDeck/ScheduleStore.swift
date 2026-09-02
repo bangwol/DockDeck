@@ -16,6 +16,11 @@ struct ScheduleCalendarSource: Identifiable, Equatable {
     let title: String
 }
 
+struct ScheduleReminderListSource: Identifiable, Equatable {
+    let id: String
+    let title: String
+}
+
 struct ScheduleEventItem: Identifiable, Equatable {
     let id: String
     let title: String
@@ -25,28 +30,46 @@ struct ScheduleEventItem: Identifiable, Equatable {
     let calendarTitle: String
 }
 
+struct ScheduleReminderItem: Identifiable, Equatable {
+    let id: String
+    let title: String
+    let dueDate: Date
+    let isAllDay: Bool
+    let listTitle: String
+}
+
 struct ScheduleFetchResult: Equatable {
     let calendars: [ScheduleCalendarSource]
     let events: [ScheduleEventItem]
+    let reminderLists: [ScheduleReminderListSource]
+    let reminders: [ScheduleReminderItem]
 }
 
 protocol ScheduleEventProviding: AnyObject {
     var authorizationState: ScheduleAuthorizationState { get }
+    var reminderAuthorizationState: ScheduleAuthorizationState { get }
     var onStoreChanged: (() -> Void)? { get set }
 
     func requestAccess(completion: @escaping (ScheduleAuthorizationState) -> Void)
+    func requestReminderAccess(completion: @escaping (ScheduleAuthorizationState) -> Void)
     func suspend()
     func fetch(
         from startDate: Date,
         to endDate: Date,
+        reminderStartDate: Date,
         selectedCalendarIDs: Set<String>,
+        selectedReminderListIDs: Set<String>,
         includeAllDay: Bool,
+        includeReminders: Bool,
         completion: @escaping (ScheduleFetchResult) -> Void)
 }
 
 final class EventKitScheduleProvider: ScheduleEventProviding {
     var authorizationState: ScheduleAuthorizationState {
-        Self.currentAuthorizationState()
+        Self.currentAuthorizationState(for: .event)
+    }
+    var reminderAuthorizationState: ScheduleAuthorizationState {
+        Self.currentAuthorizationState(for: .reminder)
     }
     var onStoreChanged: (() -> Void)?
 
@@ -65,7 +88,7 @@ final class EventKitScheduleProvider: ScheduleEventProviding {
             let finish: (Bool, Error?) -> Void = { [weak self, store] _, _ in
                 self?.queue.async {
                     store.reset()
-                    let state = Self.currentAuthorizationState()
+                    let state = Self.currentAuthorizationState(for: .event)
                     DispatchQueue.main.async { completion(state) }
                 }
             }
@@ -73,6 +96,25 @@ final class EventKitScheduleProvider: ScheduleEventProviding {
                 store.requestFullAccessToEvents(completion: finish)
             } else {
                 store.requestAccess(to: .event, completion: finish)
+            }
+        }
+    }
+
+    func requestReminderAccess(completion: @escaping (ScheduleAuthorizationState) -> Void) {
+        queue.async { [weak self] in
+            guard let self else { return }
+            let store = self.store()
+            let finish: (Bool, Error?) -> Void = { [weak self, store] _, _ in
+                self?.queue.async {
+                    store.reset()
+                    let state = Self.currentAuthorizationState(for: .reminder)
+                    DispatchQueue.main.async { completion(state) }
+                }
+            }
+            if #available(macOS 14.0, *) {
+                store.requestFullAccessToReminders(completion: finish)
+            } else {
+                store.requestAccess(to: .reminder, completion: finish)
             }
         }
     }
@@ -91,14 +133,18 @@ final class EventKitScheduleProvider: ScheduleEventProviding {
     func fetch(
         from startDate: Date,
         to endDate: Date,
+        reminderStartDate: Date,
         selectedCalendarIDs: Set<String>,
+        selectedReminderListIDs: Set<String>,
         includeAllDay: Bool,
+        includeReminders: Bool,
         completion: @escaping (ScheduleFetchResult) -> Void
     ) {
         queue.async { [weak self] in
             guard let self else { return }
             let store = self.store()
-            let eventCalendars = store.calendars(for: .event)
+            let eventCalendars = self.authorizationState.canRead
+                ? store.calendars(for: .event) : []
             let calendars = eventCalendars
                 .map {
                     ScheduleCalendarSource(
@@ -117,7 +163,9 @@ final class EventKitScheduleProvider: ScheduleEventProviding {
                 }
             }
             let events: [ScheduleEventItem]
-            if selectedCalendarIDs.isEmpty || selectedCalendars?.isEmpty == false {
+            if self.authorizationState.canRead
+                && (selectedCalendarIDs.isEmpty || selectedCalendars?.isEmpty == false)
+            {
                 let predicate = store.predicateForEvents(
                     withStart: startDate, end: endDate, calendars: selectedCalendars)
                 events = store.events(matching: predicate)
@@ -130,14 +178,62 @@ final class EventKitScheduleProvider: ScheduleEventProviding {
             } else {
                 events = []
             }
-            let result = ScheduleFetchResult(
-                calendars: calendars, events: Array(events.prefix(100)))
-            DispatchQueue.main.async { completion(result) }
+
+            guard includeReminders, self.reminderAuthorizationState.canRead else {
+                self.finish(
+                    calendars: calendars, events: events,
+                    reminderLists: [], reminders: [], completion: completion)
+                return
+            }
+            let reminderCalendars = store.calendars(for: .reminder)
+            let reminderLists = reminderCalendars
+                .map {
+                    ScheduleReminderListSource(
+                        id: $0.calendarIdentifier,
+                        title: Self.bounded($0.title, maximumLength: 60, fallback: "Reminders"))
+                }
+                .sorted {
+                    $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending
+                }
+            let selectedReminderCalendars: [EKCalendar]?
+            if selectedReminderListIDs.isEmpty {
+                selectedReminderCalendars = nil
+            } else {
+                selectedReminderCalendars = reminderCalendars.filter {
+                    selectedReminderListIDs.contains($0.calendarIdentifier)
+                }
+            }
+            guard selectedReminderListIDs.isEmpty
+                || selectedReminderCalendars?.isEmpty == false
+            else {
+                self.finish(
+                    calendars: calendars, events: events,
+                    reminderLists: reminderLists, reminders: [], completion: completion)
+                return
+            }
+            let predicate = store.predicateForIncompleteReminders(
+                withDueDateStarting: reminderStartDate,
+                ending: endDate,
+                calendars: selectedReminderCalendars)
+            store.fetchReminders(matching: predicate) { [weak self] reminders in
+                guard let self else { return }
+                self.queue.async {
+                    let items = (reminders ?? [])
+                        .compactMap(Self.item)
+                        .sorted { $0.dueDate < $1.dueDate }
+                    self.finish(
+                        calendars: calendars, events: events,
+                        reminderLists: reminderLists, reminders: items,
+                        completion: completion)
+                }
+            }
         }
     }
 
-    static func currentAuthorizationState() -> ScheduleAuthorizationState {
-        let status = EKEventStore.authorizationStatus(for: .event)
+    static func currentAuthorizationState(
+        for entityType: EKEntityType
+    ) -> ScheduleAuthorizationState {
+        let status = EKEventStore.authorizationStatus(for: entityType)
         if #available(macOS 14.0, *) {
             switch status {
             case .fullAccess: return .granted
@@ -183,6 +279,35 @@ final class EventKitScheduleProvider: ScheduleEventProviding {
                 event.calendar?.title, maximumLength: 60, fallback: "Calendar"))
     }
 
+    private static func item(_ reminder: EKReminder) -> ScheduleReminderItem? {
+        guard let components = reminder.dueDateComponents,
+            let dueDate = Calendar.current.date(from: components)
+        else { return nil }
+        let reminderID = reminder.calendarItemIdentifier
+        return ScheduleReminderItem(
+            id: "\(reminderID)|\(dueDate.timeIntervalSinceReferenceDate)",
+            title: bounded(reminder.title, maximumLength: 90, fallback: "Untitled reminder"),
+            dueDate: dueDate,
+            isAllDay: components.hour == nil && components.minute == nil,
+            listTitle: bounded(
+                reminder.calendar?.title, maximumLength: 60, fallback: "Reminders"))
+    }
+
+    private func finish(
+        calendars: [ScheduleCalendarSource],
+        events: [ScheduleEventItem],
+        reminderLists: [ScheduleReminderListSource],
+        reminders: [ScheduleReminderItem],
+        completion: @escaping (ScheduleFetchResult) -> Void
+    ) {
+        let result = ScheduleFetchResult(
+            calendars: calendars,
+            events: Array(events.prefix(100)),
+            reminderLists: reminderLists,
+            reminders: Array(reminders.prefix(100)))
+        DispatchQueue.main.async { completion(result) }
+    }
+
     private static func bounded(
         _ value: String?, maximumLength: Int, fallback: String
     ) -> String {
@@ -200,12 +325,17 @@ enum ScheduleLoadStatus: Equatable {
 
 final class ScheduleStore: ObservableObject {
     @Published private(set) var authorization: ScheduleAuthorizationState
+    @Published private(set) var reminderAuthorization: ScheduleAuthorizationState
     @Published private(set) var calendars: [ScheduleCalendarSource] = []
     @Published private(set) var events: [ScheduleEventItem] = []
+    @Published private(set) var reminderLists: [ScheduleReminderListSource] = []
+    @Published private(set) var reminders: [ScheduleReminderItem] = []
     @Published private(set) var status: ScheduleLoadStatus = .idle
 
     private var selectedCalendarIDs: Set<String>
+    private var selectedReminderListIDs: Set<String>
     private var includeAllDay: Bool
+    private var includeReminders: Bool
     private var refreshInterval: TimeInterval
     private var timer: Timer?
     private var generation = 0
@@ -215,16 +345,26 @@ final class ScheduleStore: ObservableObject {
 
     init(
         selectedCalendarIDs: [String] = PanelSettings.scheduleCalendarIDs,
+        selectedReminderListIDs: [String] = PanelSettings.scheduleReminderListIDs,
         includeAllDay: Bool = PanelSettings.scheduleIncludesAllDay,
+        includeReminders: Bool = PanelSettings.scheduleIncludesReminders,
         refreshInterval: TimeInterval = PanelSettings.scheduleRefreshInterval,
         provider: ScheduleEventProviding = EventKitScheduleProvider()
     ) {
         self.selectedCalendarIDs = Set(selectedCalendarIDs.filter { !$0.isEmpty })
+        self.selectedReminderListIDs = Set(
+            selectedReminderListIDs.filter { !$0.isEmpty })
         self.includeAllDay = includeAllDay
+        self.includeReminders = includeReminders
         self.refreshInterval = Self.resolvedRefreshInterval(refreshInterval)
         self.provider = provider
         authorization = provider.authorizationState
+        reminderAuthorization = provider.reminderAuthorizationState
         provider.onStoreChanged = { [weak self] in self?.refresh() }
+    }
+
+    var canReadAnySource: Bool {
+        authorization.canRead || (includeReminders && reminderAuthorization.canRead)
     }
 
     func start() {
@@ -241,6 +381,8 @@ final class ScheduleStore: ObservableObject {
         timer = nil
         calendars = []
         events = []
+        reminderLists = []
+        reminders = []
         status = .idle
         provider.suspend()
     }
@@ -253,19 +395,27 @@ final class ScheduleStore: ObservableObject {
         provider.requestAccess { [weak self] state in
             guard let self else { return }
             self.authorization = state
-            if self.isRunning, state.canRead {
-                self.refresh()
-                self.scheduleTimer()
-            } else {
-                self.status = .permissionRequired
-            }
+            self.resumeAfterAuthorizationChange()
+        }
+    }
+
+    func requestReminderAccess() {
+        guard reminderAuthorization == .notDetermined else {
+            refreshAuthorization()
+            return
+        }
+        provider.requestReminderAccess { [weak self] state in
+            guard let self else { return }
+            self.reminderAuthorization = state
+            self.resumeAfterAuthorizationChange()
         }
     }
 
     func refreshAuthorization() {
         authorization = provider.authorizationState
+        reminderAuthorization = provider.reminderAuthorizationState
         guard isRunning else { return }
-        if authorization.canRead {
+        if canReadAnySource {
             refresh()
             scheduleTimer()
         } else {
@@ -274,27 +424,32 @@ final class ScheduleStore: ObservableObject {
             timer = nil
             calendars = []
             events = []
+            reminderLists = []
+            reminders = []
             status = .permissionRequired
         }
     }
 
     func updateConfiguration(
-        selectedCalendarIDs: [String], includeAllDay: Bool,
+        selectedCalendarIDs: [String], selectedReminderListIDs: [String],
+        includeAllDay: Bool, includeReminders: Bool,
         refreshInterval: TimeInterval
     ) {
         self.selectedCalendarIDs = Set(selectedCalendarIDs.filter { !$0.isEmpty })
+        self.selectedReminderListIDs = Set(
+            selectedReminderListIDs.filter { !$0.isEmpty })
         self.includeAllDay = includeAllDay
+        self.includeReminders = includeReminders
         self.refreshInterval = Self.resolvedRefreshInterval(refreshInterval)
-        guard isRunning, authorization.canRead else { return }
-        refresh()
-        scheduleTimer()
+        guard isRunning else { return }
+        refreshAuthorization()
     }
 
     func setRuntimeActivity(
         _ activity: ModuleRuntimeActivity, lowPowerMode: Bool
     ) {
         guard refreshCadence.update(activity: activity, lowPowerMode: lowPowerMode),
-            isRunning, authorization.canRead
+            isRunning, canReadAnySource
         else { return }
         scheduleTimer()
     }
@@ -302,7 +457,8 @@ final class ScheduleStore: ObservableObject {
     func refresh(now: Date = Date()) {
         guard isRunning else { return }
         authorization = provider.authorizationState
-        guard authorization.canRead else {
+        reminderAuthorization = provider.reminderAuthorizationState
+        guard canReadAnySource else {
             refreshAuthorization()
             return
         }
@@ -312,25 +468,43 @@ final class ScheduleStore: ObservableObject {
         provider.fetch(
             from: now.addingTimeInterval(-12 * 60 * 60),
             to: now.addingTimeInterval(48 * 60 * 60),
+            reminderStartDate: now.addingTimeInterval(-7 * 24 * 60 * 60),
             selectedCalendarIDs: selectedCalendarIDs,
-            includeAllDay: includeAllDay
+            selectedReminderListIDs: selectedReminderListIDs,
+            includeAllDay: includeAllDay,
+            includeReminders: includeReminders
         ) { [weak self] result in
             guard let self, self.isRunning, generation == self.generation else { return }
             self.calendars = result.calendars
             self.events = result.events
+            self.reminderLists = result.reminderLists
+            self.reminders = result.reminders
             self.status = .ready
         }
     }
 
     private func scheduleTimer() {
         timer?.invalidate()
-        guard isRunning, authorization.canRead else {
+        guard isRunning, canReadAnySource else {
             timer = nil
             return
         }
         let interval = refreshCadence.effectiveInterval(
             configuredInterval: refreshInterval)
         timer = .moduleRefreshTimer(interval: interval) { [weak self] in self?.refresh() }
+    }
+
+    private func resumeAfterAuthorizationChange() {
+        guard isRunning else {
+            status = .permissionRequired
+            return
+        }
+        if canReadAnySource {
+            refresh()
+            scheduleTimer()
+        } else {
+            status = .permissionRequired
+        }
     }
 
     private static func resolvedRefreshInterval(_ value: TimeInterval) -> TimeInterval {
@@ -374,5 +548,61 @@ enum ScheduleTimeline {
         let duration = event.endDate.timeIntervalSince(event.startDate)
         guard duration > 0 else { return 0 }
         return min(max(now.timeIntervalSince(event.startDate) / duration, 0), 1)
+    }
+}
+
+enum ScheduleReminderPresentationMode: Equatable {
+    case overdue
+    case upcoming
+}
+
+struct ScheduleReminderPresentation: Equatable {
+    let reminder: ScheduleReminderItem
+    let mode: ScheduleReminderPresentationMode
+}
+
+enum ScheduleAgendaPresentation: Equatable {
+    case event(SchedulePresentation)
+    case reminder(ScheduleReminderPresentation)
+}
+
+enum ScheduleAgendaTimeline {
+    static func presentation(
+        events: [ScheduleEventItem], reminders: [ScheduleReminderItem], now: Date
+    ) -> ScheduleAgendaPresentation? {
+        let currentEvent = ScheduleTimeline.presentation(events: events, now: now)
+        if let currentEvent,
+            currentEvent.mode == .current,
+            !currentEvent.event.isAllDay
+        {
+            return .event(currentEvent)
+        }
+
+        if let overdue = reminders.filter({ $0.dueDate <= now }).max(by: {
+            $0.dueDate < $1.dueDate
+        }) {
+            return .reminder(
+                ScheduleReminderPresentation(reminder: overdue, mode: .overdue))
+        }
+
+        if let currentEvent, currentEvent.mode == .current {
+            return .event(currentEvent)
+        }
+
+        let nextEvent = currentEvent
+        let nextReminder = reminders.filter { $0.dueDate > now }.min(by: {
+            $0.dueDate < $1.dueDate
+        })
+        switch (nextEvent, nextReminder) {
+        case (let event?, let reminder?) where event.event.startDate <= reminder.dueDate:
+            return .event(event)
+        case (_, let reminder?):
+            return .reminder(
+                ScheduleReminderPresentation(reminder: reminder, mode: .upcoming))
+        case (let event?, nil):
+            return .event(event)
+        case (nil, nil):
+            return nil
+        }
     }
 }

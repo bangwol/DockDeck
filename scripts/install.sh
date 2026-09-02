@@ -157,6 +157,10 @@ cat > "$APP_PATH/Contents/Info.plist" <<EOF
     <string>DockDeck reads upcoming event titles and times for Schedule. It never changes calendars.</string>
     <key>NSCalendarsUsageDescription</key>
     <string>DockDeck reads upcoming event titles and times for Schedule. It never changes calendars.</string>
+    <key>NSRemindersFullAccessUsageDescription</key>
+    <string>DockDeck reads incomplete reminder titles and due dates for Schedule. It never changes reminders.</string>
+    <key>NSRemindersUsageDescription</key>
+    <string>DockDeck reads incomplete reminder titles and due dates for Schedule. It never changes reminders.</string>
     <key>LSUIElement</key>
     <true/>
 </dict>

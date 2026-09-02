@@ -7,18 +7,26 @@ struct ScheduleSettingsView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
-                permissionSection
+                calendarPermissionSection
                 if store.authorization.canRead {
                     calendarsSection
                     displaySection
+                }
+                remindersSection
+                if model.values.schedule.includeReminders,
+                    store.reminderAuthorization.canRead
+                {
+                    reminderListsSection
+                }
+                if store.canReadAnySource {
                     refreshSection
                 }
 
                 Text(
-                    "DockDeck reads only event titles, start and end times, all-day state, and "
-                        + "calendar names. Events stay in memory and are never written to disk, "
-                        + "logged, modified, or sent over the network. macOS grants full Calendar "
-                        + "access because EventKit has no read-only permission tier.")
+                    "DockDeck reads only event and reminder titles, times, completion state, and "
+                        + "source names. Items stay in memory and are never written to disk, "
+                        + "logged, modified, or sent over the network. macOS grants full access "
+                        + "because EventKit has no read-only permission tier.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -27,7 +35,7 @@ struct ScheduleSettingsView: View {
         .onAppear { store.refreshAuthorization() }
     }
 
-    private var permissionSection: some View {
+    private var calendarPermissionSection: some View {
         GroupBox {
             HStack(spacing: 12) {
                 Image(systemName: permissionSymbol)
@@ -55,6 +63,50 @@ struct ScheduleSettingsView: View {
             .padding(.vertical, 6)
         } label: {
             Label("Calendar Access", systemImage: "lock.shield")
+                .font(.headline)
+        }
+    }
+
+    private var remindersSection: some View {
+        GroupBox {
+            VStack(spacing: 10) {
+                Toggle(
+                    "Include due reminders",
+                    isOn: Binding(
+                        get: { model.values.schedule.includeReminders },
+                        set: model.setScheduleIncludesReminders))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                if model.values.schedule.includeReminders {
+                    Divider()
+                    HStack(spacing: 12) {
+                        Image(systemName: reminderPermissionSymbol)
+                            .font(.system(size: 20))
+                            .foregroundStyle(reminderPermissionColor)
+                            .frame(width: 28)
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(reminderPermissionTitle).fontWeight(.medium)
+                            Text(reminderPermissionDetail)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        switch store.reminderAuthorization {
+                        case .notDetermined:
+                            Button("Request Access", action: store.requestReminderAccess)
+                        case .denied, .restricted, .writeOnly:
+                            Button("Check Again", action: store.refreshAuthorization)
+                        case .granted:
+                            Button(action: { store.refresh() }) {
+                                Label("Refresh", systemImage: "arrow.clockwise")
+                            }
+                        }
+                    }
+                }
+            }
+            .padding(.vertical, 6)
+        } label: {
+            Label("Reminders", systemImage: "checklist")
                 .font(.headline)
         }
     }
@@ -101,6 +153,51 @@ struct ScheduleSettingsView: View {
             .padding(.horizontal, 4)
         } label: {
             Label("Calendars", systemImage: "calendar.badge.clock")
+                .font(.headline)
+        }
+    }
+
+    private var reminderListsSection: some View {
+        GroupBox {
+            VStack(spacing: 0) {
+                if store.reminderLists.isEmpty {
+                    HStack(spacing: 8) {
+                        if store.status == .loading { ProgressView().controlSize(.small) }
+                        Text(
+                            store.status == .loading
+                                ? "Loading reminder lists…" : "No reminder lists are available.")
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                    }
+                    .padding(.vertical, 8)
+                } else {
+                    ForEach(Array(store.reminderLists.enumerated()), id: \.element.id) {
+                        index, list in
+                        if index > 0 { Divider() }
+                        Toggle(
+                            list.title,
+                            isOn: Binding(
+                                get: {
+                                    model.isScheduleReminderListEnabled(
+                                        list.id,
+                                        availableIDs: store.reminderLists.map(\.id))
+                                },
+                                set: {
+                                    model.setScheduleReminderList(
+                                        list.id, enabled: $0,
+                                        availableIDs: store.reminderLists.map(\.id))
+                                }))
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.vertical, 8)
+                            .disabled(
+                                !model.canDisableScheduleReminderList(
+                                    list.id, availableIDs: store.reminderLists.map(\.id)))
+                    }
+                }
+            }
+            .padding(.horizontal, 4)
+        } label: {
+            Label("Reminder Lists", systemImage: "list.bullet.circle")
                 .font(.headline)
         }
     }
@@ -172,6 +269,38 @@ struct ScheduleSettingsView: View {
 
     private var permissionColor: Color {
         store.authorization.canRead ? .green : .orange
+    }
+
+    private var reminderPermissionTitle: String {
+        switch store.reminderAuthorization {
+        case .notDetermined: "Reminders access has not been requested"
+        case .granted: "Reminders access granted"
+        case .writeOnly: "Read access is not granted"
+        case .denied: "Reminders access denied"
+        case .restricted: "Reminders access restricted"
+        }
+    }
+
+    private var reminderPermissionDetail: String {
+        switch store.reminderAuthorization {
+        case .notDetermined:
+            "Access is requested only after you press the button."
+        case .granted:
+            "DockDeck reads incomplete reminders without changing them."
+        case .writeOnly, .denied:
+            "Enable DockDeck in System Settings → Privacy & Security → Reminders."
+        case .restricted:
+            "Reminders access is restricted by this Mac's policy."
+        }
+    }
+
+    private var reminderPermissionSymbol: String {
+        store.reminderAuthorization.canRead
+            ? "checkmark.circle.fill" : "checklist"
+    }
+
+    private var reminderPermissionColor: Color {
+        store.reminderAuthorization.canRead ? .green : .orange
     }
 
     private func refreshTitle(_ interval: TimeInterval) -> String {

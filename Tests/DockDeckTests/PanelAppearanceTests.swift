@@ -690,7 +690,8 @@ final class PanelAppearanceTests: XCTestCase {
             weather: WeatherSettingsState(
                 location: nil, temperatureUnit: .celsius, refreshInterval: 1_800),
             schedule: ScheduleSettingsState(
-                calendarIDs: [], includeAllDay: false, refreshInterval: 300),
+                calendarIDs: [], reminderListIDs: [], includeAllDay: false,
+                includeReminders: false, refreshInterval: 300),
             clock: ClockSettingsState(
                 timeZoneIdentifier: ClockTimeZone.systemIdentifier, hourFormat: .system),
             battery: BatterySettingsState(refreshInterval: 60),

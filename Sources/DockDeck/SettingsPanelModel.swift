@@ -47,7 +47,7 @@ enum SettingsPaneID: String, CaseIterable, Identifiable {
         case .systemStats: "Choose compact local performance metrics."
         case .serviceMonitor: "Check the availability of your services."
         case .weather: "Show current conditions for a selected city."
-        case .schedule: "Show the current or next calendar event."
+        case .schedule: "Show the current event or next calendar and reminder item."
         case .clock: "Show local time or another time zone."
         case .battery: "Show charge, power state, and time left."
         case .network: "Show local download and upload throughput."
@@ -105,7 +105,7 @@ enum PanelModuleRegistry {
             id: .weather, title: "Weather", subtitle: "Selected-city conditions",
             symbolName: "cloud.sun", settingsPane: .weather),
         PanelModuleDefinition(
-            id: .schedule, title: "Schedule", subtitle: "Current and next event",
+            id: .schedule, title: "Schedule", subtitle: "Calendar and reminders",
             symbolName: "calendar", settingsPane: .schedule),
         PanelModuleDefinition(
             id: .clock, title: "World Clock", subtitle: "Local or selected time zone",
@@ -166,7 +166,9 @@ struct WeatherSettingsState: Equatable {
 
 struct ScheduleSettingsState: Equatable {
     var calendarIDs: [String]
+    var reminderListIDs: [String]
     var includeAllDay: Bool
+    var includeReminders: Bool
     var refreshInterval: TimeInterval
 }
 
@@ -246,7 +248,9 @@ enum WeatherSettingsChange {
 
 enum ScheduleSettingsChange {
     case calendarIDs([String])
+    case reminderListIDs([String])
     case includeAllDay(Bool)
+    case includeReminders(Bool)
     case refreshInterval(TimeInterval)
 }
 
@@ -642,6 +646,33 @@ final class SettingsPanelModel: ObservableObject {
         onChange?(.schedule(.includeAllDay(value)))
     }
 
+    func isScheduleReminderListEnabled(_ id: String, availableIDs: [String]) -> Bool {
+        resolvedScheduleReminderListIDs(availableIDs: availableIDs).contains(id)
+    }
+
+    func canDisableScheduleReminderList(_ id: String, availableIDs: [String]) -> Bool {
+        let selected = resolvedScheduleReminderListIDs(availableIDs: availableIDs)
+        return !selected.contains(id) || selected.count > 1
+    }
+
+    func setScheduleReminderList(_ id: String, enabled: Bool, availableIDs: [String]) {
+        var selected = resolvedScheduleReminderListIDs(availableIDs: availableIDs)
+        if enabled {
+            selected.insert(id)
+        } else {
+            guard selected.count > 1 else { return }
+            selected.remove(id)
+        }
+        let identifiers = availableIDs.filter(selected.contains)
+        updateValues { $0.schedule.reminderListIDs = identifiers }
+        onChange?(.schedule(.reminderListIDs(identifiers)))
+    }
+
+    func setScheduleIncludesReminders(_ value: Bool) {
+        updateValues { $0.schedule.includeReminders = value }
+        onChange?(.schedule(.includeReminders(value)))
+    }
+
     func setScheduleRefreshInterval(_ value: TimeInterval) {
         let selected = PanelSettings.scheduleRefreshIntervals.min(by: {
             abs($0 - value) < abs($1 - value)
@@ -780,6 +811,11 @@ final class SettingsPanelModel: ObservableObject {
 
     private func resolvedScheduleCalendarIDs(availableIDs: [String]) -> Set<String> {
         let stored = Set(values.schedule.calendarIDs)
+        return stored.isEmpty ? Set(availableIDs) : Set(availableIDs.filter(stored.contains))
+    }
+
+    private func resolvedScheduleReminderListIDs(availableIDs: [String]) -> Set<String> {
+        let stored = Set(values.schedule.reminderListIDs)
         return stored.isEmpty ? Set(availableIDs) : Set(availableIDs.filter(stored.contains))
     }
 }

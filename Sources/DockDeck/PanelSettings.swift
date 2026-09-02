@@ -320,7 +320,11 @@ enum PanelSettings {
     private static let weatherTemperatureUnitKey = "DockDeck.settings.weatherTemperatureUnit"
     private static let weatherRefreshIntervalKey = "DockDeck.settings.weatherRefreshInterval"
     private static let scheduleCalendarIDsKey = "DockDeck.settings.scheduleCalendarIDs"
+    private static let scheduleReminderListIDsKey =
+        "DockDeck.settings.scheduleReminderListIDs"
     private static let scheduleIncludesAllDayKey = "DockDeck.settings.scheduleIncludesAllDay"
+    private static let scheduleIncludesRemindersKey =
+        "DockDeck.settings.scheduleIncludesReminders"
     private static let scheduleRefreshIntervalKey = "DockDeck.settings.scheduleRefreshInterval"
     private static let clockTimeZoneIdentifierKey =
         "DockDeck.settings.clockTimeZoneIdentifier"
@@ -610,6 +614,17 @@ enum PanelSettings {
         }
     }
 
+    static var scheduleReminderListIDs: [String] {
+        get {
+            normalizedScheduleCalendarIDs(
+                UserDefaults.standard.stringArray(forKey: scheduleReminderListIDsKey) ?? [])
+        }
+        set {
+            UserDefaults.standard.set(
+                normalizedScheduleCalendarIDs(newValue), forKey: scheduleReminderListIDsKey)
+        }
+    }
+
     static var scheduleIncludesAllDay: Bool {
         get {
             let defaults = UserDefaults.standard
@@ -617,6 +632,17 @@ enum PanelSettings {
             return defaults.bool(forKey: scheduleIncludesAllDayKey)
         }
         set { UserDefaults.standard.set(newValue, forKey: scheduleIncludesAllDayKey) }
+    }
+
+    static var scheduleIncludesReminders: Bool {
+        get {
+            let defaults = UserDefaults.standard
+            guard defaults.object(forKey: scheduleIncludesRemindersKey) != nil else {
+                return false
+            }
+            return defaults.bool(forKey: scheduleIncludesRemindersKey)
+        }
+        set { UserDefaults.standard.set(newValue, forKey: scheduleIncludesRemindersKey) }
     }
 
     static var scheduleRefreshInterval: TimeInterval {
@@ -854,7 +880,9 @@ enum PanelSettings {
         defaults.removeObject(forKey: weatherTemperatureUnitKey)
         defaults.removeObject(forKey: weatherRefreshIntervalKey)
         defaults.removeObject(forKey: scheduleCalendarIDsKey)
+        defaults.removeObject(forKey: scheduleReminderListIDsKey)
         defaults.removeObject(forKey: scheduleIncludesAllDayKey)
+        defaults.removeObject(forKey: scheduleIncludesRemindersKey)
         defaults.removeObject(forKey: scheduleRefreshIntervalKey)
         defaults.removeObject(forKey: clockTimeZoneIdentifierKey)
         defaults.removeObject(forKey: clockHourFormatKey)

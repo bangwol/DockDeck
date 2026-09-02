@@ -162,7 +162,9 @@ extension AppDelegate {
                 refreshInterval: PanelSettings.weatherRefreshInterval)
             self.scheduleStore.updateConfiguration(
                 selectedCalendarIDs: PanelSettings.scheduleCalendarIDs,
+                selectedReminderListIDs: PanelSettings.scheduleReminderListIDs,
                 includeAllDay: PanelSettings.scheduleIncludesAllDay,
+                includeReminders: PanelSettings.scheduleIncludesReminders,
                 refreshInterval: PanelSettings.scheduleRefreshInterval)
             self.batteryStore.setRefreshInterval(PanelSettings.batteryRefreshInterval)
             self.networkStore.setRefreshInterval(PanelSettings.networkRefreshInterval)
@@ -236,7 +238,9 @@ extension AppDelegate {
                 refreshInterval: PanelSettings.weatherRefreshInterval),
             schedule: ScheduleSettingsState(
                 calendarIDs: PanelSettings.scheduleCalendarIDs,
+                reminderListIDs: PanelSettings.scheduleReminderListIDs,
                 includeAllDay: PanelSettings.scheduleIncludesAllDay,
+                includeReminders: PanelSettings.scheduleIncludesReminders,
                 refreshInterval: PanelSettings.scheduleRefreshInterval),
             clock: ClockSettingsState(
                 timeZoneIdentifier: PanelSettings.clockTimeZoneIdentifier,
@@ -331,8 +335,14 @@ extension AppDelegate {
         case .schedule(.calendarIDs(let identifiers)):
             PanelSettings.scheduleCalendarIDs = identifiers
             applyScheduleConfiguration()
+        case .schedule(.reminderListIDs(let identifiers)):
+            PanelSettings.scheduleReminderListIDs = identifiers
+            applyScheduleConfiguration()
         case .schedule(.includeAllDay(let includeAllDay)):
             PanelSettings.scheduleIncludesAllDay = includeAllDay
+            applyScheduleConfiguration()
+        case .schedule(.includeReminders(let includeReminders)):
+            PanelSettings.scheduleIncludesReminders = includeReminders
             applyScheduleConfiguration()
         case .schedule(.refreshInterval(let interval)):
             PanelSettings.scheduleRefreshInterval = interval
@@ -374,7 +384,9 @@ extension AppDelegate {
     private func applyScheduleConfiguration() {
         scheduleStore.updateConfiguration(
             selectedCalendarIDs: PanelSettings.scheduleCalendarIDs,
+            selectedReminderListIDs: PanelSettings.scheduleReminderListIDs,
             includeAllDay: PanelSettings.scheduleIncludesAllDay,
+            includeReminders: PanelSettings.scheduleIncludesReminders,
             refreshInterval: PanelSettings.scheduleRefreshInterval)
     }
 
