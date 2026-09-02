@@ -4,6 +4,27 @@ import XCTest
 @testable import DockDeck
 
 final class UsageProviderTests: XCTestCase {
+    func testSingleUsageWindowUsesSplitHeader() {
+        XCTAssertEqual(UsageResetPlacement.forWindowCount(1), .splitHeader)
+        XCTAssertEqual(UsageResetPlacement.forWindowCount(2), .below)
+        XCTAssertEqual(UsageResetPlacement.forWindowCount(3), .below)
+    }
+
+    func testUsageProviderMarkAssetsMatchOfficialVariants() {
+        XCTAssertEqual(
+            UsageProviderMarkAsset.resourceName(for: .codex, dark: true),
+            "OpenAI-Blossom-White")
+        XCTAssertEqual(
+            UsageProviderMarkAsset.resourceName(for: .codex, dark: false),
+            "OpenAI-Blossom-Black")
+        XCTAssertEqual(
+            UsageProviderMarkAsset.resourceName(for: .claude, dark: true),
+            "ClaudeIcon-Rounded")
+        XCTAssertNotNil(UsageProviderMarkAsset.image(for: .codex, dark: true))
+        XCTAssertNotNil(UsageProviderMarkAsset.image(for: .codex, dark: false))
+        XCTAssertNotNil(UsageProviderMarkAsset.image(for: .claude, dark: true))
+    }
+
     func testResetFormatterShowsLocalTimeAndDate() {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(secondsFromGMT: 9 * 3_600)!

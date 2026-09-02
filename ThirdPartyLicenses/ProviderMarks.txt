@@ -1,0 +1,14 @@
+Provider marks
+==============
+
+DockDeck includes the following unmodified assets solely to identify supported
+usage providers:
+
+- OpenAI Blossom, white and black SVG variants
+  Source: https://openai.com/brand/
+- Claude rounded icon SVG
+  Source: https://www.anthropic.com/press-kit
+
+OpenAI, Codex, Claude, Anthropic, and their respective marks are trademarks of
+their owners. Their inclusion does not imply affiliation or endorsement. These
+marks are not licensed under DockDeck's MIT license.

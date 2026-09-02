@@ -12,6 +12,7 @@ X86_64_SCRATCH="$REPO_DIR/.build-x86_64"
 APP_PATH="$REPO_DIR/.build/release-dist/DockDeck.app"
 APP_BIN_PATH="$APP_PATH/Contents/MacOS/DockDeck"
 APP_BRIDGE_PATH="$APP_PATH/Contents/Resources/bin/dockdeck-claude-bridge"
+APP_RESOURCE_BUNDLE_PATH="$APP_PATH/Contents/Resources/DockDeck_DockDeck.bundle"
 LICENSES_PATH="$APP_PATH/Contents/Resources/Licenses"
 VERSION="$(tr -d '[:space:]' < "$REPO_DIR/VERSION")"
 SIGNING_IDENTITY="${DOCKDECK_SIGNING_IDENTITY:--}"
@@ -53,10 +54,13 @@ lipo -create -output "$APP_BIN_PATH" \
 lipo -create -output "$APP_BRIDGE_PATH" \
     "$ARM64_SCRATCH/arm64-apple-macosx/release/dockdeck-claude-bridge" \
     "$X86_64_SCRATCH/x86_64-apple-macosx/release/dockdeck-claude-bridge"
+cp -R "$ARM64_SCRATCH/arm64-apple-macosx/release/DockDeck_DockDeck.bundle" \
+    "$APP_RESOURCE_BUNDLE_PATH"
 cp "$REPO_DIR/assets/AppIcon.icns" "$APP_PATH/Contents/Resources/AppIcon.icns"
 cp "$REPO_DIR/LICENSE" "$LICENSES_PATH/DockDeck.txt"
 cp "$REPO_DIR/ThirdPartyLicenses/SwiftTerm.txt" "$LICENSES_PATH/SwiftTerm.txt"
 cp "$REPO_DIR/ThirdPartyLicenses/Open-Meteo.txt" "$LICENSES_PATH/Open-Meteo.txt"
+cp "$REPO_DIR/ThirdPartyLicenses/ProviderMarks.txt" "$LICENSES_PATH/ProviderMarks.txt"
 
 cat > "$APP_PATH/Contents/Info.plist" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>

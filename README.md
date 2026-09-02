@@ -130,11 +130,11 @@ gh attestation verify DockDeck-*-unsigned.zip -R bangwol/DockDeck
 
 Percentages and bars show **remaining** capacity by default. Select **Used** under **Settings → Usage → Values** to invert both the number and filled bar. For example, the same quota appears as either 22% remaining or 78% used.
 
-Each meter shows the provider-supplied reset time below its bar in the Mac's local time zone. Codex supplies `resetsAt` through its [app-server rate-limit response](https://learn.chatgpt.com/docs/app-server#6-rate-limits-chatgpt), while Claude Code supplies `resets_at` through its [status-line data](https://code.claude.com/docs/en/statusline#rate-limit-usage). Resets later today use `HH:mm`; a different day uses `M/D HH:mm`. `--` means that the provider did not supply a timestamp. The full localized date and time remain available by hovering the meter.
+Each meter shows the provider-supplied reset time in the Mac's local time zone. A provider with one returned window uses a two-column header: usage is centered in the first column and its reset time in the second. Providers with two or three windows place each reset below its matching bar. Codex supplies `resetsAt` through its [app-server rate-limit response](https://learn.chatgpt.com/docs/app-server#6-rate-limits-chatgpt), while Claude Code supplies `resets_at` through its [status-line data](https://code.claude.com/docs/en/statusline#rate-limit-usage). Resets later today use `HH:mm`; a different day uses `M/D HH:mm`. `--` means that the provider did not supply a timestamp. The full localized date and time remain available by hovering the meter.
 
 Codex displays whichever 5-hour and weekly windows the signed-in account returns. DockDeck uses the returned durations instead of guessing the plan. OpenAI documents a shared 5-hour window for local and cloud tasks and notes that weekly limits may also apply in the [Codex pricing guide](https://learn.chatgpt.com/docs/pricing).
 
-Claude displays the officially documented 5-hour and weekly fields available in Claude Code's status-line payload. Anthropic does not currently document a separate Fable rate-limit field. For forward compatibility, DockDeck recognizes the experimental aliases `seven_day_fable` and `fable`; it adds an `FBL` meter only when the payload actually contains one of them and never estimates Fable usage. [Fable availability is plan-specific](https://support.claude.com/en/articles/15424964-claude-fable-5-on-your-plan), and Fable 5 requires Claude Code `2.1.170` or later.
+Claude displays the officially documented 5-hour and weekly fields available in Claude Code's status-line payload. Anthropic does not currently document a separate Fable rate-limit field. For forward compatibility, DockDeck recognizes the experimental aliases `seven_day_fable` and `fable`; it adds an `FBL` meter only when the payload actually contains one of them and never estimates Fable usage. [Fable availability is plan-specific](https://support.claude.com/en/articles/15424964-claude-fable-models-on-your-plan), and Fable 5 requires Claude Code `2.1.170` or later.
 
 - More than 50% remaining (less than 50% used): selected text color
 - 20–50% remaining (50–80% used): orange
@@ -321,6 +321,8 @@ Report suspected vulnerabilities through [GitHub private vulnerability reporting
 DockDeck began as a derivative of [Starboard v0.17.1](https://github.com/palamim/starboard/tree/v0.17.1) by Leonardo Palamim Cardozo. It is independently maintained and is not affiliated with or endorsed by the original project.
 
 Starboard's MIT copyright and permission notice remain in [LICENSE](LICENSE). Dependency notices are recorded in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) and [ThirdPartyLicenses](ThirdPartyLicenses).
+
+OpenAI and Claude marks identify their respective usage providers only. DockDeck is not affiliated with or endorsed by OpenAI or Anthropic. The marks remain the property of their respective owners and are not covered by DockDeck's MIT license; provenance is recorded in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 ## License
 

@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import SwiftUI
 
@@ -22,6 +23,47 @@ enum UsageResetFormatter {
         guard let resetsAt = window.resetsAt else { return "\(prefix) reset time unavailable" }
         return "\(prefix) resets \(resetsAt.formatted(date: .abbreviated, time: .shortened))"
     }
+}
+
+enum UsageResetPlacement: Equatable {
+    case splitHeader
+    case below
+
+    static func forWindowCount(_ count: Int) -> Self {
+        count == 1 ? .splitHeader : .below
+    }
+}
+
+enum UsageProviderMarkAsset {
+    static func resourceName(for providerID: UsageProviderID, dark: Bool) -> String {
+        switch providerID {
+        case .codex:
+            dark ? "OpenAI-Blossom-White" : "OpenAI-Blossom-Black"
+        case .claude:
+            "ClaudeIcon-Rounded"
+        }
+    }
+
+    static func image(for providerID: UsageProviderID, dark: Bool) -> NSImage? {
+        images[resourceName(for: providerID, dark: dark)]
+    }
+
+    private static let images: [String: NSImage] = {
+        let names = [
+            "OpenAI-Blossom-White",
+            "OpenAI-Blossom-Black",
+            "ClaudeIcon-Rounded",
+        ]
+        return Dictionary(
+            uniqueKeysWithValues: names.compactMap { name in
+                guard
+                    let url = Bundle.module.url(
+                        forResource: name, withExtension: "svg", subdirectory: "ProviderMarks"),
+                    let image = NSImage(contentsOf: url)
+                else { return nil }
+                return (name, image)
+            })
+    }()
 }
 
 struct UsagePanelConfiguration: Equatable {
@@ -82,15 +124,16 @@ private struct QuotaRow: View {
     var body: some View {
         let windows = Array(provider.windows.prefix(3))
         let spacing: CGFloat = compact ? 4 : 6
-        let providerWidth: CGFloat = compact ? 44 : 54
+        let providerWidth: CGFloat = compact ? 26 : 32
+        let resetPlacement = UsageResetPlacement.forWindowCount(windows.count)
 
         HStack(alignment: .center, spacing: spacing) {
-            Text(provider.name)
-                .font(configuration.font(weight: .bold))
-                .foregroundStyle(providerColor)
-                .lineLimit(1)
-                .minimumScaleFactor(0.8)
-                .frame(width: providerWidth, alignment: .leading)
+            UsageProviderMark(
+                provider: provider,
+                theme: theme,
+                fallbackColor: providerColor,
+                compact: compact)
+                .frame(width: providerWidth)
                 .help(provider.detail ?? provider.freshness.label ?? provider.name)
 
             if windows.isEmpty {
@@ -110,7 +153,9 @@ private struct QuotaRow: View {
                             configuration: configuration,
                             baseColor: baseColor,
                             meterColor: meterColor(for: window),
-                            dense: windows.count > 2)
+                            dense: windows.count > 2,
+                            resetPlacement: resetPlacement,
+                            columnSpacing: spacing)
                         .frame(maxWidth: .infinity)
                     }
                 }
@@ -155,30 +200,108 @@ private struct QuotaRow: View {
     }
 }
 
+private struct UsageProviderMark: View {
+    let provider: ProviderUsage
+    let theme: Theme
+    let fallbackColor: Color
+    let compact: Bool
+
+    var body: some View {
+        ZStack(alignment: .trailing) {
+            Group {
+                if let image = UsageProviderMarkAsset.image(
+                    for: provider.id, dark: theme.isDark)
+                {
+                    Image(nsImage: image)
+                        .resizable()
+                        .interpolation(.high)
+                        .scaledToFit()
+                } else {
+                    Text(String(provider.name.prefix(1)))
+                        .font(.system(size: markSize - 2, weight: .bold, design: .rounded))
+                        .foregroundStyle(fallbackColor)
+                }
+            }
+            .frame(width: markSize, height: markSize)
+            .frame(maxWidth: .infinity, alignment: .center)
+
+            if needsAttention {
+                Circle()
+                    .fill(fallbackColor)
+                    .frame(width: 4, height: 4)
+            }
+        }
+        .frame(height: markSize)
+        .accessibilityHidden(true)
+    }
+
+    private var markSize: CGFloat {
+        switch provider.id {
+        case .codex:
+            compact ? 22 : 24
+        case .claude:
+            compact ? 16 : 18
+        }
+    }
+
+    private var needsAttention: Bool {
+        switch provider.freshness {
+        case .stale, .signIn, .unavailable, .setupRequired:
+            true
+        case .loading, .live:
+            false
+        }
+    }
+}
+
 private struct UsageMeter: View {
     let window: UsageWindow
     let configuration: UsagePanelConfiguration
     let baseColor: Color
     let meterColor: Color
     let dense: Bool
+    let resetPlacement: UsageResetPlacement
+    let columnSpacing: CGFloat
 
     var body: some View {
-        VStack(spacing: 1) {
-            MeterLabel(
-                window: window,
-                configuration: configuration,
-                baseColor: baseColor,
-                meterColor: meterColor,
-                dense: dense)
+        VStack(spacing: resetPlacement == .splitHeader ? 2 : 1) {
+            if resetPlacement == .splitHeader {
+                HStack(alignment: .firstTextBaseline, spacing: columnSpacing) {
+                    MeterLabel(
+                        window: window,
+                        configuration: configuration,
+                        baseColor: baseColor,
+                        meterColor: meterColor,
+                        dense: dense)
+                        .frame(maxWidth: .infinity, alignment: .center)
+                    ResetLabel(
+                        window: window,
+                        configuration: configuration,
+                        baseColor: baseColor,
+                        dense: dense,
+                        placement: resetPlacement)
+                        .frame(maxWidth: .infinity, alignment: .center)
+                }
+            } else {
+                MeterLabel(
+                    window: window,
+                    configuration: configuration,
+                    baseColor: baseColor,
+                    meterColor: meterColor,
+                    dense: dense)
+            }
             MeterBar(
                 value: configuration.displayMode.value(for: window),
                 baseColor: baseColor,
                 meterColor: meterColor)
-            ResetLabel(
-                window: window,
-                configuration: configuration,
-                baseColor: baseColor,
-                dense: dense)
+            if resetPlacement == .below {
+                ResetLabel(
+                    window: window,
+                    configuration: configuration,
+                    baseColor: baseColor,
+                    dense: dense,
+                    placement: resetPlacement)
+            }
         }
     }
 }
@@ -211,23 +334,29 @@ private struct ResetLabel: View {
     let configuration: UsagePanelConfiguration
     let baseColor: Color
     let dense: Bool
+    let placement: UsageResetPlacement
 
     var body: some View {
         HStack(spacing: 1.5) {
-            Image(systemName: "arrow.clockwise")
-                .font(.system(size: max(fontSize - 1, 5.5), weight: .semibold))
+            if !dense {
+                Image(systemName: "arrow.clockwise")
+                    .font(.system(size: max(fontSize - 0.5, 6), weight: .semibold))
+            }
             Text(UsageResetFormatter.compactString(for: window.resetsAt))
                 .font(configuration.font(size: fontSize, weight: .medium))
                 .monospacedDigit()
         }
-        .foregroundStyle(baseColor.opacity(window.resetsAt == nil ? 0.38 : 0.68))
+        .foregroundStyle(baseColor.opacity(window.resetsAt == nil ? 0.38 : 0.82))
         .lineLimit(1)
-        .minimumScaleFactor(0.68)
+        .minimumScaleFactor(dense ? 0.75 : 0.82)
         .help(UsageResetFormatter.helpText(for: window))
     }
 
     private var fontSize: CGFloat {
-        min(max(configuration.fontSize - (dense ? 3.5 : 2.5), 6.5), 8)
+        if placement == .splitHeader {
+            return min(max(configuration.fontSize - 1, 8.5), 10)
+        }
+        return min(max(configuration.fontSize - (dense ? 2 : 1.5), dense ? 7.5 : 8.25), 9)
     }
 }
 

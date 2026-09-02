@@ -16,7 +16,8 @@ let package = Package(
         .executableTarget(
             name: "DockDeck",
             dependencies: ["SwiftTerm"],
-            path: "Sources/DockDeck"
+            path: "Sources/DockDeck",
+            resources: [.copy("Resources/ProviderMarks")]
         ),
         .executableTarget(
             name: "DockDeckClaudeBridge",
