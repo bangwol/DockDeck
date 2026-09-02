@@ -238,6 +238,49 @@ final class ProjectPulseTests: XCTestCase {
         store.stop()
     }
 
+    func testStoreClearsRepositorySnapshotWhenSwitchingGitHubScope() {
+        let repository = fixtureGitHubSnapshot()
+        let snapshot = ProjectPulseSnapshot(
+            git: ProjectGitSnapshot(
+                repositoryName: repository.shortName,
+                branch: repository.defaultBranch,
+                stagedCount: 0,
+                modifiedCount: 0,
+                untrackedCount: 0,
+                conflictCount: 0,
+                aheadCount: 0,
+                behindCount: 0),
+            github: repository,
+            workflow: nil)
+        let store = ProjectPulseStore(
+            configuration: ProjectPulseConfiguration(
+                source: .github,
+                githubRepository: repository.nameWithOwner),
+            reader: FakeProjectPulseReader(snapshot: snapshot),
+            initialSnapshot: snapshot)
+
+        store.updateConfiguration(
+            ProjectPulseConfiguration(source: .github, githubScope: .activity))
+
+        XCTAssertNil(store.snapshot)
+        XCTAssertEqual(store.status, .loading)
+    }
+
+    func testCommandRejectsCombinedOutputAboveLimit() throws {
+        XCTAssertThrowsError(
+            try ProjectPulseCommand.run(
+                executableURL: URL(fileURLWithPath: "/bin/dd"),
+                arguments: [
+                    "if=/dev/zero",
+                    "bs=\(ProjectPulseCommand.maximumOutputBytes + 1)",
+                    "count=1",
+                ],
+                currentDirectoryURL: FileManager.default.temporaryDirectory)
+        ) { error in
+            XCTAssertEqual(error as? ProjectPulseError, .outputTooLarge)
+        }
+    }
+
     func testReaderReadsTemporaryGitRepository() throws {
         let fileManager = FileManager.default
         let directory = fileManager.temporaryDirectory

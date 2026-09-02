@@ -470,16 +470,34 @@ enum ProjectPulseCommand {
         process.standardOutput = outputPipe
         process.standardError = errorPipe
 
-        let capture = ProjectPulseCommandCapture()
+        let capture = ProjectPulseCommandCapture(limit: maximumOutputBytes)
         let reads = DispatchGroup()
         reads.enter()
         DispatchQueue.global(qos: .utility).async {
-            capture.setOutput(outputPipe.fileHandleForReading.readDataToEndOfFile())
+            while true {
+                let data: Data?
+                do {
+                    data = try outputPipe.fileHandleForReading.read(upToCount: 65_536)
+                } catch {
+                    break
+                }
+                guard let data, !data.isEmpty else { break }
+                capture.appendOutput(data)
+            }
             reads.leave()
         }
         reads.enter()
         DispatchQueue.global(qos: .utility).async {
-            capture.setError(errorPipe.fileHandleForReading.readDataToEndOfFile())
+            while true {
+                let data: Data?
+                do {
+                    data = try errorPipe.fileHandleForReading.read(upToCount: 65_536)
+                } catch {
+                    break
+                }
+                guard let data, !data.isEmpty else { break }
+                capture.appendError(data)
+            }
             reads.leave()
         }
 
@@ -504,9 +522,7 @@ enum ProjectPulseCommand {
             throw ProjectPulseError.commandTimedOut
         }
         reads.wait()
-        guard capture.output.count <= maximumOutputBytes,
-            capture.error.count <= maximumOutputBytes
-        else { throw ProjectPulseError.outputTooLarge }
+        guard !capture.exceededLimit else { throw ProjectPulseError.outputTooLarge }
         guard process.terminationStatus == 0 else { throw ProjectPulseError.commandFailed }
         return capture.output
     }
@@ -514,14 +530,33 @@ enum ProjectPulseCommand {
 
 private final class ProjectPulseCommandCapture {
     private let lock = NSLock()
+    private let limit: Int
     private var storedOutput = Data()
-    private var storedError = Data()
+    private var storedByteCount = 0
+    private var didExceedLimit = false
 
     var output: Data { lock.withLock { storedOutput } }
-    var error: Data { lock.withLock { storedError } }
+    var exceededLimit: Bool { lock.withLock { didExceedLimit } }
 
-    func setOutput(_ data: Data) { lock.withLock { storedOutput = data } }
-    func setError(_ data: Data) { lock.withLock { storedError = data } }
+    init(limit: Int) { self.limit = max(limit, 0) }
+
+    func appendOutput(_ data: Data) {
+        append(data, capturesOutput: true)
+    }
+
+    func appendError(_ data: Data) {
+        append(data, capturesOutput: false)
+    }
+
+    private func append(_ data: Data, capturesOutput: Bool) {
+        lock.withLock {
+            guard !data.isEmpty else { return }
+            let remaining = max(limit - storedByteCount, 0)
+            if capturesOutput { storedOutput.append(data.prefix(remaining)) }
+            storedByteCount += min(data.count, remaining)
+            if data.count > remaining { didExceedLimit = true }
+        }
+    }
 }
 
 final class ProjectPulseStore: ObservableObject {
@@ -570,6 +605,7 @@ final class ProjectPulseStore: ObservableObject {
         guard self.configuration != configuration else { return }
         let repositoryChanged = self.configuration.source != configuration.source
             || self.configuration.repositoryPath != configuration.repositoryPath
+            || self.configuration.githubScope != configuration.githubScope
             || self.configuration.githubRepository != configuration.githubRepository
         self.configuration = configuration
         generation += 1
