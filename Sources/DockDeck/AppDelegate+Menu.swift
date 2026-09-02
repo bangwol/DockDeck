@@ -77,19 +77,14 @@ extension AppDelegate {
     }
 
     @objc func refreshModules(_ sender: Any?) {
-        if PanelSettings.enabledReadOnlyModules.contains(.usage) { usageStore.refresh() }
-        if PanelSettings.enabledReadOnlyModules.contains(.systemStats) {
-            systemStatsStore.refresh()
-        }
-        if PanelSettings.enabledReadOnlyModules.contains(.serviceMonitor) {
-            serviceMonitorStore.refresh()
-        }
-        if PanelSettings.enabledReadOnlyModules.contains(.weather) {
-            weatherStore.refresh()
-        }
-        if PanelSettings.enabledReadOnlyModules.contains(.schedule) {
-            scheduleStore.refreshAuthorization()
-        }
+        let enabled = Set(PanelSettings.enabledReadOnlyModules)
+        if enabled.contains(.usage) { usageStore.refresh() }
+        if enabled.contains(.systemStats) { systemStatsStore.refresh() }
+        if enabled.contains(.serviceMonitor) { serviceMonitorStore.refresh() }
+        if enabled.contains(.weather) { weatherStore.refresh() }
+        if enabled.contains(.schedule) { scheduleStore.refreshAuthorization() }
+        if enabled.contains(.battery) { batteryStore.refresh() }
+        if enabled.contains(.network) { networkStore.refresh() }
         refreshCoarseCaches()
         startTrackingTimer()
         runEvaluation()
