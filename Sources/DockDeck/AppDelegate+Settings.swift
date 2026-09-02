@@ -149,10 +149,11 @@ extension AppDelegate {
             contentRect: NSRect(
                 origin: settingsOrigin(anchor: anchor, size: SettingsPanelView.preferredSize),
                 size: SettingsPanelView.preferredSize),
-            styleMask: [.titled, .closable],
+            styleMask: [.titled, .closable, .resizable],
             backing: .buffered,
             defer: false)
         settingsPanelWindow.title = pane.windowTitle
+        settingsPanelWindow.contentMinSize = SettingsPanelView.preferredSize
         settingsPanelWindow.level = .floating
         settingsPanelWindow.isOpaque = true
         settingsPanelWindow.backgroundColor = .windowBackgroundColor

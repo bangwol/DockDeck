@@ -2,7 +2,8 @@ import Cocoa
 import SwiftUI
 
 final class SettingsPanelView: NSView {
-    static let preferredSize = NSSize(width: 700, height: 520)
+    static let preferredSize = NSSize(width: 740, height: 540)
+    static let sidebarWidth: CGFloat = 200
 
     private let model: SettingsPanelModel
     private let hostingView: NSHostingView<SettingsRootView>
@@ -94,9 +95,10 @@ private struct SettingsRootView: View {
                     .tag(pane)
                 }
                 .listStyle(.sidebar)
+                .scrollContentBackground(.hidden)
             }
-            .frame(width: 184)
-            .background(Color(nsColor: .underPageBackgroundColor))
+            .frame(width: SettingsPanelView.sidebarWidth)
+            .background(SidebarBackdrop())
 
             Divider()
 
@@ -148,6 +150,19 @@ private struct SettingsRootView: View {
             AppearanceSettingsView(model: model)
         }
     }
+}
+
+/// One sidebar material behind both the header and the list. A flat `underPageBackgroundColor`
+/// left a darker band above the list in light mode because the sidebar list paints its own surface.
+private struct SidebarBackdrop: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSVisualEffectView {
+        let view = NSVisualEffectView()
+        view.material = .sidebar
+        view.blendingMode = .behindWindow
+        return view
+    }
+
+    func updateNSView(_ nsView: NSVisualEffectView, context: Context) {}
 }
 
 private struct SettingsHeader: View {
