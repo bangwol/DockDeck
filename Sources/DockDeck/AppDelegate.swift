@@ -38,6 +38,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     lazy var clockStore = ClockStore()
     lazy var batteryStore = BatteryStore()
     lazy var networkStore = NetworkStore()
+    lazy var projectPulseStore = ProjectPulseStore()
     let notificationCoordinator = DockNotificationCoordinator(
         settings: PanelSettings.notifications)
     lazy var dockCoordinator = DockCoordinator { [weak self] channel, message in
@@ -150,6 +151,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             clockStore: clockStore,
             batteryStore: batteryStore,
             networkStore: networkStore,
+            projectPulseStore: projectPulseStore,
             menuTarget: self,
             side: .left,
             onSelectionChange: { [weak self] side in
@@ -166,6 +168,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             clockStore: clockStore,
             batteryStore: batteryStore,
             networkStore: networkStore,
+            projectPulseStore: projectPulseStore,
             menuTarget: self,
             side: .right,
             onSelectionChange: { [weak self] side in
@@ -319,6 +322,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             stop: { [weak self] in self?.networkStore.stop() },
             updateActivity: { [weak self] activity, lowPowerMode in
                 self?.networkStore.setRuntimeActivity(
+                    activity, lowPowerMode: lowPowerMode)
+            })
+        moduleRuntimeCoordinator.register(
+            .projectPulse,
+            start: { [weak self] in self?.projectPulseStore.start() },
+            stop: { [weak self] in self?.projectPulseStore.stop() },
+            updateActivity: { [weak self] activity, lowPowerMode in
+                self?.projectPulseStore.setRuntimeActivity(
                     activity, lowPowerMode: lowPowerMode)
             })
     }

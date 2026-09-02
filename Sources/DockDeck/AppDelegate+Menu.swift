@@ -88,6 +88,7 @@ extension AppDelegate {
         if enabled.contains(.schedule) { scheduleStore.refreshAuthorization() }
         if enabled.contains(.battery) { batteryStore.refresh() }
         if enabled.contains(.network) { networkStore.refresh() }
+        if enabled.contains(.projectPulse) { projectPulseStore.refresh() }
         refreshCoarseCaches()
         startTrackingTimer()
         runEvaluation()

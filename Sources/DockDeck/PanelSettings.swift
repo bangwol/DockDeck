@@ -140,10 +140,12 @@ struct PanelModuleID: Hashable, Codable {
     static let clock = PanelModuleID(rawValue: "clock")
     static let battery = PanelModuleID(rawValue: "battery")
     static let network = PanelModuleID(rawValue: "network")
+    static let projectPulse = PanelModuleID(rawValue: "project-pulse")
 
     static let readOnlyBuiltIns: [PanelModuleID] = [
         .usage, .systemStats, .serviceMonitor, .weather, .schedule, .clock, .battery,
         .network,
+        .projectPulse,
     ]
     static let builtIns: [PanelModuleID] = [.terminal] + readOnlyBuiltIns
 
@@ -320,6 +322,8 @@ enum PanelSettings {
     private static let batteryRefreshIntervalKey = "DockDeck.settings.batteryRefreshInterval"
     private static let networkRefreshIntervalKey = "DockDeck.settings.networkRefreshInterval"
     private static let notificationsKey = "DockDeck.settings.notifications.v1"
+    private static let projectPulseConfigurationKey =
+        "DockDeck.settings.projectPulseConfiguration.v1"
     private static let panelOrderKey = "DockDeck.settings.panelOrder"
     private static let enabledPanelsKey = "DockDeck.settings.enabledPanels"
     private static let panelDeckConfigurationKey =
@@ -699,6 +703,20 @@ enum PanelSettings {
         }
     }
 
+    static var projectPulseConfiguration: ProjectPulseConfiguration {
+        get {
+            guard let data = UserDefaults.standard.data(forKey: projectPulseConfigurationKey),
+                let configuration = try? JSONDecoder().decode(
+                    ProjectPulseConfiguration.self, from: data)
+            else { return ProjectPulseConfiguration() }
+            return configuration.normalized()
+        }
+        set {
+            guard let data = try? JSONEncoder().encode(newValue.normalized()) else { return }
+            UserDefaults.standard.set(data, forKey: projectPulseConfigurationKey)
+        }
+    }
+
     static var enabledPanels: EnabledPanels {
         get {
             var panels: EnabledPanels = []
@@ -806,6 +824,7 @@ enum PanelSettings {
         defaults.removeObject(forKey: batteryRefreshIntervalKey)
         defaults.removeObject(forKey: networkRefreshIntervalKey)
         defaults.removeObject(forKey: notificationsKey)
+        defaults.removeObject(forKey: projectPulseConfigurationKey)
         defaults.removeObject(forKey: panelOrderKey)
         defaults.removeObject(forKey: enabledPanelsKey)
         defaults.removeObject(forKey: panelDeckConfigurationKey)

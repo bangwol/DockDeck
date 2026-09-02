@@ -20,6 +20,7 @@ final class PanelAppearanceTests: XCTestCase {
             [
                 .usage, .systemStats, .serviceMonitor, .weather, .schedule, .clock, .battery,
                 .network,
+                .projectPulse,
             ])
         XCTAssertEqual(configuration.right, [.terminal])
         XCTAssertEqual(configuration.enabled, [.terminal])
@@ -42,6 +43,7 @@ final class PanelAppearanceTests: XCTestCase {
             [
                 .usage, .systemStats, .serviceMonitor, .weather, .schedule, .clock, .battery,
                 .network,
+                .projectPulse,
             ])
         XCTAssertEqual(decoded.enabled, [futureModule])
     }
@@ -58,6 +60,7 @@ final class PanelAppearanceTests: XCTestCase {
             configuration.right,
             [
                 .usage, .serviceMonitor, .weather, .schedule, .clock, .battery, .network,
+                .projectPulse,
             ])
     }
 
@@ -112,6 +115,7 @@ final class PanelAppearanceTests: XCTestCase {
             [
                 .usage, .systemStats, .serviceMonitor, .weather, .schedule, .clock, .battery,
                 .network,
+                .projectPulse,
             ])
         XCTAssertEqual(model.values.deckConfiguration.right, [.terminal, futureModule])
         XCTAssertEqual(persistedConfiguration, model.values.deckConfiguration)
@@ -191,7 +195,7 @@ final class PanelAppearanceTests: XCTestCase {
             model.availablePanes,
             [
                 .decks, .notifications, .terminal, .usage, .systemStats, .serviceMonitor,
-                .weather, .schedule, .clock, .battery, .network, .appearance,
+                .weather, .schedule, .clock, .battery, .network, .projectPulse, .appearance,
             ])
         XCTAssertEqual(model.moduleDefinition(for: .usage)?.id, .usage)
         XCTAssertEqual(model.moduleDefinition(for: .systemStats)?.id, .systemStats)
@@ -201,6 +205,7 @@ final class PanelAppearanceTests: XCTestCase {
         XCTAssertEqual(model.moduleDefinition(for: .clock)?.id, .clock)
         XCTAssertEqual(model.moduleDefinition(for: .battery)?.id, .battery)
         XCTAssertEqual(model.moduleDefinition(for: .network)?.id, .network)
+        XCTAssertEqual(model.moduleDefinition(for: .projectPulse)?.id, .projectPulse)
     }
 
     func testModuleRuntimeCoordinatorStartsAndStopsOnlyChangedModules() {
@@ -644,6 +649,7 @@ final class PanelAppearanceTests: XCTestCase {
             clockStore: ClockStore(),
             batteryStore: BatteryStore(),
             networkStore: NetworkStore(),
+            projectPulseStore: ProjectPulseStore(),
             menuTarget: NSObject(),
             side: side)
     }
@@ -682,6 +688,7 @@ final class PanelAppearanceTests: XCTestCase {
                 timeZoneIdentifier: ClockTimeZone.systemIdentifier, hourFormat: .system),
             battery: BatterySettingsState(refreshInterval: 60),
             network: NetworkSettingsState(refreshInterval: 2),
+            projectPulse: ProjectPulseConfiguration(),
             appearance: AppearanceSettingsState(
                 cornerRadius: 10, tintOpacity: 0.6))
     }

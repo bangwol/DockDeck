@@ -30,6 +30,7 @@ final class ReadOnlyDeckPanelController: NSObject, NSMenuDelegate {
     private let clockStore: ClockStore
     private let batteryStore: BatteryStore
     private let networkStore: NetworkStore
+    private let projectPulseStore: ProjectPulseStore
     private weak var menuTarget: AnyObject?
     private var theme: Theme
     private let onSelectionChange: (PanelSide) -> Void
@@ -47,6 +48,7 @@ final class ReadOnlyDeckPanelController: NSObject, NSMenuDelegate {
         clockStore: ClockStore,
         batteryStore: BatteryStore,
         networkStore: NetworkStore,
+        projectPulseStore: ProjectPulseStore,
         menuTarget: AnyObject,
         side: PanelSide = .right,
         onSelectionChange: @escaping (PanelSide) -> Void = { _ in }
@@ -59,6 +61,7 @@ final class ReadOnlyDeckPanelController: NSObject, NSMenuDelegate {
         self.clockStore = clockStore
         self.batteryStore = batteryStore
         self.networkStore = networkStore
+        self.projectPulseStore = projectPulseStore
         self.theme = theme
         self.menuTarget = menuTarget
         self.side = side
@@ -92,6 +95,7 @@ final class ReadOnlyDeckPanelController: NSObject, NSMenuDelegate {
                 clockStore: clockStore,
                 batteryStore: batteryStore,
                 networkStore: networkStore,
+                projectPulseStore: projectPulseStore,
                 activeModule: PanelSettings.activeModule(on: side),
                 theme: theme))
         hostingView.frame = surfaceView.bounds
@@ -152,6 +156,7 @@ final class ReadOnlyDeckPanelController: NSObject, NSMenuDelegate {
             clockStore: clockStore,
             batteryStore: batteryStore,
             networkStore: networkStore,
+            projectPulseStore: projectPulseStore,
             activeModule: activeModule,
             theme: theme)
     }

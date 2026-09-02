@@ -13,6 +13,7 @@ enum SettingsPaneID: String, CaseIterable, Identifiable {
     case clock
     case battery
     case network
+    case projectPulse
     case appearance
 
     var id: Self { self }
@@ -30,6 +31,7 @@ enum SettingsPaneID: String, CaseIterable, Identifiable {
         case .clock: "World Clock"
         case .battery: "Battery"
         case .network: "Network"
+        case .projectPulse: "Project Pulse"
         case .appearance: "Appearance"
         }
     }
@@ -47,6 +49,7 @@ enum SettingsPaneID: String, CaseIterable, Identifiable {
         case .clock: "Show local time or another time zone."
         case .battery: "Show charge, power state, and time left."
         case .network: "Show local download and upload throughput."
+        case .projectPulse: "Show local Git and optional GitHub Actions status."
         case .appearance: "Adjust the shared panel surface."
         }
     }
@@ -64,6 +67,7 @@ enum SettingsPaneID: String, CaseIterable, Identifiable {
         case .clock: "clock"
         case .battery: "battery.75percent"
         case .network: "network"
+        case .projectPulse: "point.3.connected.trianglepath.dotted"
         case .appearance: "paintbrush"
         }
     }
@@ -108,6 +112,9 @@ enum PanelModuleRegistry {
         PanelModuleDefinition(
             id: .network, title: "Network", subtitle: "Download and upload rates",
             symbolName: "network", settingsPane: .network),
+        PanelModuleDefinition(
+            id: .projectPulse, title: "Project Pulse", subtitle: "Git and Actions status",
+            symbolName: "point.3.connected.trianglepath.dotted", settingsPane: .projectPulse),
     ]
 
     static func definition(for id: PanelModuleID) -> PanelModuleDefinition? {
@@ -186,12 +193,14 @@ struct SettingsPanelValues: Equatable {
     var clock: ClockSettingsState
     var battery: BatterySettingsState
     var network: NetworkSettingsState
+    var projectPulse: ProjectPulseConfiguration
     var appearance: AppearanceSettingsState
 
     func normalized() -> Self {
         var values = self
         values.deckConfiguration = deckConfiguration.normalized()
         values.systemStats.metrics = SystemStatsMetric.normalized(systemStats.metrics)
+        values.projectPulse = projectPulse.normalized()
         return values
     }
 }
@@ -245,6 +254,10 @@ enum NetworkSettingsChange {
     case refreshInterval(TimeInterval)
 }
 
+enum ProjectPulseSettingsChange {
+    case configuration(ProjectPulseConfiguration)
+}
+
 enum AppearanceSettingsChange {
     case cornerRadius(CGFloat)
     case tintOpacity(CGFloat)
@@ -262,6 +275,7 @@ enum SettingsPanelChange {
     case clock(ClockSettingsChange)
     case battery(BatterySettingsChange)
     case network(NetworkSettingsChange)
+    case projectPulse(ProjectPulseSettingsChange)
     case appearance(AppearanceSettingsChange)
 }
 
@@ -645,6 +659,18 @@ final class SettingsPanelModel: ObservableObject {
         onChange?(.network(.refreshInterval(selected)))
     }
 
+    func setProjectPulseRepositoryPath(_ path: String?) {
+        updateProjectPulseConfiguration { $0.repositoryPath = path }
+    }
+
+    func setProjectPulseIncludesGitHubActions(_ value: Bool) {
+        updateProjectPulseConfiguration { $0.includesGitHubActions = value }
+    }
+
+    func setProjectPulseRefreshInterval(_ value: TimeInterval) {
+        updateProjectPulseConfiguration { $0.refreshInterval = value }
+    }
+
     func setValues(_ values: SettingsPanelValues) {
         self.values = values.normalized()
         if !availablePanes.contains(selectedPane) { selectedPane = .decks }
@@ -704,6 +730,16 @@ final class SettingsPanelModel: ObservableObject {
         let endpoints = Array(endpoints.prefix(ServiceMonitorEndpoint.maximumCount))
         updateValues { $0.serviceMonitor.endpoints = endpoints }
         onChange?(.serviceMonitor(.endpoints(endpoints)))
+    }
+
+    private func updateProjectPulseConfiguration(
+        _ update: (inout ProjectPulseConfiguration) -> Void
+    ) {
+        var configuration = values.projectPulse
+        update(&configuration)
+        configuration = configuration.normalized()
+        updateValues { $0.projectPulse = configuration }
+        onChange?(.projectPulse(.configuration(configuration)))
     }
 
     private func resolvedScheduleCalendarIDs(availableIDs: [String]) -> Set<String> {

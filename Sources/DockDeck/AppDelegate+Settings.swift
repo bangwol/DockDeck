@@ -166,6 +166,8 @@ extension AppDelegate {
                 refreshInterval: PanelSettings.scheduleRefreshInterval)
             self.batteryStore.setRefreshInterval(PanelSettings.batteryRefreshInterval)
             self.networkStore.setRefreshInterval(PanelSettings.networkRefreshInterval)
+            self.projectPulseStore.updateConfiguration(
+                PanelSettings.projectPulseConfiguration)
             self.applyCornerRadius()
             self.applyTintOpacity()
             self.applyFont()
@@ -241,6 +243,7 @@ extension AppDelegate {
                 refreshInterval: PanelSettings.batteryRefreshInterval),
             network: NetworkSettingsState(
                 refreshInterval: PanelSettings.networkRefreshInterval),
+            projectPulse: PanelSettings.projectPulseConfiguration,
             appearance: AppearanceSettingsState(
                 cornerRadius: PanelSettings.cornerRadius,
                 tintOpacity: PanelSettings.tintOpacity
@@ -343,6 +346,9 @@ extension AppDelegate {
         case .network(.refreshInterval(let interval)):
             PanelSettings.networkRefreshInterval = interval
             networkStore.setRefreshInterval(interval)
+        case .projectPulse(.configuration(let configuration)):
+            PanelSettings.projectPulseConfiguration = configuration
+            projectPulseStore.updateConfiguration(configuration)
         case .appearance(.cornerRadius(let radius)):
             PanelSettings.cornerRadius = radius
             applyCornerRadius()

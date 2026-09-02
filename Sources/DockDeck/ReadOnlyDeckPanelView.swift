@@ -38,6 +38,7 @@ struct ReadOnlyDeckPanelView: View {
     let clockStore: ClockStore
     let batteryStore: BatteryStore
     let networkStore: NetworkStore
+    let projectPulseStore: ProjectPulseStore
     let activeModule: PanelModuleID?
     let theme: Theme
 
@@ -63,6 +64,8 @@ struct ReadOnlyDeckPanelView: View {
             BatteryPanelView(store: batteryStore, theme: theme)
         case .network:
             NetworkPanelView(store: networkStore, theme: theme)
+        case .projectPulse:
+            ProjectPulsePanelView(store: projectPulseStore, theme: theme)
         default:
             EmptyView()
         }

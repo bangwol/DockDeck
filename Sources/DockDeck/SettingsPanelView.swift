@@ -148,6 +148,8 @@ private struct SettingsRootView: View {
             BatterySettingsView(model: model)
         case .network:
             NetworkSettingsView(model: model)
+        case .projectPulse:
+            ProjectPulseSettingsView(model: model)
         case .appearance:
             AppearanceSettingsView(model: model)
         }
