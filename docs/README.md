@@ -9,7 +9,13 @@ front page harder to scan.
 - [Terminal](modules/terminal.md)
 - [Usage](modules/usage.md)
 - [System Stats](modules/system-stats.md)
-- [Service Monitor, Weather, Schedule, World Clock, Battery, and Network](modules/catalog.md)
+- [Schedule and Reminders](modules/schedule.md)
+- [Project Pulse](modules/project-pulse.md)
+- [Service Monitor, Weather, World Clock, Battery, Network, and Focus Timer](modules/catalog.md)
+
+## App behavior
+
+- [Local notifications](notifications.md)
 
 ## Integrations
 

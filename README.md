@@ -18,23 +18,26 @@
   <sub>Compact terminal and configurable Codex and Claude usage beside the macOS Dock. Open the image for full resolution.</sub>
 </p>
 
-DockDeck uses the space beside a bottom-aligned Dock for up to two compact module Decks. Assign Terminal, Usage, System Stats, Service Monitor, Weather, Schedule, World Clock, Battery, and Network to either side; each non-empty Deck shows one enabled module at a time. The terminal stays interactive whenever it is selected. Both Decks follow the Dock across displays, Spaces, and auto-hide transitions.
+DockDeck uses the space beside a bottom-aligned Dock for up to two compact module Decks. Assign Terminal, Usage, System Stats, Service Monitor, Weather, Schedule, World Clock, Battery, Network, Project Pulse, and Focus Timer to either side; each non-empty Deck shows one enabled module at a time. The terminal stays interactive whenever it is selected. Both Decks follow the Dock across displays, Spaces, and auto-hide transitions.
 
 ## Features
 
 - Persistent [SwiftTerm](https://github.com/migueldeicaza/SwiftTerm) login shell with a compact `% ` prompt that does not change user shell files.
-- Remaining or used Codex and Claude capacity from their supported local interfaces; either provider can be selected independently, with no browser cookies or private web endpoints.
+- Remaining or used Codex and Claude capacity, reset times, and an optional even-use pace marker from their supported local interfaces; either provider can be selected independently, with no browser cookies or private web endpoints.
 - Two to four selectable local CPU, memory, disk, network-I/O, and temperature tiles with a configurable 1–10 second sampling interval.
 - HTTPS service availability and latency checks for up to four user-configured endpoints.
 - Current temperature, daily high and low, and conditions for a user-selected city.
-- Current or next macOS Calendar event with a live elapsed-time bar.
+- Current or next macOS Calendar event plus optional due Reminders, with separate explicit permissions and source selection.
 - Local or selected-world-time display with system, 12-hour, and 24-hour formats.
 - Internal battery level, power state, and the system-provided charge or discharge estimate.
 - Local download and upload throughput for the current primary network interface.
+- Local Git branch and working-tree status with optional GitHub Actions status through the installed `gh` CLI.
+- Persistent focus and break countdowns that continue behind other modules and survive an app restart.
+- Opt-in native notifications for quota thresholds, service transitions, low battery, and completed focus timers.
 - Dock-aware, symmetric placement across displays, Spaces, and auto-hide transitions.
 - Independent manual module selection per Deck; right-click either Deck to select a module or open its settings.
-- A shared sidebar-based Settings window with Deck cards, module detail pages, side placement, and independent module visibility controls.
-- Disabled modules stop their background timers and subprocesses instead of merely hiding their panels.
+- A shared sectioned Settings sidebar with Deck cards, module detail pages, side placement, and independent module visibility controls.
+- Disabled modules stop their background work; selected samplers use a coarser cadence while hidden, and all module timers slow in macOS Low Power Mode.
 - Click-to-focus terminal expansion, forgiving edge resizing, and remembered dimensions.
 - Native Liquid Glass on macOS 26, with a translucent fallback and stronger terminal tint on earlier macOS.
 - Manual large-terminal mode plus 20 themes with configurable fonts, tint, corner radius, and panel placement.
@@ -48,14 +51,16 @@ DockDeck uses the space beside a bottom-aligned Dock for up to two compact modul
 | System Stats | CPU, memory, disk, network I/O, and temperature | [System Stats](docs/modules/system-stats.md) |
 | Service Monitor | Availability and latency for configured endpoints | [Module catalog](docs/modules/catalog.md#service-monitor) |
 | Weather | Current conditions for a selected city | [Module catalog](docs/modules/catalog.md#weather) |
-| Schedule | Current or next event from macOS Calendar | [Module catalog](docs/modules/catalog.md#schedule) |
+| Schedule | Current Calendar event or next event/Reminder | [Schedule](docs/modules/schedule.md) |
 | World Clock | Local or selected time zone | [Module catalog](docs/modules/catalog.md#world-clock) |
 | Battery | Charge, power state, and time estimate | [Module catalog](docs/modules/catalog.md#battery) |
 | Network | Primary-interface download and upload throughput | [Module catalog](docs/modules/catalog.md#network) |
+| Project Pulse | Local Git state and optional GitHub Actions result | [Project Pulse](docs/modules/project-pulse.md) |
+| Focus Timer | Persistent focus and break countdowns | [Module catalog](docs/modules/catalog.md#focus-timer) |
 
 ## Decks and settings
 
-Settings are organized into **Decks**, module-specific pages, and **Appearance**. Drag a card from its `≡` handle within a Deck to set its cycle order or into the other Deck to change sides. Enabled modules stay above disabled modules; the same moves are available from each card's context menu. Move every card to one Deck if you want the other side completely empty and hidden. You can also swap the complete left and right Decks. At least one module remains enabled so Settings stays reachable. Disabled modules stop sampling and subprocesses. DockDeck remembers each Deck's selected module and the last Settings section you opened.
+Settings are organized into **General**, **Modules**, and **Interface** sections. Module pages are generated from the same registry that drives the Deck editor, with enabled modules listed first. Drag a card from its `≡` handle within a Deck to set its cycle order or into the other Deck to change sides. The same moves are available from each card's context menu. Move every card to one Deck if you want the other side completely empty and hidden. You can also swap the complete left and right Decks. At least one module remains enabled so Settings stays reachable. DockDeck remembers each Deck's selected module and the last Settings page you opened.
 
 <p align="center">
   <a href="assets/dockdeck-decks-settings.png">
@@ -72,7 +77,10 @@ Settings are organized into **Decks**, module-specific pages, and **Appearance**
 - [Terminal controls and shortcuts](docs/modules/terminal.md)
 - [Usage values, reset times, and provider states](docs/modules/usage.md)
 - [System Stats metrics and macOS memory semantics](docs/modules/system-stats.md)
-- [Service Monitor, Weather, Schedule, World Clock, Battery, and Network](docs/modules/catalog.md)
+- [Schedule and Reminders](docs/modules/schedule.md)
+- [Project Pulse](docs/modules/project-pulse.md)
+- [Service Monitor, Weather, World Clock, Battery, Network, and Focus Timer](docs/modules/catalog.md)
+- [Local notifications](docs/notifications.md)
 - [Claude Code bridge setup and troubleshooting](docs/integrations/claude-code.md)
 
 ## Requirements
@@ -157,10 +165,13 @@ DockDeck does not read browser cookies, browser credential stores, or private we
 | System Stats | macOS host, file-system, routing, and `ProcessInfo` APIs; optional validated local Stats SMC tool | Samples only selected CPU, memory, disk, network-counter, and temperature values locally; makes no network request |
 | Service Monitor | User-configured HTTPS or local HTTP URLs | Sends cookie-free `HEAD` requests; rejects common URL credential fields before local storage |
 | Weather | Open-Meteo forecast and geocoding APIs | Sends submitted searches and selected coordinates over HTTPS only while used; stores the selected city locally |
-| Schedule | Apple EventKit | Reads selected calendars into memory after explicit permission; never saves, edits, logs, or uploads events |
+| Schedule | Apple EventKit | Reads selected calendars and optional due Reminders into memory after separate explicit permissions; never saves, edits, logs, or uploads items |
 | World Clock | macOS time-zone database | Formats time locally and stops its minute timer while disabled |
 | Battery | macOS IOKit | Reads the internal power source locally; does not read battery identifiers or serial numbers |
 | Network | macOS routing and configuration APIs | Reads only primary-interface byte counters; does not inspect network traffic or destinations |
+| Project Pulse | Local `git`; optional authenticated `gh` CLI | Stores a selected local path, caps command output, and never reads or stores GitHub tokens or remote URLs |
+| Focus Timer | Local countdown state | Stores phase, deadline, and remaining duration only when timer state changes |
+| Notifications | macOS UserNotifications | Evaluates enabled rules locally and sends no notification data to an external service |
 
 Storage locations and permission details are documented in the
 [Usage](docs/modules/usage.md#local-cache) and

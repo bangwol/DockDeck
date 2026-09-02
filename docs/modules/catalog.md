@@ -46,30 +46,6 @@ Review [Open-Meteo's terms and privacy details](https://open-meteo.com/en/terms)
 before enabling the module. Commercial distributions need a suitable commercial
 API arrangement and are not supported by the current keyless provider.
 
-## Schedule
-
-Schedule reads upcoming events through Apple's EventKit framework and shows the
-current event, elapsed progress, or the next event. Enable Schedule under
-**Settings → Decks**, then press **Request Access** under
-**Settings → Schedule**.
-
-DockDeck never triggers the Calendar permission prompt merely by launching or
-enabling the module. Current macOS releases require full Calendar access to
-fetch events even for a read-only app; DockDeck never calls EventKit's save,
-edit, or delete APIs. See Apple's
-[EventKit access guidance](https://developer.apple.com/documentation/eventkit/ekeventstore/requestfullaccesstoevents%28completion%3A%29)
-and [calendar purpose-string reference](https://developer.apple.com/documentation/bundleresources/information-property-list/nscalendarsfullaccessusagedescription).
-
-DockDeck retains only event title, start and end times, all-day state, and
-calendar name in memory. It persists only selected calendar identifiers and
-module settings, does not store or log events, and makes no calendar-related
-network request. Disabling Schedule stops its timer, removes its EventKit
-observer, releases the event store, and clears the in-memory event list.
-
-Google and other accounts appear only when their calendars are enabled for
-macOS under **System Settings → Internet Accounts**. Signing into a provider in
-Safari alone does not connect it to EventKit.
-
 ## World Clock
 
 World Clock uses the macOS time-zone database and makes no network request.
@@ -98,3 +74,17 @@ Select a 1-second, 2-second, or 5-second interval under
 **Settings → Network**. Sampling and counter retention stop while the module is
 disabled. The primary interface name remains available in panel help and
 accessibility text.
+
+## Focus Timer
+
+Focus Timer alternates between configurable 15–60 minute focus periods and
+5–15 minute breaks. Start, pause, reset, or skip from the compact panel or its
+context menu. A running timer uses an absolute deadline, so it continues while
+another module is selected and resumes correctly after DockDeck restarts.
+
+DockDeck writes the phase, deadline, and remaining duration only when timer
+state changes, not every second. The visible countdown refreshes once per second;
+while hidden it uses a coarser cadence plus a separate one-shot completion
+timer. macOS Low Power Mode further reduces display refreshes without delaying
+the completion transition. Optional completion alerts are controlled under
+**Settings → Notifications**.

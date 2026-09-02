@@ -49,7 +49,17 @@ swift test
 - Keep Schedule read-only and permission-on-button only. Fetch EventKit data
   off the main thread, map only the displayed fields into value types, and
   release the event store and observer when disabled. Never log or persist
-  event content.
+  event or Reminder content. Calendar and Reminders access remain separate and
+  neither prompt may be triggered by enabling the module.
+- Keep Project Pulse on bounded, non-interactive local `git` and optional `gh`
+  commands. Never persist file names, command output, remote URLs, or
+  credentials; GitHub authentication remains owned by GitHub CLI.
+- Persist Focus Timer state only on transitions. Keep an absolute completion
+  deadline separate from display refreshes so background and Low Power Mode
+  cadence changes do not delay a completed phase.
+- Keep notifications opt-in, local, and transition-based. Request macOS
+  authorization only after the user enables notifications, and do not add
+  separate network requests for alert evaluation.
 - Keep World Clock local and minute-aligned. Do not add network time services;
   stop its timer when the module is disabled.
 - Keep Battery on documented IOKit power-source fields only. Do not read or

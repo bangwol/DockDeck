@@ -18,6 +18,18 @@ Resets later today use `HH:mm`; a different day uses `M/D HH:mm`. `--` means
 that the provider did not supply a timestamp. Hover a meter for its full
 localized reset date and time.
 
+### Even-use pace marker
+
+Enable **Even-use pace** under **Settings → Usage** to place a thin marker on
+each bar. The marker shows how much of that window would be used (or remain) if
+capacity were consumed evenly from the inferred window start to its supplied
+reset time. Hover the bar to compare the current value with that pace.
+
+The marker is a planning reference, not a forecast or plan recommendation. It
+appears only for a live window with both a known duration and a future reset
+time. DockDeck hides it for stale data, expired windows, missing reset times,
+and Fable values whose duration is not supplied.
+
 ## Codex
 
 Codex supplies `resetsAt` through its
