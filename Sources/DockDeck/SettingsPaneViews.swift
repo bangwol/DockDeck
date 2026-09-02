@@ -633,15 +633,19 @@ struct AppearanceSettingsView: View {
 private struct DeckPreviewCard: View {
     let side: PanelSide
     @ObservedObject var model: SettingsPanelModel
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var isDropTarget = false
 
     private var title: String { side == .left ? "Left Deck" : "Right Deck" }
+    private var definitions: [PanelModuleDefinition] { model.moduleDefinitions(on: side) }
 
     var body: some View {
         GroupBox {
             VStack(spacing: 8) {
-                let definitions = model.moduleDefinitions(on: side)
                 if definitions.isEmpty {
-                    EmptyDeckDropZone()
+                    EmptyDeckDropZone(
+                        isTargeted: isDropTarget,
+                        targetAnimation: targetAnimation)
                 } else {
                     ForEach(definitions) { definition in
                         DeckModuleCard(
@@ -651,19 +655,38 @@ private struct DeckPreviewCard: View {
                     }
                 }
             }
+            .animation(relocationAnimation, value: definitions.map(\.id))
             .frame(maxWidth: .infinity, minHeight: 74, alignment: .top)
         } label: {
             Label(title, systemImage: "rectangle.stack")
                 .font(.headline)
         }
         .frame(maxWidth: .infinity)
+        .scaleEffect(isDropTarget ? 1.008 : 1)
+        .animation(targetAnimation, value: isDropTarget)
         .onDrop(
             of: [DeckModuleDragPayload.contentType],
-            delegate: DeckModuleDropDelegate(side: side, target: nil, model: model))
+            delegate: DeckModuleDropDelegate(
+                side: side,
+                target: nil,
+                model: model,
+                relocationAnimation: relocationAnimation,
+                isTargeted: $isDropTarget))
+    }
+
+    private var relocationAnimation: Animation? {
+        reduceMotion ? nil : .easeInOut(duration: 0.22)
+    }
+
+    private var targetAnimation: Animation? {
+        reduceMotion ? nil : .easeOut(duration: 0.12)
     }
 }
 
 private struct EmptyDeckDropZone: View {
+    let isTargeted: Bool
+    let targetAnimation: Animation?
+
     var body: some View {
         VStack(spacing: 5) {
             Image(systemName: "square.and.arrow.down")
@@ -677,12 +700,16 @@ private struct EmptyDeckDropZone: View {
         .frame(maxWidth: .infinity, minHeight: 74)
         .background(
             RoundedRectangle(cornerRadius: 8)
-                .fill(Color.primary.opacity(0.025)))
+                .fill(
+                    isTargeted
+                        ? Color.accentColor.opacity(0.12)
+                        : Color.primary.opacity(0.025)))
         .overlay(
             RoundedRectangle(cornerRadius: 8)
                 .stroke(
-                    Color.secondary.opacity(0.35),
-                    style: StrokeStyle(lineWidth: 1, dash: [5, 4])))
+                    isTargeted ? Color.accentColor : Color.secondary.opacity(0.35),
+                    style: StrokeStyle(lineWidth: isTargeted ? 1.5 : 1, dash: [5, 4])))
+        .animation(targetAnimation, value: isTargeted)
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Empty deck. Drop modules here. This side stays hidden.")
     }
@@ -692,6 +719,8 @@ private struct DeckModuleCard: View {
     let definition: PanelModuleDefinition
     let side: PanelSide
     @ObservedObject var model: SettingsPanelModel
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var isDropTarget = false
 
     var body: some View {
         HStack(spacing: 10) {
@@ -702,6 +731,8 @@ private struct DeckModuleCard: View {
                 .contentShape(Rectangle())
                 .onDrag {
                     DeckModuleDragPayload.itemProvider(for: definition.id)
+                } preview: {
+                    DeckModuleDragPreview(definition: definition, isEnabled: isEnabled)
                 }
                 .accessibilityLabel("Drag \(definition.title)")
             Image(systemName: definition.symbolName)
@@ -732,16 +763,32 @@ private struct DeckModuleCard: View {
         .padding(10)
         .background(
             RoundedRectangle(cornerRadius: 8)
-                .fill(Color(nsColor: .controlBackgroundColor)))
+                .fill(
+                    isDropTarget
+                        ? Color.accentColor.opacity(0.12)
+                        : Color(nsColor: .controlBackgroundColor)))
         .overlay(
             RoundedRectangle(cornerRadius: 8)
-                .stroke(Color.primary.opacity(0.08)))
+                .stroke(
+                    isDropTarget ? Color.accentColor : Color.primary.opacity(0.08),
+                    lineWidth: isDropTarget ? 1.5 : 1))
         .opacity(model.isEnabled(definition.id) ? 1 : 0.55)
+        .scaleEffect(isDropTarget ? 1.015 : 1)
+        .shadow(
+            color: isDropTarget ? Color.accentColor.opacity(0.14) : .clear,
+            radius: 5,
+            y: 2)
+        .animation(targetAnimation, value: isDropTarget)
+        .transition(.scale(scale: 0.97).combined(with: .opacity))
         .contentShape(Rectangle())
         .onDrop(
             of: [DeckModuleDragPayload.contentType],
             delegate: DeckModuleDropDelegate(
-                side: side, target: definition.id, model: model))
+                side: side,
+                target: definition.id,
+                model: model,
+                relocationAnimation: relocationAnimation,
+                isTargeted: $isDropTarget))
         .contextMenu {
             if let pane = definition.settingsPane {
                 Button("Configure \(definition.title)…") { model.selectPane(pane) }
@@ -764,12 +811,54 @@ private struct DeckModuleCard: View {
         }
         .help("Drag the ≡ handle to move or reorder \(definition.title)")
     }
+
+    private var isEnabled: Bool { model.isEnabled(definition.id) }
+
+    private var relocationAnimation: Animation? {
+        reduceMotion ? nil : .easeInOut(duration: 0.22)
+    }
+
+    private var targetAnimation: Animation? {
+        reduceMotion ? nil : .easeOut(duration: 0.12)
+    }
+}
+
+private struct DeckModuleDragPreview: View {
+    let definition: PanelModuleDefinition
+    let isEnabled: Bool
+
+    var body: some View {
+        HStack(spacing: 9) {
+            Image(systemName: "line.3.horizontal")
+                .foregroundStyle(.secondary)
+            Image(systemName: definition.symbolName)
+                .frame(width: 18)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(definition.title)
+                    .fontWeight(.semibold)
+                Text(definition.subtitle)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 9)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 9))
+        .overlay(
+            RoundedRectangle(cornerRadius: 9)
+                .stroke(Color.accentColor.opacity(0.45)))
+        .opacity(isEnabled ? 1 : 0.7)
+        .shadow(color: .black.opacity(0.18), radius: 8, y: 4)
+        .fixedSize()
+    }
 }
 
 private struct DeckModuleDropDelegate: DropDelegate {
     let side: PanelSide
     let target: PanelModuleID?
     let model: SettingsPanelModel
+    let relocationAnimation: Animation?
+    @Binding var isTargeted: Bool
 
     func validateDrop(info: DropInfo) -> Bool {
         info.hasItemsConforming(to: [DeckModuleDragPayload.contentType])
@@ -779,7 +868,23 @@ private struct DeckModuleDropDelegate: DropDelegate {
         DropProposal(operation: .move)
     }
 
+    func dropEntered(info: DropInfo) {
+        isTargeted = true
+        guard target != nil else { return }
+        moveModule(from: info, onlyWhileTargeted: true)
+    }
+
+    func dropExited(info: DropInfo) {
+        isTargeted = false
+    }
+
     func performDrop(info: DropInfo) -> Bool {
+        isTargeted = false
+        return moveModule(from: info, onlyWhileTargeted: false)
+    }
+
+    @discardableResult
+    private func moveModule(from info: DropInfo, onlyWhileTargeted: Bool) -> Bool {
         guard
             let provider = info.itemProviders(
                 for: [DeckModuleDragPayload.contentType]
@@ -791,7 +896,10 @@ private struct DeckModuleDropDelegate: DropDelegate {
                 let module = DeckModuleDragPayload.moduleID(from: text as String)
             else { return }
             DispatchQueue.main.async {
-                model.moveModule(module, to: side, before: target)
+                guard !onlyWhileTargeted || isTargeted else { return }
+                withAnimation(relocationAnimation) {
+                    model.moveModule(module, to: side, before: target)
+                }
             }
         }
         return true

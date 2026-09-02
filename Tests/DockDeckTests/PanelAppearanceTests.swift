@@ -148,6 +148,19 @@ final class PanelAppearanceTests: XCTestCase {
         XCTAssertTrue(model.moduleDefinitions.dropFirst(2).allSatisfy { !model.isEnabled($0.id) })
     }
 
+    func testSettingsModelDoesNotRepublishNoOpDeckMove() {
+        let model = makeSettingsModel(
+            configuration: PanelDeckConfiguration(
+                left: [.terminal], right: [.usage, .systemStats],
+                enabled: [.terminal, .usage, .systemStats]))
+        var callbackCount = 0
+        model.onChange = { _ in callbackCount += 1 }
+
+        model.moveModule(.usage, to: .right, before: .systemStats)
+
+        XCTAssertEqual(callbackCount, 0)
+    }
+
     func testSettingsModelCanEmptyADeck() {
         let model = makeSettingsModel(
             configuration: .legacy(order: .terminalLeft, enabledPanels: .all))

@@ -771,6 +771,7 @@ final class SettingsPanelModel: ObservableObject {
 
     private func publishDeck(_ configuration: PanelDeckConfiguration) {
         let configuration = configuration.normalized()
+        guard configuration != values.deckConfiguration else { return }
         updateValues { $0.deckConfiguration = configuration }
         onChange?(.deck(configuration))
     }
