@@ -31,7 +31,7 @@ DockDeck uses the space beside a bottom-aligned Dock for up to two compact modul
 - Local or selected-world-time display with system, 12-hour, and 24-hour formats.
 - Internal battery level, power state, and the system-provided charge or discharge estimate.
 - Local download and upload throughput for the current primary network interface.
-- Local Git status or remote GitHub activity, including 7-day commits, open pull requests and issues, and optional Actions status through the installed `gh` CLI.
+- Local Git status, one remote GitHub repository, or the signed-in user's 7-day GitHub contribution summary through the installed `gh` CLI.
 - Persistent focus and break countdowns that continue behind other modules and survive an app restart.
 - Opt-in native notifications for quota thresholds, service transitions, low battery, and completed focus timers.
 - Dock-aware, symmetric placement across displays, Spaces, and auto-hide transitions.
@@ -55,7 +55,7 @@ DockDeck uses the space beside a bottom-aligned Dock for up to two compact modul
 | World Clock | Local or selected time zone | [Module catalog](docs/modules/catalog.md#world-clock) |
 | Battery | Charge, power state, and time estimate | [Module catalog](docs/modules/catalog.md#battery) |
 | Network | Primary-interface download and upload throughput | [Module catalog](docs/modules/catalog.md#network) |
-| Project Pulse | Local Git state or remote GitHub repository activity | [Project Pulse](docs/modules/project-pulse.md) |
+| Project Pulse | Local Git, one GitHub repository, or personal GitHub contribution activity | [Project Pulse](docs/modules/project-pulse.md) |
 | Focus Timer | Persistent focus and break countdowns | [Module catalog](docs/modules/catalog.md#focus-timer) |
 
 ## Decks and settings
@@ -169,7 +169,7 @@ DockDeck does not read browser cookies, browser credential stores, or private we
 | World Clock | macOS time-zone database | Formats time locally and stops its minute timer while disabled |
 | Battery | macOS IOKit | Reads the internal power source locally; does not read battery identifiers or serial numbers |
 | Network | macOS routing and configuration APIs | Reads only primary-interface byte counters; does not inspect network traffic or destinations |
-| Project Pulse | Local `git`; authenticated `gh` REST, GraphQL, and optional Actions calls | Stores a selected local path or `owner/repository` name, caps command output, and never reads or stores GitHub tokens or command output |
+| Project Pulse | Local `git`; authenticated `gh` REST, GraphQL, and optional Actions calls | Stores a selected local path, GitHub view, or `owner/repository` name. Personal contribution totals stay in memory; command output and GitHub tokens are never stored. |
 | Focus Timer | Local countdown state | Stores phase, deadline, and remaining duration only when timer state changes |
 | Notifications | macOS UserNotifications | Evaluates enabled rules locally and sends no notification data to an external service |
 

@@ -554,6 +554,30 @@ final class PanelAppearanceTests: XCTestCase {
         cancellable.cancel()
     }
 
+    func testProjectPulseSettingsRenderGitHubActivity() throws {
+        let model = makeSettingsModel(
+            configuration: .legacy(order: .terminalLeft, enabledPanels: .all))
+        model.setProjectPulseSource(.github)
+        model.setProjectPulseGitHubScope(.activity)
+        XCTAssertEqual(model.values.projectPulse.refreshInterval, 300)
+
+        let size = NSSize(width: 540, height: 540)
+        let rootView = ProjectPulseSettingsView(model: model)
+            .frame(width: size.width, height: size.height)
+            .background(Color(nsColor: .windowBackgroundColor))
+            .environment(\.colorScheme, .dark)
+        let view = NSHostingView(rootView: rootView)
+        view.appearance = NSAppearance(named: .darkAqua)
+        view.frame = NSRect(origin: .zero, size: size)
+        view.layoutSubtreeIfNeeded()
+        let bitmap = try XCTUnwrap(view.bitmapImageRepForCachingDisplay(in: view.bounds))
+        view.cacheDisplay(in: view.bounds, to: bitmap)
+
+        XCTAssertEqual(view.frame.size, size)
+        XCTAssertGreaterThan(bitmap.pixelsWide, 0)
+        XCTAssertGreaterThan(bitmap.pixelsHigh, 0)
+    }
+
     func testEmptyDeckDropZoneRenders() throws {
         let configuration = PanelDeckConfiguration(
             left: [],

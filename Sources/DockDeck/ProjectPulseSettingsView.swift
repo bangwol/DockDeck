@@ -45,43 +45,45 @@ struct ProjectPulseSettingsView: View {
                 if configuration.source == .local {
                     localRepositorySettings
                 } else {
-                    githubRepositorySettings
+                    githubSettings
                 }
 
-                GroupBox {
-                    VStack(spacing: 12) {
-                        HStack {
-                            VStack(alignment: .leading, spacing: 3) {
-                                Text("Latest Actions run")
-                                Text("Show the latest workflow result beside the repository name.")
+                if configuration.source == .local || configuration.githubScope == .repository {
+                    GroupBox {
+                        VStack(spacing: 12) {
+                            HStack {
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text("Latest Actions run")
+                                    Text("Show the latest workflow result beside the repository name.")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                                Spacer(minLength: 16)
+                                Toggle(
+                                    "Latest Actions run",
+                                    isOn: Binding(
+                                        get: { configuration.includesGitHubActions },
+                                        set: model.setProjectPulseIncludesGitHubActions))
+                                    .labelsHidden()
+                                    .toggleStyle(.switch)
+                                    .disabled(!configuration.isConfigured)
+                            }
+                            Divider()
+                            HStack {
+                                Link(
+                                    "GitHub CLI setup",
+                                    destination: URL(string: "https://cli.github.com/")!)
+                                Spacer()
+                                Text("Optional for local · Required for GitHub")
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                             }
-                            Spacer(minLength: 16)
-                            Toggle(
-                                "Latest Actions run",
-                                isOn: Binding(
-                                    get: { configuration.includesGitHubActions },
-                                    set: model.setProjectPulseIncludesGitHubActions))
-                                .labelsHidden()
-                                .toggleStyle(.switch)
-                                .disabled(!configuration.isConfigured)
                         }
-                        Divider()
-                        HStack {
-                            Link(
-                                "GitHub CLI setup",
-                                destination: URL(string: "https://cli.github.com/")!)
-                            Spacer()
-                            Text("Optional for local · Required for GitHub")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
+                        .padding(.top, 4)
+                    } label: {
+                        Label("Continuous Integration", systemImage: "checkmark.circle")
+                            .font(.headline)
                     }
-                    .padding(.top, 4)
-                } label: {
-                    Label("Continuous Integration", systemImage: "checkmark.circle")
-                        .font(.headline)
                 }
 
                 GroupBox {
@@ -92,7 +94,7 @@ struct ProjectPulseSettingsView: View {
                                 get: { configuration.refreshInterval },
                                 set: model.setProjectPulseRefreshInterval)
                         ) {
-                            ForEach(ProjectPulseConfiguration.refreshIntervals, id: \.self) {
+                            ForEach(refreshIntervals, id: \.self) {
                                 Text($0 < 60 ? "\(Int($0)) seconds" : "\(Int($0 / 60)) minutes")
                                     .tag($0)
                             }
@@ -112,7 +114,9 @@ struct ProjectPulseSettingsView: View {
             .padding(24)
         }
         .onAppear {
-            if configuration.source == .github { githubRepositories.loadIfNeeded() }
+            if configuration.source == .github, configuration.githubScope == .repository {
+                githubRepositories.loadIfNeeded()
+            }
         }
     }
 
@@ -157,67 +161,96 @@ struct ProjectPulseSettingsView: View {
         }
     }
 
-    private var githubRepositorySettings: some View {
+    private var githubSettings: some View {
         GroupBox {
             VStack(alignment: .leading, spacing: 10) {
-                SettingsPickerRow(title: "Repository") {
+                SettingsPickerRow(title: "View") {
                     Picker(
-                        "GitHub repository",
+                        "GitHub view",
                         selection: Binding(
-                            get: { configuration.githubRepository ?? "" },
-                            set: { model.setProjectPulseGitHubRepository($0) })
+                            get: { configuration.githubScope },
+                            set: selectGitHubScope)
                     ) {
-                        if let selected = selectedRepositoryMissingFromCatalog {
-                            Text(selected).tag(selected)
-                        }
-                        Text("Choose…").tag("")
-                        ForEach(githubRepositories.repositories) { repository in
-                            Label(
-                                repository.nameWithOwner,
-                                systemImage: repository.isArchived
-                                    ? "archivebox.fill"
-                                    : (repository.isPrivate ? "lock.fill" : "globe"))
-                                .tag(repository.nameWithOwner)
+                        ForEach(GitHubPulseScope.allCases) { scope in
+                            Text(scope.title).tag(scope)
                         }
                     }
                     .labelsHidden()
-                    .frame(maxWidth: 300)
-                    .disabled(githubRepositories.status != .ready)
-                }
-
-                switch githubRepositories.status {
-                case .idle, .loading:
-                    HStack(spacing: 8) {
-                        ProgressView().controlSize(.small)
-                        Text("Reading repositories from GitHub CLI…")
-                            .foregroundStyle(.secondary)
-                    }
-                case .failed(let message):
-                    Label(message, systemImage: "person.crop.circle.badge.exclamationmark")
-                        .foregroundStyle(.orange)
-                case .ready:
-                    if githubRepositories.repositories.isEmpty {
-                        Text("No accessible repositories were returned by GitHub.")
-                            .foregroundStyle(.secondary)
-                    }
+                    .pickerStyle(.segmented)
                 }
 
                 Divider()
-                HStack {
-                    Text("Most recently pushed accessible repositories, up to 100.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    Spacer()
-                    Button(action: githubRepositories.load) {
-                        Label("Refresh", systemImage: "arrow.clockwise")
+                if configuration.githubScope == .repository {
+                    SettingsPickerRow(title: "Repository") {
+                        Picker(
+                            "GitHub repository",
+                            selection: Binding(
+                                get: { configuration.githubRepository ?? "" },
+                                set: { model.setProjectPulseGitHubRepository($0) })
+                        ) {
+                            if let selected = selectedRepositoryMissingFromCatalog {
+                                Text(selected).tag(selected)
+                            }
+                            Text("Choose…").tag("")
+                            ForEach(githubRepositories.repositories) { repository in
+                                Label(
+                                    repository.nameWithOwner,
+                                    systemImage: repository.isArchived
+                                        ? "archivebox.fill"
+                                        : (repository.isPrivate ? "lock.fill" : "globe"))
+                                    .tag(repository.nameWithOwner)
+                            }
+                        }
+                        .labelsHidden()
+                        .frame(maxWidth: 300)
+                        .disabled(githubRepositories.status != .ready)
                     }
-                    .disabled(githubRepositories.status == .loading)
+
+                    switch githubRepositories.status {
+                    case .idle, .loading:
+                        HStack(spacing: 8) {
+                            ProgressView().controlSize(.small)
+                            Text("Reading repositories from GitHub CLI…")
+                                .foregroundStyle(.secondary)
+                        }
+                    case .failed(let message):
+                        Label(message, systemImage: "person.crop.circle.badge.exclamationmark")
+                            .foregroundStyle(.orange)
+                    case .ready:
+                        if githubRepositories.repositories.isEmpty {
+                            Text("No accessible repositories were returned by GitHub.")
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+
+                    Divider()
+                    HStack {
+                        Text("Most recently pushed accessible repositories, up to 100.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        Button(action: githubRepositories.load) {
+                            Label("Refresh", systemImage: "arrow.clockwise")
+                        }
+                        .disabled(githubRepositories.status == .loading)
+                    }
+                } else {
+                    Label {
+                        Text(
+                            "Summarize your last 7 days of GitHub contributions across "
+                                + "repositories. Activity uses a 5-minute base interval."
+                        )
+                        .foregroundStyle(.secondary)
+                    } icon: {
+                        Image(systemName: "person.crop.circle")
+                            .foregroundStyle(Color.accentColor)
+                    }
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.top, 4)
         } label: {
-            Label("GitHub Repository", systemImage: "network")
+            Label("GitHub", systemImage: "network")
                 .font(.headline)
         }
     }
@@ -236,7 +269,7 @@ struct ProjectPulseSettingsView: View {
         case .local:
             "Read branch and working-tree state directly from a folder on this Mac."
         case .github:
-            "Use your signed-in GitHub CLI to monitor a repository without a local clone."
+            "Use your signed-in GitHub CLI for one repository or your recent activity."
         }
     }
 
@@ -246,15 +279,34 @@ struct ProjectPulseSettingsView: View {
             "Git status is read locally and file names are discarded. Optional Actions data "
                 + "uses GitHub CLI non-interactively."
         case .github:
-            "DockDeck stores the selected owner/repository name. GitHub CLI supplies "
-                + "authentication for repository metadata and optional Actions data; DockDeck "
-                + "never reads or stores its token."
+            if configuration.githubScope == .activity {
+                "DockDeck keeps aggregated 7-day contribution counts in memory. GitHub CLI "
+                    + "supplies authentication; DockDeck never reads or stores its token."
+            } else {
+                "DockDeck stores the selected owner/repository name. GitHub CLI supplies "
+                    + "authentication for repository metadata and optional Actions data; "
+                    + "DockDeck never reads or stores its token."
+            }
         }
+    }
+
+    private var refreshIntervals: [TimeInterval] {
+        if configuration.source == .github, configuration.githubScope == .activity {
+            return ProjectPulseConfiguration.refreshIntervals.filter { $0 >= 5 * 60 }
+        }
+        return ProjectPulseConfiguration.refreshIntervals
     }
 
     private func selectSource(_ source: ProjectPulseSource) {
         model.setProjectPulseSource(source)
-        if source == .github { githubRepositories.loadIfNeeded() }
+        if source == .github, configuration.githubScope == .repository {
+            githubRepositories.loadIfNeeded()
+        }
+    }
+
+    private func selectGitHubScope(_ scope: GitHubPulseScope) {
+        model.setProjectPulseGitHubScope(scope)
+        if scope == .repository { githubRepositories.loadIfNeeded() }
     }
 
     private func chooseRepository() {

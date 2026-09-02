@@ -742,6 +742,10 @@ final class SettingsPanelModel: ObservableObject {
         updateProjectPulseConfiguration { $0.source = source }
     }
 
+    func setProjectPulseGitHubScope(_ scope: GitHubPulseScope) {
+        updateProjectPulseConfiguration { $0.githubScope = scope }
+    }
+
     func setProjectPulseGitHubRepository(_ repository: String?) {
         updateProjectPulseConfiguration { $0.githubRepository = repository }
     }

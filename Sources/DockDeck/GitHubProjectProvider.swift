@@ -19,6 +19,17 @@ struct ProjectGitHubSnapshot: Equatable {
     }
 }
 
+struct ProjectGitHubActivitySnapshot: Equatable {
+    let login: String
+    let totalContributions: Int
+    let commitContributions: Int
+    let pullRequestContributions: Int
+    let reviewContributions: Int
+    let issueContributions: Int
+    let repositoriesWithCommits: Int
+    let restrictedContributions: Int
+}
+
 struct GitHubProjectResult: Equatable {
     let repository: ProjectGitHubSnapshot
     let workflow: ProjectWorkflowSnapshot?
@@ -39,6 +50,8 @@ protocol GitHubProjectReading {
         includesWorkflow: Bool,
         now: Date
     ) throws -> GitHubProjectResult
+
+    func readActivity(now: Date) throws -> ProjectGitHubActivitySnapshot
 
     func readWorkflow(
         repository: String?,
@@ -76,6 +89,23 @@ struct GitHubProjectClient: GitHubProjectReading, GitHubRepositoryListing {
             issues(states:OPEN){totalCount}
             stargazerCount
             forkCount
+          }
+        }
+        """
+
+    private static let activityQuery = """
+        query($from:DateTime!,$to:DateTime!){
+          viewer{
+            login
+            contributionsCollection(from:$from,to:$to){
+              contributionCalendar{totalContributions}
+              totalCommitContributions
+              totalPullRequestContributions
+              totalPullRequestReviewContributions
+              totalIssueContributions
+              totalRepositoriesWithContributedCommits
+              restrictedContributionsCount
+            }
           }
         }
         """
@@ -124,6 +154,35 @@ struct GitHubProjectClient: GitHubProjectReading, GitHubRepositoryListing {
                 currentDirectoryURL: FileManager.default.homeDirectoryForCurrentUser)
             : nil
         return GitHubProjectResult(repository: snapshot, workflow: workflow)
+    }
+
+    func readActivity(now: Date) throws -> ProjectGitHubActivitySnapshot {
+        guard let gh = ProjectPulseBinaryLocator.githubCLI() else {
+            throw ProjectPulseError.githubCLIUnavailable
+        }
+        let formatter = ISO8601DateFormatter()
+        let from = formatter.string(from: now.addingTimeInterval(-7 * 24 * 60 * 60))
+        let to = formatter.string(from: now)
+        let output: Data
+        do {
+            output = try ProjectPulseCommand.run(
+                executableURL: gh,
+                arguments: [
+                    "api", "graphql",
+                    "-f", "query=\(Self.activityQuery)",
+                    "-F", "from=\(from)",
+                    "-F", "to=\(to)",
+                ],
+                currentDirectoryURL: FileManager.default.homeDirectoryForCurrentUser,
+                environment: Self.environment)
+        } catch let error as ProjectPulseError
+            where error == .commandTimedOut || error == .outputTooLarge
+        {
+            throw error
+        } catch {
+            throw ProjectPulseError.githubUnavailable
+        }
+        return try GitHubActivityParser.parse(output)
     }
 
     func readWorkflow(
@@ -176,6 +235,63 @@ struct GitHubProjectClient: GitHubProjectReading, GitHubRepositoryListing {
             throw ProjectPulseError.githubUnavailable
         }
         return try GitHubRepositoryListParser.parse(output)
+    }
+}
+
+enum GitHubActivityParser {
+    private struct Response: Decodable {
+        let data: Payload?
+    }
+
+    private struct Payload: Decodable {
+        let viewer: Viewer?
+    }
+
+    private struct Viewer: Decodable {
+        let login: String
+        let contributionsCollection: Contributions
+    }
+
+    private struct Contributions: Decodable {
+        let contributionCalendar: Calendar
+        let totalCommitContributions: Int
+        let totalPullRequestContributions: Int
+        let totalPullRequestReviewContributions: Int
+        let totalIssueContributions: Int
+        let totalRepositoriesWithContributedCommits: Int
+        let restrictedContributionsCount: Int
+    }
+
+    private struct Calendar: Decodable {
+        let totalContributions: Int
+    }
+
+    static func parse(_ data: Data) throws -> ProjectGitHubActivitySnapshot {
+        let response: Response
+        do {
+            response = try JSONDecoder().decode(Response.self, from: data)
+        } catch {
+            throw ProjectPulseError.invalidOutput
+        }
+        guard let viewer = response.data?.viewer else {
+            throw ProjectPulseError.invalidOutput
+        }
+        let login = viewer.login.trimmingCharacters(in: .whitespacesAndNewlines)
+        let allowed = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "-"))
+        guard !login.isEmpty, login.count <= 100,
+            login.unicodeScalars.allSatisfy(allowed.contains)
+        else { throw ProjectPulseError.invalidOutput }
+        let contributions = viewer.contributionsCollection
+        return ProjectGitHubActivitySnapshot(
+            login: login,
+            totalContributions: max(contributions.contributionCalendar.totalContributions, 0),
+            commitContributions: max(contributions.totalCommitContributions, 0),
+            pullRequestContributions: max(contributions.totalPullRequestContributions, 0),
+            reviewContributions: max(contributions.totalPullRequestReviewContributions, 0),
+            issueContributions: max(contributions.totalIssueContributions, 0),
+            repositoriesWithCommits: max(
+                contributions.totalRepositoriesWithContributedCommits, 0),
+            restrictedContributions: max(contributions.restrictedContributionsCount, 0))
     }
 }
 

@@ -15,6 +15,20 @@ enum ProjectPulseSource: String, Codable, CaseIterable, Identifiable {
     }
 }
 
+enum GitHubPulseScope: String, Codable, CaseIterable, Identifiable {
+    case repository
+    case activity
+
+    var id: Self { self }
+
+    var title: String {
+        switch self {
+        case .repository: "Repository"
+        case .activity: "My Activity"
+        }
+    }
+}
+
 struct ProjectPulseConfiguration: Codable, Equatable {
     static let refreshIntervals: [TimeInterval] = [30, 60, 5 * 60]
     static let defaultRefreshInterval: TimeInterval = 60
@@ -22,6 +36,7 @@ struct ProjectPulseConfiguration: Codable, Equatable {
 
     var source: ProjectPulseSource
     var repositoryPath: String?
+    var githubScope: GitHubPulseScope
     var githubRepository: String?
     var includesGitHubActions: Bool
     var refreshInterval: TimeInterval
@@ -29,12 +44,14 @@ struct ProjectPulseConfiguration: Codable, Equatable {
     init(
         source: ProjectPulseSource = .local,
         repositoryPath: String? = nil,
+        githubScope: GitHubPulseScope = .repository,
         githubRepository: String? = nil,
         includesGitHubActions: Bool = false,
         refreshInterval: TimeInterval = Self.defaultRefreshInterval
     ) {
         self.source = source
         self.repositoryPath = repositoryPath
+        self.githubScope = githubScope
         self.githubRepository = githubRepository
         self.includesGitHubActions = includesGitHubActions
         self.refreshInterval = refreshInterval
@@ -44,6 +61,7 @@ struct ProjectPulseConfiguration: Codable, Equatable {
     private enum CodingKeys: String, CodingKey {
         case source
         case repositoryPath
+        case githubScope
         case githubRepository
         case includesGitHubActions
         case refreshInterval
@@ -54,6 +72,8 @@ struct ProjectPulseConfiguration: Codable, Equatable {
         source = try container.decodeIfPresent(ProjectPulseSource.self, forKey: .source)
             ?? .local
         repositoryPath = try container.decodeIfPresent(String.self, forKey: .repositoryPath)
+        githubScope = try container.decodeIfPresent(GitHubPulseScope.self, forKey: .githubScope)
+            ?? .repository
         githubRepository = try container.decodeIfPresent(
             String.self, forKey: .githubRepository)
         includesGitHubActions = try container.decodeIfPresent(
@@ -67,6 +87,7 @@ struct ProjectPulseConfiguration: Codable, Equatable {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(source, forKey: .source)
         try container.encodeIfPresent(repositoryPath, forKey: .repositoryPath)
+        try container.encode(githubScope, forKey: .githubScope)
         try container.encodeIfPresent(githubRepository, forKey: .githubRepository)
         try container.encode(includesGitHubActions, forKey: .includesGitHubActions)
         try container.encode(refreshInterval, forKey: .refreshInterval)
@@ -87,13 +108,16 @@ struct ProjectPulseConfiguration: Codable, Equatable {
         configuration.refreshInterval = Self.refreshIntervals.min {
             abs($0 - refreshInterval) < abs($1 - refreshInterval)
         } ?? Self.defaultRefreshInterval
+        if configuration.source == .github, configuration.githubScope == .activity {
+            configuration.refreshInterval = max(configuration.refreshInterval, 5 * 60)
+        }
         return configuration
     }
 
     var isConfigured: Bool {
         switch source {
         case .local: repositoryPath != nil
-        case .github: githubRepository != nil
+        case .github: githubScope == .activity || githubRepository != nil
         }
     }
 
@@ -147,15 +171,18 @@ struct ProjectWorkflowSnapshot: Equatable {
 struct ProjectPulseSnapshot: Equatable {
     let git: ProjectGitSnapshot
     let github: ProjectGitHubSnapshot?
+    let githubActivity: ProjectGitHubActivitySnapshot?
     let workflow: ProjectWorkflowSnapshot?
 
     init(
         git: ProjectGitSnapshot,
         github: ProjectGitHubSnapshot? = nil,
+        githubActivity: ProjectGitHubActivitySnapshot? = nil,
         workflow: ProjectWorkflowSnapshot?
     ) {
         self.git = git
         self.github = github
+        self.githubActivity = githubActivity
         self.workflow = workflow
     }
 }
@@ -255,6 +282,21 @@ struct ProjectPulseReader: ProjectPulseReading {
     private func readGitHub(
         configuration: ProjectPulseConfiguration
     ) throws -> ProjectPulseSnapshot {
+        if configuration.githubScope == .activity {
+            let activity = try github.readActivity(now: Date())
+            return ProjectPulseSnapshot(
+                git: ProjectGitSnapshot(
+                    repositoryName: "@\(activity.login)",
+                    branch: "7 days",
+                    stagedCount: 0,
+                    modifiedCount: 0,
+                    untrackedCount: 0,
+                    conflictCount: 0,
+                    aheadCount: 0,
+                    behindCount: 0),
+                githubActivity: activity,
+                workflow: nil)
+        }
         guard let repository = configuration.githubRepository else {
             throw ProjectPulseError.githubUnavailable
         }

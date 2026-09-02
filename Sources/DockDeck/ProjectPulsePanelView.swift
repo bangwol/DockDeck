@@ -18,7 +18,7 @@ struct ProjectPulsePanelView: View {
                         ProgressView().controlSize(.small)
                         Text("Reading repository…")
                     }
-                    .font(.system(size: 9, weight: .semibold, design: .rounded))
+                    .font(.system(size: 10, weight: .semibold, design: .rounded))
                     .foregroundStyle(baseColor.opacity(0.78))
                 case .failed(let message):
                     placeholder(message, symbol: "exclamationmark.triangle")
@@ -35,7 +35,7 @@ struct ProjectPulsePanelView: View {
 
     private func placeholder(_ title: String, symbol: String) -> some View {
         Label(title, systemImage: symbol)
-            .font(.system(size: 9, weight: .semibold, design: .rounded))
+            .font(.system(size: 10, weight: .semibold, design: .rounded))
             .foregroundStyle(baseColor.opacity(0.72))
             .lineLimit(1)
             .minimumScaleFactor(0.75)
@@ -54,15 +54,49 @@ private struct ProjectPulseContent: View {
                 Text(snapshot.git.repositoryName)
                     .fontWeight(.bold)
                     .foregroundStyle(baseColor)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                    .minimumScaleFactor(0.8)
                 Spacer(minLength: 3)
                 if case .loading = status {
                     ProgressView().controlSize(.mini)
                 }
-                if let workflow = snapshot.workflow {
+                if let activity = snapshot.githubActivity {
+                    ProjectActivityMetric(
+                        label: "7D", value: activity.totalContributions,
+                        help: "Contributions in the last 7 days", baseColor: baseColor)
+                    if activity.restrictedContributions > 0 {
+                        HStack(spacing: 1.5) {
+                            Image(systemName: "lock.fill")
+                            Text(compactProjectValue(activity.restrictedContributions))
+                        }
+                        .foregroundStyle(baseColor.opacity(0.72))
+                        .fixedSize()
+                        .help(
+                            "Restricted or private contributions: "
+                                + "\(activity.restrictedContributions)")
+                    }
+                } else if let workflow = snapshot.workflow {
                     WorkflowBadge(workflow: workflow)
                 }
             }
-            if let github = snapshot.github {
+            if let activity = snapshot.githubActivity {
+                HStack(spacing: 5) {
+                    ProjectActivityMetric(
+                        label: "COM", value: activity.commitContributions,
+                        help: "Commit contributions", baseColor: baseColor)
+                    Spacer(minLength: 2)
+                    ProjectActivityMetric(
+                        label: "PR", value: activity.pullRequestContributions,
+                        help: "Pull requests opened", baseColor: baseColor)
+                    ProjectActivityMetric(
+                        label: "REV", value: activity.reviewContributions,
+                        help: "Pull request reviews", baseColor: baseColor)
+                    ProjectActivityMetric(
+                        label: "ISS", value: activity.issueContributions,
+                        help: "Issues opened", baseColor: baseColor)
+                }
+            } else if let github = snapshot.github {
                 HStack(spacing: 5) {
                     Image(systemName: "arrow.triangle.branch")
                         .foregroundStyle(baseColor.opacity(0.62))
@@ -100,13 +134,20 @@ private struct ProjectPulseContent: View {
                 }
             }
         }
-        .font(.system(size: 8.5, weight: .semibold, design: .rounded))
+        .font(.system(size: 10, weight: .semibold, design: .rounded))
         .padding(.horizontal, 8)
         .padding(.vertical, 6)
         .help(helpText)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(snapshot.github?.nameWithOwner ?? snapshot.git.repositoryName)
+        .accessibilityLabel(accessibilityTitle)
         .accessibilityValue(helpText)
+    }
+
+    private var accessibilityTitle: String {
+        if let activity = snapshot.githubActivity {
+            return "GitHub activity for \(activity.login)"
+        }
+        return snapshot.github?.nameWithOwner ?? snapshot.git.repositoryName
     }
 
     private var changeLabel: String {
@@ -126,6 +167,23 @@ private struct ProjectPulseContent: View {
     }
 
     private var helpText: String {
+        if let activity = snapshot.githubActivity {
+            var parts = [
+                "GitHub activity for @\(activity.login)",
+                "\(activity.totalContributions) contributions in the last 7 days",
+                "\(activity.commitContributions) commits",
+                "\(activity.pullRequestContributions) pull requests",
+                "\(activity.reviewContributions) pull request reviews",
+                "\(activity.issueContributions) issues",
+                "commits across \(activity.repositoriesWithCommits) repositories",
+            ]
+            if activity.restrictedContributions > 0 {
+                parts.append(
+                    "\(activity.restrictedContributions) restricted or private contributions")
+            }
+            if case .failed(let message) = status { parts.append(message) }
+            return parts.joined(separator: " · ")
+        }
         if let github = snapshot.github {
             var parts = [
                 github.nameWithOwner,
@@ -177,14 +235,18 @@ private struct ProjectActivityMetric: View {
     }
 
     private var compactValue: String {
-        if value >= 1_000_000 {
-            return String(format: "%.1fM", Double(value) / 1_000_000)
-        }
-        if value >= 1_000 {
-            return String(format: "%.1fK", Double(value) / 1_000)
-        }
-        return "\(value)"
+        compactProjectValue(value)
     }
+}
+
+private func compactProjectValue(_ value: Int) -> String {
+    if value >= 1_000_000 {
+        return String(format: "%.1fM", Double(value) / 1_000_000)
+    }
+    if value >= 1_000 {
+        return String(format: "%.1fK", Double(value) / 1_000)
+    }
+    return "\(value)"
 }
 
 private struct WorkflowBadge: View {
@@ -195,7 +257,7 @@ private struct WorkflowBadge: View {
             Image(systemName: symbolName)
             Text(label)
         }
-        .font(.system(size: 7.5, weight: .bold, design: .rounded))
+        .font(.system(size: 9, weight: .bold, design: .rounded))
         .foregroundStyle(color)
         .lineLimit(1)
         .help(workflow.title)
