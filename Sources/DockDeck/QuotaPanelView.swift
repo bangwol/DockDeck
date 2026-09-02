@@ -66,6 +66,23 @@ enum UsageProviderMarkAsset {
     }()
 }
 
+enum UsageProviderMarkState: Equatable {
+    case normal
+    case muted
+    case disconnected
+
+    static func resolved(from freshness: UsageFreshness) -> Self {
+        switch freshness {
+        case .live:
+            .normal
+        case .loading, .stale:
+            .muted
+        case .signIn, .unavailable, .setupRequired:
+            .disconnected
+        }
+    }
+}
+
 struct UsagePanelConfiguration: Equatable {
     let displayMode: UsageDisplayMode
     let fontName: String
@@ -134,7 +151,7 @@ private struct QuotaRow: View {
                 fallbackColor: providerColor,
                 compact: compact)
                 .frame(width: providerWidth)
-                .help(provider.detail ?? provider.freshness.label ?? provider.name)
+                .help(providerHelp)
 
             if windows.isEmpty {
                 Text(provider.freshness.label ?? "WAITING")
@@ -170,25 +187,30 @@ private struct QuotaRow: View {
     }
 
     private var accessibilityLabel: String {
+        let status = provider.freshness.label.map { ", \($0)" } ?? ""
         guard !provider.windows.isEmpty else {
-            return "\(provider.name), \(provider.freshness.label ?? "waiting")"
+            return "\(provider.name)\(status), \(provider.detail ?? "waiting")"
         }
         let description = configuration.displayMode.accessibilityDescription
         let windows = provider.windows.map {
             "\($0.label) \(Int(configuration.displayMode.value(for: $0).rounded())) percent "
                 + "\(description), \(UsageResetFormatter.helpText(for: $0))"
         }.joined(separator: ", ")
-        return "\(provider.name), \(windows)"
+        return "\(provider.name)\(status), \(windows)"
+    }
+
+    private var providerHelp: String {
+        [provider.freshness.label, provider.detail ?? provider.name]
+            .compactMap { $0 }
+            .joined(separator: " · ")
     }
 
     private var providerColor: Color {
         switch provider.freshness {
         case .live:
             baseColor
-        case .loading:
+        case .loading, .stale, .signIn, .unavailable, .setupRequired:
             Color(nsColor: .secondaryLabelColor)
-        case .stale, .signIn, .unavailable, .setupRequired:
-            .orange
         }
     }
 
@@ -207,7 +229,7 @@ private struct UsageProviderMark: View {
     let compact: Bool
 
     var body: some View {
-        ZStack(alignment: .trailing) {
+        ZStack {
             Group {
                 if let image = UsageProviderMarkAsset.image(
                     for: provider.id, dark: theme.isDark)
@@ -224,11 +246,14 @@ private struct UsageProviderMark: View {
             }
             .frame(width: markSize, height: markSize)
             .frame(maxWidth: .infinity, alignment: .center)
+            .saturation(markState == .normal ? 1 : 0)
+            .opacity(markOpacity)
 
-            if needsAttention {
-                Circle()
-                    .fill(fallbackColor)
-                    .frame(width: 4, height: 4)
+            if markState == .disconnected {
+                Capsule()
+                    .fill(Color(nsColor: .secondaryLabelColor).opacity(0.9))
+                    .frame(width: markSize + 4, height: 1.5)
+                    .rotationEffect(.degrees(-45))
             }
         }
         .frame(height: markSize)
@@ -244,12 +269,15 @@ private struct UsageProviderMark: View {
         }
     }
 
-    private var needsAttention: Bool {
-        switch provider.freshness {
-        case .stale, .signIn, .unavailable, .setupRequired:
-            true
-        case .loading, .live:
-            false
+    private var markState: UsageProviderMarkState {
+        UsageProviderMarkState.resolved(from: provider.freshness)
+    }
+
+    private var markOpacity: Double {
+        switch markState {
+        case .normal: 1
+        case .muted: 0.55
+        case .disconnected: 0.3
         }
     }
 }

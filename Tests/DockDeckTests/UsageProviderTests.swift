@@ -25,6 +25,15 @@ final class UsageProviderTests: XCTestCase {
         XCTAssertNotNil(UsageProviderMarkAsset.image(for: .claude, dark: true))
     }
 
+    func testUsageProviderMarkStateSeparatesStaleAndDisconnected() {
+        XCTAssertEqual(UsageProviderMarkState.resolved(from: .live), .normal)
+        XCTAssertEqual(UsageProviderMarkState.resolved(from: .loading), .muted)
+        XCTAssertEqual(UsageProviderMarkState.resolved(from: .stale), .muted)
+        XCTAssertEqual(UsageProviderMarkState.resolved(from: .signIn), .disconnected)
+        XCTAssertEqual(UsageProviderMarkState.resolved(from: .unavailable), .disconnected)
+        XCTAssertEqual(UsageProviderMarkState.resolved(from: .setupRequired), .disconnected)
+    }
+
     func testResetFormatterShowsLocalTimeAndDate() {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(secondsFromGMT: 9 * 3_600)!

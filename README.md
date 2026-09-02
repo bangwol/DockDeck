@@ -136,6 +136,14 @@ Codex displays whichever 5-hour and weekly windows the signed-in account returns
 
 Claude displays the officially documented 5-hour and weekly fields available in Claude Code's status-line payload. Anthropic does not currently document a separate Fable rate-limit field. For forward compatibility, DockDeck recognizes the experimental aliases `seven_day_fable` and `fable`; it adds an `FBL` meter only when the payload actually contains one of them and never estimates Fable usage. [Fable availability is plan-specific](https://support.claude.com/en/articles/15424964-claude-fable-models-on-your-plan), and Fable 5 requires Claude Code `2.1.170` or later.
 
+Provider marks show data state without adding a detached status dot:
+
+- Full-color mark: current data
+- Muted mark: loading or cached data past its freshness window
+- Muted mark with a diagonal slash: sign-in, setup, or connection required
+
+Hover a provider mark for its exact status and source detail. The same status is included in VoiceOver labels.
+
 - More than 50% remaining (less than 50% used): selected text color
 - 20–50% remaining (50–80% used): orange
 - Less than 20% remaining (more than 80% used): red
