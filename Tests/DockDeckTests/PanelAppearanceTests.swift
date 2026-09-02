@@ -190,8 +190,8 @@ final class PanelAppearanceTests: XCTestCase {
         XCTAssertEqual(
             model.availablePanes,
             [
-                .decks, .terminal, .usage, .systemStats, .serviceMonitor, .weather, .schedule,
-                .clock, .battery, .network, .appearance,
+                .decks, .notifications, .terminal, .usage, .systemStats, .serviceMonitor,
+                .weather, .schedule, .clock, .battery, .network, .appearance,
             ])
         XCTAssertEqual(model.moduleDefinition(for: .usage)?.id, .usage)
         XCTAssertEqual(model.moduleDefinition(for: .systemStats)?.id, .systemStats)
@@ -662,6 +662,7 @@ final class PanelAppearanceTests: XCTestCase {
     ) -> SettingsPanelValues {
         SettingsPanelValues(
             deckConfiguration: configuration,
+            notifications: DockNotificationSettings(),
             terminal: TerminalSettingsState(
                 focusWidthMultiplier: 2, focusHeightMultiplier: 4,
                 fontName: "Menlo"),

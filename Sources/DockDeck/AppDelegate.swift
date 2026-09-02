@@ -1,5 +1,6 @@
 import ApplicationServices
 import Cocoa
+import Combine
 import CoreGraphics
 import SwiftTerm
 
@@ -37,10 +38,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     lazy var clockStore = ClockStore()
     lazy var batteryStore = BatteryStore()
     lazy var networkStore = NetworkStore()
+    let notificationCoordinator = DockNotificationCoordinator(
+        settings: PanelSettings.notifications)
     lazy var dockCoordinator = DockCoordinator { [weak self] channel, message in
         self?.debugLog(channel, message)
     }
     let moduleRuntimeCoordinator = ModuleRuntimeCoordinator()
+    var notificationCancellables: Set<AnyCancellable> = []
 
     var panel: KeyablePanel { terminalPanelController.panel }
     var readOnlyDeckPanelControllers: [ReadOnlyDeckPanelController] {
@@ -168,6 +172,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 self?.deckSelectionDidChange(on: side)
             })
         panel.delegate = self
+        configureNotifications()
         registerModuleRuntimes()
         synchronizeModuleRuntimes()
 
@@ -248,6 +253,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if let terminalScrollMonitor { NSEvent.removeMonitor(terminalScrollMonitor) }
         trackingTimer?.invalidate()
         moduleRuntimeCoordinator.stopAll()
+        notificationCancellables.removeAll()
     }
 
     private func registerModuleRuntimes() {
@@ -315,6 +321,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 self?.networkStore.setRuntimeActivity(
                     activity, lowPowerMode: lowPowerMode)
             })
+    }
+
+    private func configureNotifications() {
+        notificationCoordinator.refreshAuthorizationStatus()
+        usageStore.$providers
+            .receive(on: RunLoop.main)
+            .sink { [weak self] in self?.notificationCoordinator.observeUsage($0) }
+            .store(in: &notificationCancellables)
+        serviceMonitorStore.$items
+            .receive(on: RunLoop.main)
+            .sink { [weak self] in self?.notificationCoordinator.observeServices($0) }
+            .store(in: &notificationCancellables)
+        batteryStore.$snapshot
+            .receive(on: RunLoop.main)
+            .sink { [weak self] in self?.notificationCoordinator.observeBattery($0) }
+            .store(in: &notificationCancellables)
     }
 
     func synchronizeModuleRuntimes() {

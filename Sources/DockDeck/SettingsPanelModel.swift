@@ -3,6 +3,7 @@ import Combine
 
 enum SettingsPaneID: String, CaseIterable, Identifiable {
     case decks
+    case notifications
     case terminal
     case usage
     case systemStats
@@ -19,6 +20,7 @@ enum SettingsPaneID: String, CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .decks: "Decks"
+        case .notifications: "Notifications"
         case .terminal: "Terminal"
         case .usage: "Usage"
         case .systemStats: "System Stats"
@@ -35,6 +37,7 @@ enum SettingsPaneID: String, CaseIterable, Identifiable {
     var subtitle: String {
         switch self {
         case .decks: "Choose which modules appear beside the Dock."
+        case .notifications: "Choose which local events can alert you."
         case .terminal: "Control terminal expansion and text."
         case .usage: "Choose how account limits are displayed."
         case .systemStats: "Choose compact local performance metrics."
@@ -51,6 +54,7 @@ enum SettingsPaneID: String, CaseIterable, Identifiable {
     var symbolName: String {
         switch self {
         case .decks: "rectangle.stack"
+        case .notifications: "bell.badge"
         case .terminal: "terminal"
         case .usage: "chart.bar"
         case .systemStats: "gauge.with.dots.needle.67percent"
@@ -171,6 +175,7 @@ struct AppearanceSettingsState: Equatable {
 
 struct SettingsPanelValues: Equatable {
     var deckConfiguration: PanelDeckConfiguration
+    var notifications: DockNotificationSettings
     var terminal: TerminalSettingsState
     var usage: UsageSettingsState
     var systemStats: SystemStatsSettingsState
@@ -245,6 +250,7 @@ enum AppearanceSettingsChange {
 
 enum SettingsPanelChange {
     case deck(PanelDeckConfiguration)
+    case notifications(DockNotificationSettings)
     case terminal(TerminalSettingsChange)
     case usage(UsageSettingsChange)
     case systemStats(SystemStatsSettingsChange)
@@ -289,7 +295,8 @@ final class SettingsPanelModel: ObservableObject {
         let modulePanes = Self.moduleDefinitions(in: values.deckConfiguration)
             .compactMap(\.settingsPane)
         self.selectedPane = modulePanes.contains(selectedPane)
-            || selectedPane == .decks || selectedPane == .appearance
+            || selectedPane == .decks || selectedPane == .notifications
+            || selectedPane == .appearance
             ? selectedPane : .decks
     }
 
@@ -298,7 +305,7 @@ final class SettingsPanelModel: ObservableObject {
     }
 
     var availablePanes: [SettingsPaneID] {
-        var panes: [SettingsPaneID] = [.decks]
+        var panes: [SettingsPaneID] = [.decks, .notifications]
         for pane in moduleDefinitions.compactMap(\.settingsPane) where !panes.contains(pane) {
             panes.append(pane)
         }
@@ -394,6 +401,34 @@ final class SettingsPanelModel: ObservableObject {
         var configuration = values.deckConfiguration
         swap(&configuration.left, &configuration.right)
         publishDeck(configuration)
+    }
+
+    func setNotificationsEnabled(_ enabled: Bool) {
+        updateNotifications { $0.enabled = enabled }
+    }
+
+    func setUsageAlertsEnabled(_ enabled: Bool) {
+        updateNotifications { $0.usageAlerts = enabled }
+    }
+
+    func setUsageAlertThreshold(_ threshold: Int) {
+        updateNotifications { $0.usageRemainingThreshold = threshold }
+    }
+
+    func setServiceFailureAlertsEnabled(_ enabled: Bool) {
+        updateNotifications { $0.serviceFailureAlerts = enabled }
+    }
+
+    func setServiceRecoveryAlertsEnabled(_ enabled: Bool) {
+        updateNotifications { $0.serviceRecoveryAlerts = enabled }
+    }
+
+    func setBatteryAlertsEnabled(_ enabled: Bool) {
+        updateNotifications { $0.batteryAlerts = enabled }
+    }
+
+    func setBatteryAlertThreshold(_ threshold: Int) {
+        updateNotifications { $0.batteryRemainingThreshold = threshold }
     }
 
     func setCornerRadius(_ value: CGFloat) {
@@ -629,6 +664,16 @@ final class SettingsPanelModel: ObservableObject {
         let configuration = configuration.normalized()
         updateValues { $0.deckConfiguration = configuration }
         onChange?(.deck(configuration))
+    }
+
+    private func updateNotifications(
+        _ update: (inout DockNotificationSettings) -> Void
+    ) {
+        var settings = values.notifications
+        update(&settings)
+        settings = settings.normalized()
+        updateValues { $0.notifications = settings }
+        onChange?(.notifications(settings))
     }
 
     private func publishFocusSize() {

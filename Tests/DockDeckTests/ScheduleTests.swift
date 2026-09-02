@@ -149,6 +149,7 @@ final class ScheduleTests: XCTestCase {
     private func makeSettingsValues() -> SettingsPanelValues {
         SettingsPanelValues(
             deckConfiguration: .legacy(order: .terminalLeft, enabledPanels: .all),
+            notifications: DockNotificationSettings(),
             terminal: TerminalSettingsState(
                 focusWidthMultiplier: 2, focusHeightMultiplier: 4, fontName: "Menlo"),
             usage: UsageSettingsState(

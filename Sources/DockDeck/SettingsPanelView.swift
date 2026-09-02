@@ -128,6 +128,8 @@ private struct SettingsRootView: View {
         switch model.selectedPane {
         case .decks:
             DecksSettingsView(model: model)
+        case .notifications:
+            NotificationSettingsView(model: model)
         case .terminal:
             TerminalSettingsView(model: model)
         case .usage:

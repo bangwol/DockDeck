@@ -148,6 +148,7 @@ extension AppDelegate {
         view.onReset = { [weak self, weak view] in
             guard let self else { return }
             PanelSettings.resetToDefaults()
+            self.notificationCoordinator.updateSettings(PanelSettings.notifications)
             self.usageStore.setEnabledProviders(PanelSettings.enabledUsageProviders)
             self.systemStatsStore.setRefreshInterval(
                 PanelSettings.systemStatsRefreshInterval)
@@ -207,6 +208,7 @@ extension AppDelegate {
     private var currentSettingsValues: SettingsPanelValues {
         SettingsPanelValues(
             deckConfiguration: PanelSettings.deckConfiguration,
+            notifications: PanelSettings.notifications,
             terminal: TerminalSettingsState(
                 focusWidthMultiplier: PanelSettings.focusWidthMultiplier,
                 focusHeightMultiplier: PanelSettings.focusHeightMultiplier,
@@ -257,6 +259,16 @@ extension AppDelegate {
             }
             for controller in readOnlyDeckPanelControllers { controller.applySettings() }
             applyPanelVisibility()
+        case .notifications(let settings):
+            let wasEnabled = PanelSettings.notifications.enabled
+            PanelSettings.notifications = settings
+            notificationCoordinator.updateSettings(settings)
+            if settings.enabled, !wasEnabled {
+                notificationCoordinator.requestAuthorization()
+            }
+            notificationCoordinator.observeUsage(usageStore.providers)
+            notificationCoordinator.observeServices(serviceMonitorStore.items)
+            notificationCoordinator.observeBattery(batteryStore.snapshot)
         case .terminal(.focusSize(let width, let height)):
             PanelSettings.focusWidthMultiplier = width
             PanelSettings.focusHeightMultiplier = height

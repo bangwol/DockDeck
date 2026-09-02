@@ -61,6 +61,60 @@ enum PanelOrder: String, CaseIterable {
     }
 }
 
+struct DockNotificationSettings: Codable, Equatable {
+    static let usageThresholds = [10, 20, 30]
+    static let batteryThresholds = [10, 20, 30]
+
+    var enabled = false
+    var usageAlerts = true
+    var usageRemainingThreshold = 20
+    var serviceFailureAlerts = true
+    var serviceRecoveryAlerts = true
+    var batteryAlerts = true
+    var batteryRemainingThreshold = 20
+
+    func normalized() -> Self {
+        var settings = self
+        settings.usageRemainingThreshold = Self.closest(
+            usageRemainingThreshold, in: Self.usageThresholds)
+        settings.batteryRemainingThreshold = Self.closest(
+            batteryRemainingThreshold, in: Self.batteryThresholds)
+        return settings
+    }
+
+    private static func closest(_ value: Int, in options: [Int]) -> Int {
+        options.min { abs($0 - value) < abs($1 - value) } ?? options[0]
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case enabled
+        case usageAlerts
+        case usageRemainingThreshold
+        case serviceFailureAlerts
+        case serviceRecoveryAlerts
+        case batteryAlerts
+        case batteryRemainingThreshold
+    }
+
+    init() {}
+
+    init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        enabled = try values.decodeIfPresent(Bool.self, forKey: .enabled) ?? false
+        usageAlerts = try values.decodeIfPresent(Bool.self, forKey: .usageAlerts) ?? true
+        usageRemainingThreshold = try values.decodeIfPresent(
+            Int.self, forKey: .usageRemainingThreshold) ?? 20
+        serviceFailureAlerts = try values.decodeIfPresent(
+            Bool.self, forKey: .serviceFailureAlerts) ?? true
+        serviceRecoveryAlerts = try values.decodeIfPresent(
+            Bool.self, forKey: .serviceRecoveryAlerts) ?? true
+        batteryAlerts = try values.decodeIfPresent(Bool.self, forKey: .batteryAlerts) ?? true
+        batteryRemainingThreshold = try values.decodeIfPresent(
+            Int.self, forKey: .batteryRemainingThreshold) ?? 20
+        self = normalized()
+    }
+}
+
 struct EnabledPanels: OptionSet {
     let rawValue: Int
 
@@ -264,6 +318,7 @@ enum PanelSettings {
     private static let clockHourFormatKey = "DockDeck.settings.clockHourFormat"
     private static let batteryRefreshIntervalKey = "DockDeck.settings.batteryRefreshInterval"
     private static let networkRefreshIntervalKey = "DockDeck.settings.networkRefreshInterval"
+    private static let notificationsKey = "DockDeck.settings.notifications.v1"
     private static let panelOrderKey = "DockDeck.settings.panelOrder"
     private static let enabledPanelsKey = "DockDeck.settings.enabledPanels"
     private static let panelDeckConfigurationKey =
@@ -620,6 +675,20 @@ enum PanelSettings {
         }
     }
 
+    static var notifications: DockNotificationSettings {
+        get {
+            guard let data = UserDefaults.standard.data(forKey: notificationsKey),
+                let settings = try? JSONDecoder().decode(
+                    DockNotificationSettings.self, from: data)
+            else { return DockNotificationSettings() }
+            return settings.normalized()
+        }
+        set {
+            guard let data = try? JSONEncoder().encode(newValue.normalized()) else { return }
+            UserDefaults.standard.set(data, forKey: notificationsKey)
+        }
+    }
+
     static var enabledPanels: EnabledPanels {
         get {
             var panels: EnabledPanels = []
@@ -725,6 +794,7 @@ enum PanelSettings {
         defaults.removeObject(forKey: clockHourFormatKey)
         defaults.removeObject(forKey: batteryRefreshIntervalKey)
         defaults.removeObject(forKey: networkRefreshIntervalKey)
+        defaults.removeObject(forKey: notificationsKey)
         defaults.removeObject(forKey: panelOrderKey)
         defaults.removeObject(forKey: enabledPanelsKey)
         defaults.removeObject(forKey: panelDeckConfigurationKey)
