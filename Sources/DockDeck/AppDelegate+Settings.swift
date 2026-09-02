@@ -168,6 +168,8 @@ extension AppDelegate {
             self.networkStore.setRefreshInterval(PanelSettings.networkRefreshInterval)
             self.projectPulseStore.updateConfiguration(
                 PanelSettings.projectPulseConfiguration)
+            self.focusTimerStore.updateSettings(PanelSettings.focusTimerSettings)
+            self.focusTimerStore.replaceSession(PanelSettings.focusTimerSession)
             self.applyCornerRadius()
             self.applyTintOpacity()
             self.applyFont()
@@ -244,6 +246,7 @@ extension AppDelegate {
             network: NetworkSettingsState(
                 refreshInterval: PanelSettings.networkRefreshInterval),
             projectPulse: PanelSettings.projectPulseConfiguration,
+            focusTimer: PanelSettings.focusTimerSettings,
             appearance: AppearanceSettingsState(
                 cornerRadius: PanelSettings.cornerRadius,
                 tintOpacity: PanelSettings.tintOpacity
@@ -349,6 +352,9 @@ extension AppDelegate {
         case .projectPulse(.configuration(let configuration)):
             PanelSettings.projectPulseConfiguration = configuration
             projectPulseStore.updateConfiguration(configuration)
+        case .focusTimer(.settings(let settings)):
+            PanelSettings.focusTimerSettings = settings
+            focusTimerStore.updateSettings(settings)
         case .appearance(.cornerRadius(let radius)):
             PanelSettings.cornerRadius = radius
             applyCornerRadius()

@@ -150,6 +150,8 @@ private struct SettingsRootView: View {
             NetworkSettingsView(model: model)
         case .projectPulse:
             ProjectPulseSettingsView(model: model)
+        case .focusTimer:
+            FocusTimerSettingsView(model: model)
         case .appearance:
             AppearanceSettingsView(model: model)
         }

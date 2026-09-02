@@ -143,6 +143,21 @@ final class DockNotificationCoordinator {
                 enabled: settings.enabled && settings.batteryAlerts))
     }
 
+    func notifyFocusTimerCompleted(
+        _ phase: FocusTimerPhase, now: Date = Date()
+    ) {
+        guard settings.enabled, settings.focusTimerAlerts else { return }
+        let completedFocus = phase == .focus
+        emit([
+            DockNotificationEvent(
+                identifier: "dockdeck.focus.\(phase.rawValue).\(Int(now.timeIntervalSince1970))",
+                title: completedFocus ? "Focus complete" : "Break complete",
+                body: completedFocus
+                    ? "Your break is ready when you are."
+                    : "The next focus session is ready.")
+        ])
+    }
+
     private func emit(_ events: [DockNotificationEvent]) {
         guard settings.enabled, !events.isEmpty else { return }
         switch authorizationStatus {

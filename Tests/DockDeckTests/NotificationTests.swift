@@ -124,6 +124,25 @@ final class NotificationTests: XCTestCase {
         XCTAssertTrue(settings.serviceFailureAlerts)
         XCTAssertTrue(settings.serviceRecoveryAlerts)
         XCTAssertTrue(settings.batteryAlerts)
+        XCTAssertTrue(settings.focusTimerAlerts)
+    }
+
+    func testFocusCompletionUsesTheAuthorizedNotificationPipeline() {
+        let delivery = FakeNotificationDelivery(
+            status: .authorized, requestedStatus: .authorized)
+        var settings = DockNotificationSettings()
+        settings.enabled = true
+        let coordinator = DockNotificationCoordinator(
+            settings: settings, delivery: delivery)
+        coordinator.refreshAuthorizationStatus()
+
+        coordinator.notifyFocusTimerCompleted(
+            .focus, now: Date(timeIntervalSince1970: 10_000))
+
+        XCTAssertEqual(delivery.delivered.first?.title, "Focus complete")
+        XCTAssertEqual(
+            delivery.delivered.first?.identifier,
+            "dockdeck.focus.focus.10000")
     }
 
     private func provider(usedPercent: Double) -> ProviderUsage {

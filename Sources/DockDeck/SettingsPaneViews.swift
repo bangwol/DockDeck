@@ -165,6 +165,20 @@ struct NotificationSettingsView: View {
                 }
                 .disabled(!model.values.notifications.enabled)
 
+                GroupBox {
+                    SettingsSwitchRow(
+                        title: "Timer completion",
+                        subtitle: "Alert when a focus or break countdown finishes.",
+                        isOn: Binding(
+                            get: { model.values.notifications.focusTimerAlerts },
+                            set: model.setFocusTimerAlertsEnabled))
+                        .padding(.top, 4)
+                } label: {
+                    Label("Focus Timer", systemImage: "timer")
+                        .font(.headline)
+                }
+                .disabled(!model.values.notifications.enabled)
+
                 Text(
                     "Alerts are generated locally from DockDeck's existing module data and only "
                         + "when a condition changes. If macOS access is blocked, allow DockDeck in "

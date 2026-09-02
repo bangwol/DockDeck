@@ -72,6 +72,7 @@ struct DockNotificationSettings: Codable, Equatable {
     var serviceRecoveryAlerts = true
     var batteryAlerts = true
     var batteryRemainingThreshold = 20
+    var focusTimerAlerts = true
 
     func normalized() -> Self {
         var settings = self
@@ -94,6 +95,7 @@ struct DockNotificationSettings: Codable, Equatable {
         case serviceRecoveryAlerts
         case batteryAlerts
         case batteryRemainingThreshold
+        case focusTimerAlerts
     }
 
     init() {}
@@ -111,6 +113,8 @@ struct DockNotificationSettings: Codable, Equatable {
         batteryAlerts = try values.decodeIfPresent(Bool.self, forKey: .batteryAlerts) ?? true
         batteryRemainingThreshold = try values.decodeIfPresent(
             Int.self, forKey: .batteryRemainingThreshold) ?? 20
+        focusTimerAlerts = try values.decodeIfPresent(
+            Bool.self, forKey: .focusTimerAlerts) ?? true
         self = normalized()
     }
 }
@@ -141,11 +145,13 @@ struct PanelModuleID: Hashable, Codable {
     static let battery = PanelModuleID(rawValue: "battery")
     static let network = PanelModuleID(rawValue: "network")
     static let projectPulse = PanelModuleID(rawValue: "project-pulse")
+    static let focusTimer = PanelModuleID(rawValue: "focus-timer")
 
     static let readOnlyBuiltIns: [PanelModuleID] = [
         .usage, .systemStats, .serviceMonitor, .weather, .schedule, .clock, .battery,
         .network,
         .projectPulse,
+        .focusTimer,
     ]
     static let builtIns: [PanelModuleID] = [.terminal] + readOnlyBuiltIns
 
@@ -324,6 +330,8 @@ enum PanelSettings {
     private static let notificationsKey = "DockDeck.settings.notifications.v1"
     private static let projectPulseConfigurationKey =
         "DockDeck.settings.projectPulseConfiguration.v1"
+    private static let focusTimerSettingsKey = "DockDeck.settings.focusTimer.v1"
+    private static let focusTimerSessionKey = "DockDeck.settings.focusTimerSession.v1"
     private static let panelOrderKey = "DockDeck.settings.panelOrder"
     private static let enabledPanelsKey = "DockDeck.settings.enabledPanels"
     private static let panelDeckConfigurationKey =
@@ -717,6 +725,35 @@ enum PanelSettings {
         }
     }
 
+    static var focusTimerSettings: FocusTimerSettings {
+        get {
+            guard let data = UserDefaults.standard.data(forKey: focusTimerSettingsKey),
+                let settings = try? JSONDecoder().decode(FocusTimerSettings.self, from: data)
+            else { return FocusTimerSettings() }
+            return settings.normalized()
+        }
+        set {
+            guard let data = try? JSONEncoder().encode(newValue.normalized()) else { return }
+            UserDefaults.standard.set(data, forKey: focusTimerSettingsKey)
+        }
+    }
+
+    static var focusTimerSession: FocusTimerSession? {
+        get {
+            guard let data = UserDefaults.standard.data(forKey: focusTimerSessionKey) else {
+                return nil
+            }
+            return try? JSONDecoder().decode(FocusTimerSession.self, from: data)
+        }
+        set {
+            guard let newValue, let data = try? JSONEncoder().encode(newValue) else {
+                UserDefaults.standard.removeObject(forKey: focusTimerSessionKey)
+                return
+            }
+            UserDefaults.standard.set(data, forKey: focusTimerSessionKey)
+        }
+    }
+
     static var enabledPanels: EnabledPanels {
         get {
             var panels: EnabledPanels = []
@@ -825,6 +862,8 @@ enum PanelSettings {
         defaults.removeObject(forKey: networkRefreshIntervalKey)
         defaults.removeObject(forKey: notificationsKey)
         defaults.removeObject(forKey: projectPulseConfigurationKey)
+        defaults.removeObject(forKey: focusTimerSettingsKey)
+        defaults.removeObject(forKey: focusTimerSessionKey)
         defaults.removeObject(forKey: panelOrderKey)
         defaults.removeObject(forKey: enabledPanelsKey)
         defaults.removeObject(forKey: panelDeckConfigurationKey)

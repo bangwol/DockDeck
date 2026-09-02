@@ -39,6 +39,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     lazy var batteryStore = BatteryStore()
     lazy var networkStore = NetworkStore()
     lazy var projectPulseStore = ProjectPulseStore()
+    lazy var focusTimerStore = FocusTimerStore(
+        settings: PanelSettings.focusTimerSettings,
+        session: PanelSettings.focusTimerSession,
+        onSessionChange: { PanelSettings.focusTimerSession = $0 },
+        onCompletion: { [weak self] phase in
+            self?.notificationCoordinator.notifyFocusTimerCompleted(phase)
+        })
     let notificationCoordinator = DockNotificationCoordinator(
         settings: PanelSettings.notifications)
     lazy var dockCoordinator = DockCoordinator { [weak self] channel, message in
@@ -152,6 +159,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             batteryStore: batteryStore,
             networkStore: networkStore,
             projectPulseStore: projectPulseStore,
+            focusTimerStore: focusTimerStore,
             menuTarget: self,
             side: .left,
             onSelectionChange: { [weak self] side in
@@ -169,6 +177,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             batteryStore: batteryStore,
             networkStore: networkStore,
             projectPulseStore: projectPulseStore,
+            focusTimerStore: focusTimerStore,
             menuTarget: self,
             side: .right,
             onSelectionChange: { [weak self] side in
@@ -330,6 +339,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             stop: { [weak self] in self?.projectPulseStore.stop() },
             updateActivity: { [weak self] activity, lowPowerMode in
                 self?.projectPulseStore.setRuntimeActivity(
+                    activity, lowPowerMode: lowPowerMode)
+            })
+        moduleRuntimeCoordinator.register(
+            .focusTimer,
+            start: { [weak self] in self?.focusTimerStore.start() },
+            stop: { [weak self] in self?.focusTimerStore.stop() },
+            updateActivity: { [weak self] activity, lowPowerMode in
+                self?.focusTimerStore.setRuntimeActivity(
                     activity, lowPowerMode: lowPowerMode)
             })
     }

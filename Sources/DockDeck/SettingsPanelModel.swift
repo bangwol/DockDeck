@@ -14,6 +14,7 @@ enum SettingsPaneID: String, CaseIterable, Identifiable {
     case battery
     case network
     case projectPulse
+    case focusTimer
     case appearance
 
     var id: Self { self }
@@ -32,6 +33,7 @@ enum SettingsPaneID: String, CaseIterable, Identifiable {
         case .battery: "Battery"
         case .network: "Network"
         case .projectPulse: "Project Pulse"
+        case .focusTimer: "Focus Timer"
         case .appearance: "Appearance"
         }
     }
@@ -50,6 +52,7 @@ enum SettingsPaneID: String, CaseIterable, Identifiable {
         case .battery: "Show charge, power state, and time left."
         case .network: "Show local download and upload throughput."
         case .projectPulse: "Show local Git and optional GitHub Actions status."
+        case .focusTimer: "Run persistent focus and break countdowns."
         case .appearance: "Adjust the shared panel surface."
         }
     }
@@ -68,6 +71,7 @@ enum SettingsPaneID: String, CaseIterable, Identifiable {
         case .battery: "battery.75percent"
         case .network: "network"
         case .projectPulse: "point.3.connected.trianglepath.dotted"
+        case .focusTimer: "timer"
         case .appearance: "paintbrush"
         }
     }
@@ -115,6 +119,9 @@ enum PanelModuleRegistry {
         PanelModuleDefinition(
             id: .projectPulse, title: "Project Pulse", subtitle: "Git and Actions status",
             symbolName: "point.3.connected.trianglepath.dotted", settingsPane: .projectPulse),
+        PanelModuleDefinition(
+            id: .focusTimer, title: "Focus Timer", subtitle: "Focus and break countdowns",
+            symbolName: "timer", settingsPane: .focusTimer),
     ]
 
     static func definition(for id: PanelModuleID) -> PanelModuleDefinition? {
@@ -194,6 +201,7 @@ struct SettingsPanelValues: Equatable {
     var battery: BatterySettingsState
     var network: NetworkSettingsState
     var projectPulse: ProjectPulseConfiguration
+    var focusTimer: FocusTimerSettings
     var appearance: AppearanceSettingsState
 
     func normalized() -> Self {
@@ -201,6 +209,7 @@ struct SettingsPanelValues: Equatable {
         values.deckConfiguration = deckConfiguration.normalized()
         values.systemStats.metrics = SystemStatsMetric.normalized(systemStats.metrics)
         values.projectPulse = projectPulse.normalized()
+        values.focusTimer = focusTimer.normalized()
         return values
     }
 }
@@ -258,6 +267,10 @@ enum ProjectPulseSettingsChange {
     case configuration(ProjectPulseConfiguration)
 }
 
+enum FocusTimerSettingsChange {
+    case settings(FocusTimerSettings)
+}
+
 enum AppearanceSettingsChange {
     case cornerRadius(CGFloat)
     case tintOpacity(CGFloat)
@@ -276,6 +289,7 @@ enum SettingsPanelChange {
     case battery(BatterySettingsChange)
     case network(NetworkSettingsChange)
     case projectPulse(ProjectPulseSettingsChange)
+    case focusTimer(FocusTimerSettingsChange)
     case appearance(AppearanceSettingsChange)
 }
 
@@ -445,6 +459,10 @@ final class SettingsPanelModel: ObservableObject {
 
     func setBatteryAlertThreshold(_ threshold: Int) {
         updateNotifications { $0.batteryRemainingThreshold = threshold }
+    }
+
+    func setFocusTimerAlertsEnabled(_ enabled: Bool) {
+        updateNotifications { $0.focusTimerAlerts = enabled }
     }
 
     func setCornerRadius(_ value: CGFloat) {
@@ -671,6 +689,14 @@ final class SettingsPanelModel: ObservableObject {
         updateProjectPulseConfiguration { $0.refreshInterval = value }
     }
 
+    func setFocusTimerFocusMinutes(_ value: Int) {
+        updateFocusTimerSettings { $0.focusMinutes = value }
+    }
+
+    func setFocusTimerBreakMinutes(_ value: Int) {
+        updateFocusTimerSettings { $0.breakMinutes = value }
+    }
+
     func setValues(_ values: SettingsPanelValues) {
         self.values = values.normalized()
         if !availablePanes.contains(selectedPane) { selectedPane = .decks }
@@ -740,6 +766,16 @@ final class SettingsPanelModel: ObservableObject {
         configuration = configuration.normalized()
         updateValues { $0.projectPulse = configuration }
         onChange?(.projectPulse(.configuration(configuration)))
+    }
+
+    private func updateFocusTimerSettings(
+        _ update: (inout FocusTimerSettings) -> Void
+    ) {
+        var settings = values.focusTimer
+        update(&settings)
+        settings = settings.normalized()
+        updateValues { $0.focusTimer = settings }
+        onChange?(.focusTimer(.settings(settings)))
     }
 
     private func resolvedScheduleCalendarIDs(availableIDs: [String]) -> Set<String> {

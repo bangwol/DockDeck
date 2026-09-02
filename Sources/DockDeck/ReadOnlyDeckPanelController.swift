@@ -31,6 +31,7 @@ final class ReadOnlyDeckPanelController: NSObject, NSMenuDelegate {
     private let batteryStore: BatteryStore
     private let networkStore: NetworkStore
     private let projectPulseStore: ProjectPulseStore
+    private let focusTimerStore: FocusTimerStore
     private weak var menuTarget: AnyObject?
     private var theme: Theme
     private let onSelectionChange: (PanelSide) -> Void
@@ -49,6 +50,7 @@ final class ReadOnlyDeckPanelController: NSObject, NSMenuDelegate {
         batteryStore: BatteryStore,
         networkStore: NetworkStore,
         projectPulseStore: ProjectPulseStore,
+        focusTimerStore: FocusTimerStore,
         menuTarget: AnyObject,
         side: PanelSide = .right,
         onSelectionChange: @escaping (PanelSide) -> Void = { _ in }
@@ -62,6 +64,7 @@ final class ReadOnlyDeckPanelController: NSObject, NSMenuDelegate {
         self.batteryStore = batteryStore
         self.networkStore = networkStore
         self.projectPulseStore = projectPulseStore
+        self.focusTimerStore = focusTimerStore
         self.theme = theme
         self.menuTarget = menuTarget
         self.side = side
@@ -96,6 +99,7 @@ final class ReadOnlyDeckPanelController: NSObject, NSMenuDelegate {
                 batteryStore: batteryStore,
                 networkStore: networkStore,
                 projectPulseStore: projectPulseStore,
+                focusTimerStore: focusTimerStore,
                 activeModule: PanelSettings.activeModule(on: side),
                 theme: theme))
         hostingView.frame = surfaceView.bounds
@@ -157,6 +161,7 @@ final class ReadOnlyDeckPanelController: NSObject, NSMenuDelegate {
             batteryStore: batteryStore,
             networkStore: networkStore,
             projectPulseStore: projectPulseStore,
+            focusTimerStore: focusTimerStore,
             activeModule: activeModule,
             theme: theme)
     }
@@ -233,6 +238,24 @@ final class ReadOnlyDeckPanelController: NSObject, NSMenuDelegate {
                 action: #selector(AppDelegate.toggleUsageDisplayMode(_:)))
         }
 
+        if activeModule == .focusTimer {
+            menu.addItem(.separator())
+            let toggle = NSMenuItem(
+                title: focusTimerStore.snapshot.mode == .running ? "Pause Timer" : "Start Timer",
+                action: #selector(toggleFocusTimer(_:)), keyEquivalent: "")
+            toggle.target = self
+            menu.addItem(toggle)
+            let reset = NSMenuItem(
+                title: "Reset Timer", action: #selector(resetFocusTimer(_:)), keyEquivalent: "")
+            reset.target = self
+            menu.addItem(reset)
+            let skip = NSMenuItem(
+                title: "Skip to \(focusTimerStore.snapshot.phase.next.title.capitalized)",
+                action: #selector(skipFocusTimer(_:)), keyEquivalent: "")
+            skip.target = self
+            menu.addItem(skip)
+        }
+
         menu.addItem(.separator())
         addItem(
             to: menu,
@@ -254,6 +277,18 @@ final class ReadOnlyDeckPanelController: NSObject, NSMenuDelegate {
             let rawValue = item.representedObject as? String
         else { return }
         select(PanelModuleID(rawValue: rawValue))
+    }
+
+    @objc private func toggleFocusTimer(_ sender: Any?) {
+        focusTimerStore.toggle()
+    }
+
+    @objc private func resetFocusTimer(_ sender: Any?) {
+        focusTimerStore.reset()
+    }
+
+    @objc private func skipFocusTimer(_ sender: Any?) {
+        focusTimerStore.skip()
     }
 
     private func handleScrollWheel(_ event: NSEvent) -> Bool {

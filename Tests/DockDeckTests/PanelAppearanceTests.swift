@@ -21,6 +21,7 @@ final class PanelAppearanceTests: XCTestCase {
                 .usage, .systemStats, .serviceMonitor, .weather, .schedule, .clock, .battery,
                 .network,
                 .projectPulse,
+                .focusTimer,
             ])
         XCTAssertEqual(configuration.right, [.terminal])
         XCTAssertEqual(configuration.enabled, [.terminal])
@@ -44,6 +45,7 @@ final class PanelAppearanceTests: XCTestCase {
                 .usage, .systemStats, .serviceMonitor, .weather, .schedule, .clock, .battery,
                 .network,
                 .projectPulse,
+                .focusTimer,
             ])
         XCTAssertEqual(decoded.enabled, [futureModule])
     }
@@ -61,6 +63,7 @@ final class PanelAppearanceTests: XCTestCase {
             [
                 .usage, .serviceMonitor, .weather, .schedule, .clock, .battery, .network,
                 .projectPulse,
+                .focusTimer,
             ])
     }
 
@@ -116,6 +119,7 @@ final class PanelAppearanceTests: XCTestCase {
                 .usage, .systemStats, .serviceMonitor, .weather, .schedule, .clock, .battery,
                 .network,
                 .projectPulse,
+                .focusTimer,
             ])
         XCTAssertEqual(model.values.deckConfiguration.right, [.terminal, futureModule])
         XCTAssertEqual(persistedConfiguration, model.values.deckConfiguration)
@@ -195,7 +199,8 @@ final class PanelAppearanceTests: XCTestCase {
             model.availablePanes,
             [
                 .decks, .notifications, .terminal, .usage, .systemStats, .serviceMonitor,
-                .weather, .schedule, .clock, .battery, .network, .projectPulse, .appearance,
+                .weather, .schedule, .clock, .battery, .network, .projectPulse, .focusTimer,
+                .appearance,
             ])
         XCTAssertEqual(model.moduleDefinition(for: .usage)?.id, .usage)
         XCTAssertEqual(model.moduleDefinition(for: .systemStats)?.id, .systemStats)
@@ -206,6 +211,7 @@ final class PanelAppearanceTests: XCTestCase {
         XCTAssertEqual(model.moduleDefinition(for: .battery)?.id, .battery)
         XCTAssertEqual(model.moduleDefinition(for: .network)?.id, .network)
         XCTAssertEqual(model.moduleDefinition(for: .projectPulse)?.id, .projectPulse)
+        XCTAssertEqual(model.moduleDefinition(for: .focusTimer)?.id, .focusTimer)
     }
 
     func testModuleRuntimeCoordinatorStartsAndStopsOnlyChangedModules() {
@@ -650,6 +656,7 @@ final class PanelAppearanceTests: XCTestCase {
             batteryStore: BatteryStore(),
             networkStore: NetworkStore(),
             projectPulseStore: ProjectPulseStore(),
+            focusTimerStore: FocusTimerStore(),
             menuTarget: NSObject(),
             side: side)
     }
@@ -689,6 +696,7 @@ final class PanelAppearanceTests: XCTestCase {
             battery: BatterySettingsState(refreshInterval: 60),
             network: NetworkSettingsState(refreshInterval: 2),
             projectPulse: ProjectPulseConfiguration(),
+            focusTimer: FocusTimerSettings(),
             appearance: AppearanceSettingsState(
                 cornerRadius: 10, tintOpacity: 0.6))
     }
