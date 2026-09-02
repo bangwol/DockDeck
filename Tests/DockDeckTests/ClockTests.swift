@@ -17,6 +17,21 @@ final class ClockTests: XCTestCase {
             "12:04 PM")
     }
 
+    func testPickerTitlesIncludeCurrentGMTOffset() {
+        let date = Date(timeIntervalSince1970: 1_704_110_640)
+
+        XCTAssertEqual(ClockTimeZone.title(identifier: "system"), "System Time Zone")
+        XCTAssertEqual(
+            ClockTimeZone.title(identifier: "Asia/Seoul", at: date), "Asia/Seoul (GMT+9)")
+        XCTAssertEqual(
+            ClockTimeZone.title(identifier: "Asia/Kolkata", at: date),
+            "Asia/Kolkata (GMT+5:30)")
+        XCTAssertEqual(
+            ClockTimeZone.title(identifier: "America/Sao_Paulo", at: date),
+            "America/Sao Paulo (GMT-3)")
+        XCTAssertEqual(ClockTimeZone.gmtOffsetLabel(seconds: 0), "GMT+0")
+    }
+
     func testInvalidTimeZoneFallsBackToSystem() {
         XCTAssertEqual(
             ClockTimeZone.normalized(identifier: "not/a-time-zone"),

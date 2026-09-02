@@ -26,10 +26,12 @@ struct ClockPanelView: View {
                     .font(.system(size: 9.5, weight: .semibold, design: .rounded))
                     .foregroundStyle(baseColor)
                     .lineLimit(1)
+                    .minimumScaleFactor(0.8)
                 Text(timeZoneLabel(timeZone))
                     .font(.system(size: 8, weight: .medium, design: .rounded))
                     .foregroundStyle(baseColor.opacity(0.7))
                     .lineLimit(1)
+                    .minimumScaleFactor(0.8)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }

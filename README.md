@@ -95,7 +95,7 @@ DockDeck retains only event title, start and end times, all-day state, and calen
 
 ## Showing another time zone
 
-World Clock uses the macOS time-zone database and makes no network request. Select the system time zone or an IANA time-zone identifier under **Settings → World Clock**, then choose the system, 12-hour, or 24-hour format. It refreshes at minute boundaries and stops its timer while disabled.
+World Clock uses the macOS time-zone database and makes no network request. Select the system time zone or an IANA time-zone identifier, listed with its current GMT offset, under **Settings → World Clock**, then choose the system, 12-hour, or 24-hour format. It refreshes at minute boundaries and stops its timer while disabled.
 
 ## Checking battery status
 

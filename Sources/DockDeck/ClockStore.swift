@@ -28,9 +28,20 @@ enum ClockTimeZone {
             ? identifier : systemIdentifier
     }
 
-    static func title(identifier: String) -> String {
+    static func title(identifier: String, at date: Date = Date()) -> String {
         guard identifier != systemIdentifier else { return "System Time Zone" }
-        return identifier.replacingOccurrences(of: "_", with: " ")
+        let name = identifier.replacingOccurrences(of: "_", with: " ")
+        guard let timeZone = TimeZone(identifier: identifier) else { return name }
+        return "\(name) (\(gmtOffsetLabel(seconds: timeZone.secondsFromGMT(for: date))))"
+    }
+
+    static func gmtOffsetLabel(seconds: Int) -> String {
+        let hours = abs(seconds) / 3_600
+        let minutes = abs(seconds) % 3_600 / 60
+        let sign = seconds < 0 ? "-" : "+"
+        return minutes == 0
+            ? "GMT\(sign)\(hours)"
+            : "GMT\(sign)\(hours):" + String(format: "%02d", minutes)
     }
 }
 
