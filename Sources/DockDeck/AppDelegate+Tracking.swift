@@ -205,7 +205,7 @@ extension AppDelegate {
             hideReadOnlyDeck(on: side, reason: "no read-only module is active")
             return
         }
-        controller.applySettings()
+        controller.synchronizeActiveModule()
         if !controller.panel.isVisible { controller.panel.orderFrontRegardless() }
         applyReadOnlyDeckFrame(frame, on: side)
     }

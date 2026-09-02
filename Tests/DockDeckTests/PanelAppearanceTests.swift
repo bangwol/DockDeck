@@ -523,18 +523,7 @@ final class PanelAppearanceTests: XCTestCase {
             order: .terminalLeft, enabledPanels: .all)
         PanelSettings.setActiveModule(.usage, on: .right)
 
-        let controller = ReadOnlyDeckPanelController(
-            initialFrame: NSRect(x: 0, y: 0, width: 214, height: 59),
-            theme: Theme.theme(id: ""),
-            usageStore: UsageStore(),
-            systemStatsStore: SystemStatsStore(),
-            serviceMonitorStore: ServiceMonitorStore(),
-            weatherStore: WeatherStore(),
-            scheduleStore: ScheduleStore(),
-            clockStore: ClockStore(),
-            batteryStore: BatteryStore(),
-            networkStore: NetworkStore(),
-            menuTarget: NSObject())
+        let controller = makeReadOnlyDeckController(side: .right)
         let menu = try XCTUnwrap(controller.panel.contentView?.menu)
 
         controller.menuWillOpen(menu)
@@ -547,6 +536,44 @@ final class PanelAppearanceTests: XCTestCase {
                 "Settings…", "Show Used Values", "Move Terminal to Right",
                 "Refresh Modules & Layout",
             ])
+    }
+
+    func testReadOnlyDeckRebuildsOnlyWhenActiveModuleChanges() {
+        let previousConfiguration = PanelSettings.deckConfiguration
+        let previousRight = PanelSettings.activeModule(on: .right)
+        defer {
+            PanelSettings.deckConfiguration = previousConfiguration
+            PanelSettings.setActiveModule(previousRight, on: .right)
+        }
+        PanelSettings.deckConfiguration = PanelDeckConfiguration(
+            left: [.terminal], right: [.usage, .systemStats],
+            enabled: [.terminal, .usage, .systemStats])
+        PanelSettings.setActiveModule(.usage, on: .right)
+        let controller = makeReadOnlyDeckController(side: .right)
+
+        XCTAssertFalse(controller.synchronizeActiveModule())
+
+        PanelSettings.setActiveModule(.systemStats, on: .right)
+
+        XCTAssertTrue(controller.synchronizeActiveModule())
+        XCTAssertEqual(controller.activeModule, .systemStats)
+        XCTAssertFalse(controller.synchronizeActiveModule())
+    }
+
+    private func makeReadOnlyDeckController(side: PanelSide) -> ReadOnlyDeckPanelController {
+        ReadOnlyDeckPanelController(
+            initialFrame: NSRect(x: 0, y: 0, width: 214, height: 59),
+            theme: Theme.theme(id: ""),
+            usageStore: UsageStore(),
+            systemStatsStore: SystemStatsStore(),
+            serviceMonitorStore: ServiceMonitorStore(),
+            weatherStore: WeatherStore(),
+            scheduleStore: ScheduleStore(),
+            clockStore: ClockStore(),
+            batteryStore: BatteryStore(),
+            networkStore: NetworkStore(),
+            menuTarget: NSObject(),
+            side: side)
     }
 
     private func makeSettingsModel(

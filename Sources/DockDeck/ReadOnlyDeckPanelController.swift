@@ -34,6 +34,7 @@ final class ReadOnlyDeckPanelController: NSObject, NSMenuDelegate {
     private var theme: Theme
     private let onSelectionChange: (PanelSide) -> Void
     private var lastScrollSelectionTime: TimeInterval = 0
+    private var appliedModule: PanelModuleID?
 
     init(
         initialFrame: NSRect,
@@ -122,7 +123,21 @@ final class ReadOnlyDeckPanelController: NSObject, NSMenuDelegate {
     }
 
     func applySettings() {
+        render(activeModule: PanelSettings.activeModule(on: side))
+    }
+
+    /// Dock-tracking ticks call this up to ten times per second; rebuild the module view
+    /// only when the resolved active module changed since the last render.
+    @discardableResult
+    func synchronizeActiveModule() -> Bool {
         let activeModule = PanelSettings.activeModule(on: side)
+        guard activeModule != appliedModule else { return false }
+        render(activeModule: activeModule)
+        return true
+    }
+
+    private func render(activeModule: PanelModuleID?) {
+        appliedModule = activeModule
         PanelSettings.setActiveModule(activeModule, on: side)
         let title = activeModule.flatMap { PanelModuleRegistry.definition(for: $0)?.title }
             ?? "Modules"

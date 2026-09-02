@@ -400,10 +400,13 @@ enum PanelSettings {
 
     static func setActiveModule(_ module: PanelModuleID?, on side: PanelSide) {
         let defaults = UserDefaults.standard
-        if let module, enabledModules(on: side).contains(module) {
-            defaults.set(module.rawValue, forKey: activeModuleKey(for: side))
+        let key = activeModuleKey(for: side)
+        let rawValue = module.flatMap { enabledModules(on: side).contains($0) ? $0.rawValue : nil }
+        guard defaults.string(forKey: key) != rawValue else { return }
+        if let rawValue {
+            defaults.set(rawValue, forKey: key)
         } else {
-            defaults.removeObject(forKey: activeModuleKey(for: side))
+            defaults.removeObject(forKey: key)
         }
     }
 
