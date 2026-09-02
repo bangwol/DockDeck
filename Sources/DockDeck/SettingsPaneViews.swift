@@ -385,6 +385,7 @@ struct ServiceMonitorSettingsView: View {
 
 struct AppearanceSettingsView: View {
     @ObservedObject var model: SettingsPanelModel
+    @State private var isConfirmingReset = false
 
     var body: some View {
         ScrollView {
@@ -425,7 +426,21 @@ struct AppearanceSettingsView: View {
                                 .foregroundStyle(.secondary)
                         }
                         Spacer()
-                        Button("Reset to Defaults") { model.onReset?() }
+                        Button("Reset to Defaults") { isConfirmingReset = true }
+                            .confirmationDialog(
+                                "Reset all DockDeck settings?",
+                                isPresented: $isConfirmingReset,
+                                titleVisibility: .visible
+                            ) {
+                                Button("Reset to Defaults", role: .destructive) {
+                                    model.onReset?()
+                                }
+                                Button("Cancel", role: .cancel) {}
+                            } message: {
+                                Text(
+                                    "Deck layout, Service Monitor URLs, the Weather city, and "
+                                        + "appearance return to their defaults. Themes are kept.")
+                            }
                     }
                     .padding(.vertical, 6)
                 } label: {
