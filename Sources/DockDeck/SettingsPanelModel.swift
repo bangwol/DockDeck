@@ -87,6 +87,18 @@ struct PanelModuleDefinition: Identifiable, Equatable {
     let settingsPane: SettingsPaneID?
 }
 
+enum SettingsSidebarSectionID: String {
+    case general
+    case modules
+    case interface
+}
+
+struct SettingsSidebarSection: Identifiable, Equatable {
+    let id: SettingsSidebarSectionID
+    let title: String
+    let panes: [SettingsPaneID]
+}
+
 enum PanelModuleRegistry {
     static let all = [
         PanelModuleDefinition(
@@ -339,12 +351,19 @@ final class SettingsPanelModel: ObservableObject {
     }
 
     var availablePanes: [SettingsPaneID] {
-        var panes: [SettingsPaneID] = [.decks, .notifications]
-        for pane in moduleDefinitions.compactMap(\.settingsPane) where !panes.contains(pane) {
-            panes.append(pane)
-        }
-        if !panes.contains(.appearance) { panes.append(.appearance) }
-        return panes
+        sidebarSections.flatMap(\.panes)
+    }
+
+    var sidebarSections: [SettingsSidebarSection] {
+        let modulePanes = moduleDefinitions.compactMap(\.settingsPane)
+        return [
+            SettingsSidebarSection(
+                id: .general, title: "General", panes: [.decks, .notifications]),
+            SettingsSidebarSection(
+                id: .modules, title: "Modules", panes: modulePanes),
+            SettingsSidebarSection(
+                id: .interface, title: "Interface", panes: [.appearance]),
+        ]
     }
 
     func moduleDefinitions(on side: PanelSide) -> [PanelModuleDefinition] {

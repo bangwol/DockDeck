@@ -78,24 +78,19 @@ private struct SettingsRootView: View {
                 .padding(.horizontal, 14)
                 .frame(height: 54)
 
-                List(model.availablePanes, selection: $model.selectedPane) { pane in
-                    HStack(spacing: 8) {
-                        Label(pane.title, systemImage: pane.symbolName)
-                        Spacer()
-                        if let definition = model.moduleDefinition(for: pane) {
-                            Circle()
-                                .fill(
-                                    model.isEnabled(definition.id)
-                                        ? Color.accentColor : Color.secondary.opacity(0.45))
-                                .frame(width: 6, height: 6)
-                                .accessibilityLabel(
-                                    model.isEnabled(definition.id) ? "Enabled" : "Disabled")
+                List(selection: $model.selectedPane) {
+                    ForEach(model.sidebarSections) { section in
+                        Section(section.title) {
+                            ForEach(section.panes) { pane in
+                                SettingsSidebarRow(pane: pane, model: model)
+                                    .tag(pane)
+                            }
                         }
                     }
-                    .tag(pane)
                 }
                 .listStyle(.sidebar)
                 .scrollContentBackground(.hidden)
+                .accessibilityLabel("Settings categories")
             }
             .frame(width: SettingsPanelView.sidebarWidth)
             .background(SidebarBackdrop())
@@ -154,6 +149,27 @@ private struct SettingsRootView: View {
             FocusTimerSettingsView(model: model)
         case .appearance:
             AppearanceSettingsView(model: model)
+        }
+    }
+}
+
+private struct SettingsSidebarRow: View {
+    let pane: SettingsPaneID
+    @ObservedObject var model: SettingsPanelModel
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Label(pane.title, systemImage: pane.symbolName)
+            Spacer()
+            if let definition = model.moduleDefinition(for: pane) {
+                Circle()
+                    .fill(
+                        model.isEnabled(definition.id)
+                            ? Color.accentColor : Color.secondary.opacity(0.45))
+                    .frame(width: 6, height: 6)
+                    .accessibilityLabel(
+                        model.isEnabled(definition.id) ? "Enabled" : "Disabled")
+            }
         }
     }
 }

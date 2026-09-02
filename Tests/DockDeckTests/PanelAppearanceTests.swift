@@ -212,6 +212,12 @@ final class PanelAppearanceTests: XCTestCase {
         XCTAssertEqual(model.moduleDefinition(for: .network)?.id, .network)
         XCTAssertEqual(model.moduleDefinition(for: .projectPulse)?.id, .projectPulse)
         XCTAssertEqual(model.moduleDefinition(for: .focusTimer)?.id, .focusTimer)
+        XCTAssertEqual(model.sidebarSections.map(\.id), [.general, .modules, .interface])
+        XCTAssertEqual(model.sidebarSections[0].panes, [.decks, .notifications])
+        XCTAssertEqual(
+            model.sidebarSections[1].panes,
+            model.moduleDefinitions.compactMap(\.settingsPane))
+        XCTAssertEqual(model.sidebarSections[2].panes, [.appearance])
     }
 
     func testModuleRuntimeCoordinatorStartsAndStopsOnlyChangedModules() {
