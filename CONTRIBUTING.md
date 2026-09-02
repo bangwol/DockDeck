@@ -51,9 +51,10 @@ swift test
   release the event store and observer when disabled. Never log or persist
   event or Reminder content. Calendar and Reminders access remain separate and
   neither prompt may be triggered by enabling the module.
-- Keep Project Pulse on bounded, non-interactive local `git` and optional `gh`
-  commands. Never persist file names, command output, remote URLs, or
-  credentials; GitHub authentication remains owned by GitHub CLI.
+- Keep Project Pulse on bounded, non-interactive local `git` and authenticated
+  `gh` commands. Persist only a standardized local path or selected
+  `owner/repository` name. Never persist file names, command output, remote
+  URLs, or credentials; GitHub authentication remains owned by GitHub CLI.
 - Persist Focus Timer state only on transitions. Keep an absolute completion
   deadline separate from display refreshes so background and Low Power Mode
   cadence changes do not delay a completed phase.

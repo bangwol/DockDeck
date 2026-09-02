@@ -31,7 +31,7 @@ DockDeck uses the space beside a bottom-aligned Dock for up to two compact modul
 - Local or selected-world-time display with system, 12-hour, and 24-hour formats.
 - Internal battery level, power state, and the system-provided charge or discharge estimate.
 - Local download and upload throughput for the current primary network interface.
-- Local Git branch and working-tree status with optional GitHub Actions status through the installed `gh` CLI.
+- Local Git status or remote GitHub activity, including 7-day commits, open pull requests and issues, and optional Actions status through the installed `gh` CLI.
 - Persistent focus and break countdowns that continue behind other modules and survive an app restart.
 - Opt-in native notifications for quota thresholds, service transitions, low battery, and completed focus timers.
 - Dock-aware, symmetric placement across displays, Spaces, and auto-hide transitions.
@@ -55,12 +55,12 @@ DockDeck uses the space beside a bottom-aligned Dock for up to two compact modul
 | World Clock | Local or selected time zone | [Module catalog](docs/modules/catalog.md#world-clock) |
 | Battery | Charge, power state, and time estimate | [Module catalog](docs/modules/catalog.md#battery) |
 | Network | Primary-interface download and upload throughput | [Module catalog](docs/modules/catalog.md#network) |
-| Project Pulse | Local Git state and optional GitHub Actions result | [Project Pulse](docs/modules/project-pulse.md) |
+| Project Pulse | Local Git state or remote GitHub repository activity | [Project Pulse](docs/modules/project-pulse.md) |
 | Focus Timer | Persistent focus and break countdowns | [Module catalog](docs/modules/catalog.md#focus-timer) |
 
 ## Decks and settings
 
-Settings are organized into **General**, **Modules**, and **Interface** sections. Module pages are generated from the same registry that drives the Deck editor, with enabled modules listed first. Drag a card from its `≡` handle within a Deck to set its cycle order or into the other Deck to change sides. The same moves are available from each card's context menu. Move every card to one Deck if you want the other side completely empty and hidden. You can also swap the complete left and right Decks. At least one module remains enabled so Settings stays reachable. DockDeck remembers each Deck's selected module and the last Settings page you opened.
+Settings are organized into **General**, **Modules**, and **Interface** sections. Module pages are generated from the same registry that drives the Deck editor, with enabled modules listed first. Drag a card from its `≡` handle within a Deck to set its cycle order or into the other Deck to change sides. Cards preview their destination and animate into place while dragging; macOS Reduce Motion is respected. The same moves are available from each card's context menu. Move every card to one Deck if you want the other side completely empty and hidden. You can also swap the complete left and right Decks. At least one module remains enabled so Settings stays reachable. DockDeck remembers each Deck's selected module and the last Settings page you opened.
 
 <p align="center">
   <a href="assets/dockdeck-decks-settings.png">
@@ -169,7 +169,7 @@ DockDeck does not read browser cookies, browser credential stores, or private we
 | World Clock | macOS time-zone database | Formats time locally and stops its minute timer while disabled |
 | Battery | macOS IOKit | Reads the internal power source locally; does not read battery identifiers or serial numbers |
 | Network | macOS routing and configuration APIs | Reads only primary-interface byte counters; does not inspect network traffic or destinations |
-| Project Pulse | Local `git`; optional authenticated `gh` CLI | Stores a selected local path, caps command output, and never reads or stores GitHub tokens or remote URLs |
+| Project Pulse | Local `git`; authenticated `gh` REST, GraphQL, and optional Actions calls | Stores a selected local path or `owner/repository` name, caps command output, and never reads or stores GitHub tokens or command output |
 | Focus Timer | Local countdown state | Stores phase, deadline, and remaining duration only when timer state changes |
 | Notifications | macOS UserNotifications | Evaluates enabled rules locally and sends no notification data to an external service |
 
