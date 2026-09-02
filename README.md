@@ -47,6 +47,7 @@ Keyboard shortcuts:
 | `⌘T` | Open the theme picker |
 | `⌘,` | Open the shared settings panel |
 | `⌘R` | Refresh active module data and Dock layout |
+| `⌘W` | Close the Settings window or theme picker |
 | `⌘Q` | Quit DockDeck |
 
 DockDeck reserves the Command-key shortcuts above plus the standard `⌘C`, `⌘V`, and `⌘A` editing shortcuts. `Ctrl` combinations, Option/Meta, Esc, Tab, arrow keys, Home/End, Delete, and F1–F12 continue through SwiftTerm's normal terminal input handling. Option acts as Meta by default. Page Up and Page Down follow SwiftTerm's terminal scrolling behavior unless the running terminal application requests cursor-key handling.

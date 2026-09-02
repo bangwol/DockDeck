@@ -26,6 +26,9 @@ extension AppDelegate {
             keyEquivalent: "r"
         )
         appMenu.addItem(
+            withTitle: "Close Window", action: #selector(closeFrontWindow(_:)), keyEquivalent: "w"
+        )
+        appMenu.addItem(
             withTitle: "Quit DockDeck", action: #selector(NSApplication.terminate(_:)),
             keyEquivalent: "q")
 
@@ -88,6 +91,16 @@ extension AppDelegate {
         refreshCoarseCaches()
         startTrackingTimer()
         runEvaluation()
+    }
+
+    /// Only the Settings window and theme picker are closable; the Dock panels ignore ⌘W
+    /// instead of beeping through NSWindow.performClose(_:).
+    @objc func closeFrontWindow(_ sender: Any?) {
+        if let settingsPanel, settingsPanel.isKeyWindow {
+            settingsPanel.close()
+        } else if themePickerPanel?.isKeyWindow == true {
+            toggleThemePicker(nil)
+        }
     }
 
     @objc func showAbout(_ sender: Any?) {
