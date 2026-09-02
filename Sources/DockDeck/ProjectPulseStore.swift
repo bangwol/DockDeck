@@ -1,24 +1,75 @@
 import Darwin
 import Foundation
 
+enum ProjectPulseSource: String, Codable, CaseIterable, Identifiable {
+    case local
+    case github
+
+    var id: Self { self }
+
+    var title: String {
+        switch self {
+        case .local: "Local"
+        case .github: "GitHub"
+        }
+    }
+}
+
 struct ProjectPulseConfiguration: Codable, Equatable {
     static let refreshIntervals: [TimeInterval] = [30, 60, 5 * 60]
     static let defaultRefreshInterval: TimeInterval = 60
     static let maximumPathLength = 4_096
 
+    var source: ProjectPulseSource
     var repositoryPath: String?
+    var githubRepository: String?
     var includesGitHubActions: Bool
     var refreshInterval: TimeInterval
 
     init(
+        source: ProjectPulseSource = .local,
         repositoryPath: String? = nil,
+        githubRepository: String? = nil,
         includesGitHubActions: Bool = false,
         refreshInterval: TimeInterval = Self.defaultRefreshInterval
     ) {
+        self.source = source
         self.repositoryPath = repositoryPath
+        self.githubRepository = githubRepository
         self.includesGitHubActions = includesGitHubActions
         self.refreshInterval = refreshInterval
         self = normalized()
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case source
+        case repositoryPath
+        case githubRepository
+        case includesGitHubActions
+        case refreshInterval
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        source = try container.decodeIfPresent(ProjectPulseSource.self, forKey: .source)
+            ?? .local
+        repositoryPath = try container.decodeIfPresent(String.self, forKey: .repositoryPath)
+        githubRepository = try container.decodeIfPresent(
+            String.self, forKey: .githubRepository)
+        includesGitHubActions = try container.decodeIfPresent(
+            Bool.self, forKey: .includesGitHubActions) ?? false
+        refreshInterval = try container.decodeIfPresent(
+            TimeInterval.self, forKey: .refreshInterval) ?? Self.defaultRefreshInterval
+        self = normalized()
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(source, forKey: .source)
+        try container.encodeIfPresent(repositoryPath, forKey: .repositoryPath)
+        try container.encodeIfPresent(githubRepository, forKey: .githubRepository)
+        try container.encode(includesGitHubActions, forKey: .includesGitHubActions)
+        try container.encode(refreshInterval, forKey: .refreshInterval)
     }
 
     func normalized() -> Self {
@@ -32,10 +83,35 @@ struct ProjectPulseConfiguration: Codable, Equatable {
         } else {
             configuration.repositoryPath = nil
         }
+        configuration.githubRepository = Self.normalizedGitHubRepository(githubRepository)
         configuration.refreshInterval = Self.refreshIntervals.min {
             abs($0 - refreshInterval) < abs($1 - refreshInterval)
         } ?? Self.defaultRefreshInterval
         return configuration
+    }
+
+    var isConfigured: Bool {
+        switch source {
+        case .local: repositoryPath != nil
+        case .github: githubRepository != nil
+        }
+    }
+
+    static func normalizedGitHubRepository(_ value: String?) -> String? {
+        guard let value = value?.trimmingCharacters(in: .whitespacesAndNewlines),
+            !value.isEmpty, value.count <= 201
+        else { return nil }
+        let parts = value.split(separator: "/", omittingEmptySubsequences: false)
+        guard parts.count == 2, parts.allSatisfy({ !$0.isEmpty && $0.count <= 100 }) else {
+            return nil
+        }
+        guard parts.allSatisfy({ $0 != "." && $0 != ".." }) else { return nil }
+        let allowed = CharacterSet.alphanumerics.union(
+            CharacterSet(charactersIn: "-_."))
+        guard parts.allSatisfy({ part in
+            part.unicodeScalars.allSatisfy(allowed.contains)
+        }) else { return nil }
+        return parts.joined(separator: "/")
     }
 }
 
@@ -70,7 +146,18 @@ struct ProjectWorkflowSnapshot: Equatable {
 
 struct ProjectPulseSnapshot: Equatable {
     let git: ProjectGitSnapshot
+    let github: ProjectGitHubSnapshot?
     let workflow: ProjectWorkflowSnapshot?
+
+    init(
+        git: ProjectGitSnapshot,
+        github: ProjectGitHubSnapshot? = nil,
+        workflow: ProjectWorkflowSnapshot?
+    ) {
+        self.git = git
+        self.github = github
+        self.workflow = workflow
+    }
 }
 
 enum ProjectPulseStatus: Equatable {
@@ -82,6 +169,8 @@ enum ProjectPulseStatus: Equatable {
 
 enum ProjectPulseError: LocalizedError, Equatable {
     case gitUnavailable
+    case githubCLIUnavailable
+    case githubUnavailable
     case repositoryUnavailable
     case notRepository
     case commandTimedOut
@@ -92,6 +181,8 @@ enum ProjectPulseError: LocalizedError, Equatable {
     var errorDescription: String? {
         switch self {
         case .gitUnavailable: "Git is unavailable"
+        case .githubCLIUnavailable: "Install GitHub CLI to use this source"
+        case .githubUnavailable: "Sign in to GitHub CLI and try again"
         case .repositoryUnavailable: "Repository folder is unavailable"
         case .notRepository: "Choose a Git repository"
         case .commandTimedOut: "Repository check timed out"
@@ -107,8 +198,25 @@ protocol ProjectPulseReading {
 }
 
 struct ProjectPulseReader: ProjectPulseReading {
+    private let github: GitHubProjectReading
+
+    init(github: GitHubProjectReading = GitHubProjectClient()) {
+        self.github = github
+    }
+
     func read(configuration: ProjectPulseConfiguration) throws -> ProjectPulseSnapshot {
         let configuration = configuration.normalized()
+        switch configuration.source {
+        case .local:
+            return try readLocal(configuration: configuration)
+        case .github:
+            return try readGitHub(configuration: configuration)
+        }
+    }
+
+    private func readLocal(
+        configuration: ProjectPulseConfiguration
+    ) throws -> ProjectPulseSnapshot {
         guard let path = configuration.repositoryPath else {
             throw ProjectPulseError.repositoryUnavailable
         }
@@ -140,29 +248,32 @@ struct ProjectPulseReader: ProjectPulseReading {
         let gitSnapshot = try GitPorcelainV2Parser.parse(
             gitOutput, repositoryName: repositoryName)
         let workflow = configuration.includesGitHubActions
-            ? readWorkflow(in: repositoryURL) : nil
+            ? github.readWorkflow(repository: nil, currentDirectoryURL: repositoryURL) : nil
         return ProjectPulseSnapshot(git: gitSnapshot, workflow: workflow)
     }
 
-    private func readWorkflow(in repositoryURL: URL) -> ProjectWorkflowSnapshot {
-        guard let gh = ProjectPulseBinaryLocator.githubCLI() else {
-            return ProjectWorkflowSnapshot(state: .unavailable, title: "Install gh for Actions")
+    private func readGitHub(
+        configuration: ProjectPulseConfiguration
+    ) throws -> ProjectPulseSnapshot {
+        guard let repository = configuration.githubRepository else {
+            throw ProjectPulseError.githubUnavailable
         }
-        do {
-            let output = try ProjectPulseCommand.run(
-                executableURL: gh,
-                arguments: [
-                    "run", "list", "--limit", "1", "--json",
-                    "status,conclusion,name,displayTitle",
-                ],
-                currentDirectoryURL: repositoryURL,
-                environment: ["GH_PROMPT_DISABLED": "1", "NO_COLOR": "1", "PAGER": "cat"])
-            return try GitHubRunParser.parse(output)
-                ?? ProjectWorkflowSnapshot(state: .neutral, title: "No workflow runs")
-        } catch {
-            return ProjectWorkflowSnapshot(
-                state: .unavailable, title: "Actions unavailable")
-        }
+        let result = try github.readRepository(
+            repository,
+            includesWorkflow: configuration.includesGitHubActions,
+            now: Date())
+        return ProjectPulseSnapshot(
+            git: ProjectGitSnapshot(
+                repositoryName: result.repository.shortName,
+                branch: result.repository.defaultBranch,
+                stagedCount: 0,
+                modifiedCount: 0,
+                untrackedCount: 0,
+                conflictCount: 0,
+                aheadCount: 0,
+                behindCount: 0),
+            github: result.repository,
+            workflow: result.workflow)
     }
 }
 
@@ -394,7 +505,7 @@ final class ProjectPulseStore: ObservableObject {
         snapshot = initialSnapshot
         status = initialSnapshot != nil
             ? .ready
-            : (self.configuration.repositoryPath == nil ? .notConfigured : .loading)
+            : (self.configuration.isConfigured ? .loading : .notConfigured)
     }
 
     func start() {
@@ -415,11 +526,13 @@ final class ProjectPulseStore: ObservableObject {
     func updateConfiguration(_ configuration: ProjectPulseConfiguration) {
         let configuration = configuration.normalized()
         guard self.configuration != configuration else { return }
-        let repositoryChanged = self.configuration.repositoryPath != configuration.repositoryPath
+        let repositoryChanged = self.configuration.source != configuration.source
+            || self.configuration.repositoryPath != configuration.repositoryPath
+            || self.configuration.githubRepository != configuration.githubRepository
         self.configuration = configuration
         generation += 1
         if repositoryChanged { snapshot = nil }
-        if configuration.repositoryPath == nil {
+        if !configuration.isConfigured {
             status = .notConfigured
         } else if snapshot == nil {
             status = .loading
@@ -440,7 +553,7 @@ final class ProjectPulseStore: ObservableObject {
 
     func refresh() {
         guard isRunning else { return }
-        guard configuration.repositoryPath != nil else {
+        guard configuration.isConfigured else {
             snapshot = nil
             status = .notConfigured
             return
@@ -478,7 +591,7 @@ final class ProjectPulseStore: ObservableObject {
 
     private func scheduleTimer() {
         timer?.invalidate()
-        guard isRunning, configuration.repositoryPath != nil else {
+        guard isRunning, configuration.isConfigured else {
             timer = nil
             return
         }

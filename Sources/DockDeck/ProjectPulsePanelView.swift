@@ -1,3 +1,4 @@
+import Foundation
 import SwiftUI
 
 struct ProjectPulsePanelView: View {
@@ -61,19 +62,41 @@ private struct ProjectPulseContent: View {
                     WorkflowBadge(workflow: workflow)
                 }
             }
-            HStack(spacing: 5) {
-                Image(systemName: "arrow.triangle.branch")
-                    .foregroundStyle(baseColor.opacity(0.62))
-                Text(snapshot.git.branch)
-                    .foregroundStyle(baseColor.opacity(0.88))
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-                Spacer(minLength: 3)
-                Text(changeLabel)
-                    .foregroundStyle(changeColor)
-                if !syncLabel.isEmpty {
-                    Text(syncLabel)
-                        .foregroundStyle(baseColor.opacity(0.7))
+            if let github = snapshot.github {
+                HStack(spacing: 5) {
+                    Image(systemName: "arrow.triangle.branch")
+                        .foregroundStyle(baseColor.opacity(0.62))
+                    Text(github.defaultBranch)
+                        .foregroundStyle(baseColor.opacity(0.88))
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                    Spacer(minLength: 2)
+                    ProjectActivityMetric(
+                        label: "7D", value: github.commitsLastSevenDays,
+                        help: "Commits to the default branch in the last 7 days",
+                        baseColor: baseColor)
+                    ProjectActivityMetric(
+                        label: "PR", value: github.openPullRequests,
+                        help: "Open pull requests", baseColor: baseColor)
+                    ProjectActivityMetric(
+                        label: "ISS", value: github.openIssues,
+                        help: "Open issues", baseColor: baseColor)
+                }
+            } else {
+                HStack(spacing: 5) {
+                    Image(systemName: "arrow.triangle.branch")
+                        .foregroundStyle(baseColor.opacity(0.62))
+                    Text(snapshot.git.branch)
+                        .foregroundStyle(baseColor.opacity(0.88))
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                    Spacer(minLength: 3)
+                    Text(changeLabel)
+                        .foregroundStyle(changeColor)
+                    if !syncLabel.isEmpty {
+                        Text(syncLabel)
+                            .foregroundStyle(baseColor.opacity(0.7))
+                    }
                 }
             }
         }
@@ -82,7 +105,7 @@ private struct ProjectPulseContent: View {
         .padding(.vertical, 6)
         .help(helpText)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(snapshot.git.repositoryName)
+        .accessibilityLabel(snapshot.github?.nameWithOwner ?? snapshot.git.repositoryName)
         .accessibilityValue(helpText)
     }
 
@@ -103,6 +126,23 @@ private struct ProjectPulseContent: View {
     }
 
     private var helpText: String {
+        if let github = snapshot.github {
+            var parts = [
+                github.nameWithOwner,
+                github.isPrivate ? "private repository" : "public repository",
+                "\(github.commitsLastSevenDays) commits in the last 7 days",
+                "\(github.openPullRequests) open pull requests",
+                "\(github.openIssues) open issues",
+                "\(github.stargazerCount) stars, \(github.forkCount) forks",
+            ]
+            if let pushedAt = github.pushedAt {
+                parts.append("last push \(pushedAt.formatted(date: .abbreviated, time: .shortened))")
+            }
+            if let headOID = github.headOID { parts.append("head \(headOID)") }
+            if let workflow = snapshot.workflow { parts.append(workflow.title) }
+            if case .failed(let message) = status { parts.append(message) }
+            return parts.joined(separator: " · ")
+        }
         let git = snapshot.git
         var parts = [
             "\(git.repositoryName) · \(git.branch)",
@@ -113,6 +153,37 @@ private struct ProjectPulseContent: View {
         if let workflow = snapshot.workflow { parts.append(workflow.title) }
         if case .failed(let message) = status { parts.append(message) }
         return parts.joined(separator: " · ")
+    }
+}
+
+private struct ProjectActivityMetric: View {
+    let label: String
+    let value: Int
+    let help: String
+    let baseColor: Color
+
+    var body: some View {
+        HStack(spacing: 1.5) {
+            Text(label)
+                .foregroundStyle(baseColor.opacity(0.55))
+            Text(compactValue)
+                .foregroundStyle(baseColor.opacity(0.9))
+        }
+        .fixedSize()
+        .help("\(help): \(value)")
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(help)
+        .accessibilityValue("\(value)")
+    }
+
+    private var compactValue: String {
+        if value >= 1_000_000 {
+            return String(format: "%.1fM", Double(value) / 1_000_000)
+        }
+        if value >= 1_000 {
+            return String(format: "%.1fK", Double(value) / 1_000)
+        }
+        return "\(value)"
     }
 }
 

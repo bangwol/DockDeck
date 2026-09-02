@@ -18,6 +18,36 @@ final class ProjectPulseTests: XCTestCase {
             ProjectPulseConfiguration(repositoryPath: "relative/repo").repositoryPath)
     }
 
+    func testConfigurationNormalizesGitHubSelectionAndMigratesLocalStorage() throws {
+        let github = ProjectPulseConfiguration(
+            source: .github,
+            repositoryPath: "/tmp/local-copy",
+            githubRepository: " bangwol/DockDeck ")
+
+        XCTAssertEqual(github.source, .github)
+        XCTAssertEqual(github.githubRepository, "bangwol/DockDeck")
+        XCTAssertEqual(github.repositoryPath, "/tmp/local-copy")
+        XCTAssertTrue(github.isConfigured)
+        XCTAssertNil(
+            ProjectPulseConfiguration(
+                source: .github, githubRepository: "owner/repo/extra"
+            ).githubRepository)
+        XCTAssertNil(
+            ProjectPulseConfiguration(
+                source: .github, githubRepository: "owner/."
+            ).githubRepository)
+
+        let legacy = Data(
+            #"{"repositoryPath":"/tmp/legacy","includesGitHubActions":true,"refreshInterval":60}"#
+                .utf8)
+        let decoded = try JSONDecoder().decode(ProjectPulseConfiguration.self, from: legacy)
+
+        XCTAssertEqual(decoded.source, .local)
+        XCTAssertEqual(decoded.repositoryPath, "/tmp/legacy")
+        XCTAssertNil(decoded.githubRepository)
+        XCTAssertTrue(decoded.isConfigured)
+    }
+
     func testGitPorcelainParserCountsChangesAndBranchSync() throws {
         let records = [
             "# branch.oid abcdef1234567890",
@@ -72,6 +102,80 @@ final class ProjectPulseTests: XCTestCase {
         XCTAssertEqual(running.state, .running)
         XCTAssertEqual(running.title, "CI")
         XCTAssertNil(try GitHubRunParser.parse(Data("[]".utf8)))
+    }
+
+    func testGitHubProjectParserReadsCompactActivity() throws {
+        let data = Data(
+            #"{"data":{"repository":{"nameWithOwner":"bangwol/DockDeck","isPrivate":false,"pushedAt":"2026-09-02T08:36:22Z","defaultBranchRef":{"name":"main","target":{"abbreviatedOid":"6084895","history":{"totalCount":69}}},"pullRequests":{"totalCount":2},"issues":{"totalCount":4},"stargazerCount":8,"forkCount":3}}}"#
+                .utf8)
+
+        let repository = try GitHubProjectParser.parse(data)
+
+        XCTAssertEqual(repository.nameWithOwner, "bangwol/DockDeck")
+        XCTAssertEqual(repository.shortName, "DockDeck")
+        XCTAssertEqual(repository.defaultBranch, "main")
+        XCTAssertEqual(repository.headOID, "6084895")
+        XCTAssertEqual(repository.commitsLastSevenDays, 69)
+        XCTAssertEqual(repository.openPullRequests, 2)
+        XCTAssertEqual(repository.openIssues, 4)
+        XCTAssertEqual(repository.stargazerCount, 8)
+        XCTAssertEqual(repository.forkCount, 3)
+        XCTAssertNotNil(repository.pushedAt)
+    }
+
+    func testGitHubRepositoryListParserFiltersInvalidAndDuplicateNames() throws {
+        let data = Data(
+            #"[{"full_name":"bangwol/DockDeck","private":false,"archived":false,"pushed_at":"2026-09-02T08:36:22Z"},{"full_name":"bangwol/DockDeck","private":false,"archived":false,"pushed_at":null},{"full_name":"bad/name/extra","private":true,"archived":false,"pushed_at":null},{"full_name":"bangwol/archive","private":true,"archived":true,"pushed_at":null}]"#
+                .utf8)
+
+        let repositories = try GitHubRepositoryListParser.parse(data)
+
+        XCTAssertEqual(repositories.map(\.nameWithOwner), ["bangwol/DockDeck", "bangwol/archive"])
+        XCTAssertFalse(repositories[0].isPrivate)
+        XCTAssertTrue(repositories[1].isPrivate)
+        XCTAssertTrue(repositories[1].isArchived)
+    }
+
+    func testGitHubRepositoryCatalogPublishesLoadedOptions() {
+        let option = GitHubRepositoryOption(
+            nameWithOwner: "bangwol/DockDeck",
+            isPrivate: false,
+            isArchived: false,
+            pushedAt: nil)
+        let catalog = GitHubRepositoryCatalog(
+            listing: FakeGitHubRepositoryListing(repositories: [option]))
+        let completed = expectation(description: "Repository list loaded")
+        var fulfilled = false
+        let cancellable = catalog.$status.sink { status in
+            guard !fulfilled, status == .ready else { return }
+            fulfilled = true
+            completed.fulfill()
+        }
+
+        catalog.load()
+        wait(for: [completed], timeout: 1)
+
+        XCTAssertEqual(catalog.repositories, [option])
+        cancellable.cancel()
+    }
+
+    func testReaderBuildsRemoteSnapshotWithoutLocalRepository() throws {
+        let github = fixtureGitHubSnapshot()
+        let workflow = ProjectWorkflowSnapshot(state: .success, title: "Build")
+        let reader = ProjectPulseReader(
+            github: FakeGitHubProjectReader(
+                result: GitHubProjectResult(repository: github, workflow: workflow)))
+
+        let snapshot = try reader.read(
+            configuration: ProjectPulseConfiguration(
+                source: .github,
+                githubRepository: github.nameWithOwner,
+                includesGitHubActions: true))
+
+        XCTAssertEqual(snapshot.git.repositoryName, "DockDeck")
+        XCTAssertEqual(snapshot.git.branch, "main")
+        XCTAssertEqual(snapshot.github, github)
+        XCTAssertEqual(snapshot.workflow, workflow)
     }
 
     func testStorePublishesReaderSnapshot() {
@@ -137,6 +241,39 @@ final class ProjectPulseTests: XCTestCase {
         XCTAssertGreaterThan(bitmap.pixelsHigh, 0)
     }
 
+    func testPanelRendersGitHubActivityAtCompactSize() throws {
+        let github = fixtureGitHubSnapshot()
+        let snapshot = ProjectPulseSnapshot(
+            git: ProjectGitSnapshot(
+                repositoryName: github.shortName,
+                branch: github.defaultBranch,
+                stagedCount: 0,
+                modifiedCount: 0,
+                untrackedCount: 0,
+                conflictCount: 0,
+                aheadCount: 0,
+                behindCount: 0),
+            github: github,
+            workflow: ProjectWorkflowSnapshot(state: .running, title: "Test"))
+        let store = ProjectPulseStore(
+            configuration: ProjectPulseConfiguration(
+                source: .github, githubRepository: github.nameWithOwner),
+            reader: FakeProjectPulseReader(snapshot: snapshot),
+            initialSnapshot: snapshot)
+        let size = NSSize(width: 214, height: 59)
+        let view = NSHostingView(
+            rootView: ProjectPulsePanelView(store: store, theme: Theme.theme(id: "")))
+        view.frame = NSRect(origin: .zero, size: size)
+        view.layoutSubtreeIfNeeded()
+
+        let bitmap = try XCTUnwrap(view.bitmapImageRepForCachingDisplay(in: view.bounds))
+        view.cacheDisplay(in: view.bounds, to: bitmap)
+
+        XCTAssertEqual(view.frame.size, size)
+        XCTAssertGreaterThan(bitmap.pixelsWide, 0)
+        XCTAssertGreaterThan(bitmap.pixelsHigh, 0)
+    }
+
     private func fixtureSnapshot() -> ProjectPulseSnapshot {
         ProjectPulseSnapshot(
             git: ProjectGitSnapshot(
@@ -150,6 +287,20 @@ final class ProjectPulseTests: XCTestCase {
                 behindCount: 0),
             workflow: ProjectWorkflowSnapshot(state: .success, title: "Build"))
     }
+
+    private func fixtureGitHubSnapshot() -> ProjectGitHubSnapshot {
+        ProjectGitHubSnapshot(
+            nameWithOwner: "bangwol/DockDeck",
+            defaultBranch: "main",
+            headOID: "6084895",
+            commitsLastSevenDays: 69,
+            openPullRequests: 2,
+            openIssues: 4,
+            stargazerCount: 8,
+            forkCount: 3,
+            isPrivate: false,
+            pushedAt: Date(timeIntervalSince1970: 1_756_800_000))
+    }
 }
 
 private struct FakeProjectPulseReader: ProjectPulseReading {
@@ -157,5 +308,33 @@ private struct FakeProjectPulseReader: ProjectPulseReading {
 
     func read(configuration: ProjectPulseConfiguration) throws -> ProjectPulseSnapshot {
         snapshot
+    }
+}
+
+private struct FakeGitHubProjectReader: GitHubProjectReading {
+    let result: GitHubProjectResult
+
+    func readRepository(
+        _ nameWithOwner: String,
+        includesWorkflow: Bool,
+        now: Date
+    ) throws -> GitHubProjectResult {
+        result
+    }
+
+    func readWorkflow(
+        repository: String?,
+        currentDirectoryURL: URL
+    ) -> ProjectWorkflowSnapshot {
+        result.workflow
+            ?? ProjectWorkflowSnapshot(state: .neutral, title: "No workflow runs")
+    }
+}
+
+private struct FakeGitHubRepositoryListing: GitHubRepositoryListing {
+    let repositories: [GitHubRepositoryOption]
+
+    func listRepositories() throws -> [GitHubRepositoryOption] {
+        repositories
     }
 }

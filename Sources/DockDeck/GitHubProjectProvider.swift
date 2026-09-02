@@ -1,0 +1,335 @@
+import Combine
+import Foundation
+
+struct ProjectGitHubSnapshot: Equatable {
+    let nameWithOwner: String
+    let defaultBranch: String
+    let headOID: String?
+    let commitsLastSevenDays: Int
+    let openPullRequests: Int
+    let openIssues: Int
+    let stargazerCount: Int
+    let forkCount: Int
+    let isPrivate: Bool
+    let pushedAt: Date?
+
+    var shortName: String {
+        nameWithOwner.split(separator: "/", maxSplits: 1).last.map(String.init)
+            ?? nameWithOwner
+    }
+}
+
+struct GitHubProjectResult: Equatable {
+    let repository: ProjectGitHubSnapshot
+    let workflow: ProjectWorkflowSnapshot?
+}
+
+struct GitHubRepositoryOption: Identifiable, Equatable {
+    let nameWithOwner: String
+    let isPrivate: Bool
+    let isArchived: Bool
+    let pushedAt: Date?
+
+    var id: String { nameWithOwner }
+}
+
+protocol GitHubProjectReading {
+    func readRepository(
+        _ nameWithOwner: String,
+        includesWorkflow: Bool,
+        now: Date
+    ) throws -> GitHubProjectResult
+
+    func readWorkflow(
+        repository: String?,
+        currentDirectoryURL: URL
+    ) -> ProjectWorkflowSnapshot
+}
+
+protocol GitHubRepositoryListing {
+    func listRepositories() throws -> [GitHubRepositoryOption]
+}
+
+struct GitHubProjectClient: GitHubProjectReading, GitHubRepositoryListing {
+    private static let environment = [
+        "GH_PROMPT_DISABLED": "1",
+        "NO_COLOR": "1",
+        "PAGER": "cat",
+    ]
+
+    private static let repositoryQuery = """
+        query($owner:String!,$name:String!,$since:GitTimestamp!){
+          repository(owner:$owner,name:$name){
+            nameWithOwner
+            isPrivate
+            pushedAt
+            defaultBranchRef{
+              name
+              target{
+                ... on Commit{
+                  abbreviatedOid
+                  history(since:$since){totalCount}
+                }
+              }
+            }
+            pullRequests(states:OPEN){totalCount}
+            issues(states:OPEN){totalCount}
+            stargazerCount
+            forkCount
+          }
+        }
+        """
+
+    func readRepository(
+        _ nameWithOwner: String,
+        includesWorkflow: Bool,
+        now: Date
+    ) throws -> GitHubProjectResult {
+        guard let repository = ProjectPulseConfiguration.normalizedGitHubRepository(
+            nameWithOwner)
+        else { throw ProjectPulseError.githubUnavailable }
+        guard let gh = ProjectPulseBinaryLocator.githubCLI() else {
+            throw ProjectPulseError.githubCLIUnavailable
+        }
+        let parts = repository.split(separator: "/", maxSplits: 1).map(String.init)
+        guard parts.count == 2 else { throw ProjectPulseError.githubUnavailable }
+        let since = ISO8601DateFormatter().string(
+            from: now.addingTimeInterval(-7 * 24 * 60 * 60))
+
+        let output: Data
+        do {
+            output = try ProjectPulseCommand.run(
+                executableURL: gh,
+                arguments: [
+                    "api", "graphql",
+                    "-f", "query=\(Self.repositoryQuery)",
+                    "-F", "owner=\(parts[0])",
+                    "-F", "name=\(parts[1])",
+                    "-F", "since=\(since)",
+                ],
+                currentDirectoryURL: FileManager.default.homeDirectoryForCurrentUser,
+                environment: Self.environment)
+        } catch let error as ProjectPulseError
+            where error == .commandTimedOut || error == .outputTooLarge
+        {
+            throw error
+        } catch {
+            throw ProjectPulseError.githubUnavailable
+        }
+
+        let snapshot = try GitHubProjectParser.parse(output)
+        let workflow = includesWorkflow
+            ? readWorkflow(
+                repository: repository,
+                currentDirectoryURL: FileManager.default.homeDirectoryForCurrentUser)
+            : nil
+        return GitHubProjectResult(repository: snapshot, workflow: workflow)
+    }
+
+    func readWorkflow(
+        repository: String?,
+        currentDirectoryURL: URL
+    ) -> ProjectWorkflowSnapshot {
+        guard let gh = ProjectPulseBinaryLocator.githubCLI() else {
+            return ProjectWorkflowSnapshot(state: .unavailable, title: "Install gh for Actions")
+        }
+        var arguments = ["run", "list"]
+        if let repository { arguments += ["--repo", repository] }
+        arguments += [
+            "--limit", "1", "--json", "status,conclusion,name,displayTitle",
+        ]
+        do {
+            let output = try ProjectPulseCommand.run(
+                executableURL: gh,
+                arguments: arguments,
+                currentDirectoryURL: currentDirectoryURL,
+                environment: Self.environment)
+            return try GitHubRunParser.parse(output)
+                ?? ProjectWorkflowSnapshot(state: .neutral, title: "No workflow runs")
+        } catch {
+            return ProjectWorkflowSnapshot(state: .unavailable, title: "Actions unavailable")
+        }
+    }
+
+    func listRepositories() throws -> [GitHubRepositoryOption] {
+        guard let gh = ProjectPulseBinaryLocator.githubCLI() else {
+            throw ProjectPulseError.githubCLIUnavailable
+        }
+        let output: Data
+        do {
+            output = try ProjectPulseCommand.run(
+                executableURL: gh,
+                arguments: [
+                    "api", "-X", "GET", "user/repos",
+                    "-f", "affiliation=owner,collaborator,organization_member",
+                    "-f", "sort=pushed",
+                    "-f", "direction=desc",
+                    "-F", "per_page=100",
+                ],
+                currentDirectoryURL: FileManager.default.homeDirectoryForCurrentUser,
+                environment: Self.environment)
+        } catch let error as ProjectPulseError
+            where error == .commandTimedOut || error == .outputTooLarge
+        {
+            throw error
+        } catch {
+            throw ProjectPulseError.githubUnavailable
+        }
+        return try GitHubRepositoryListParser.parse(output)
+    }
+}
+
+enum GitHubProjectParser {
+    private struct Response: Decodable {
+        let data: Payload?
+    }
+
+    private struct Payload: Decodable {
+        let repository: Repository?
+    }
+
+    private struct Repository: Decodable {
+        let nameWithOwner: String
+        let isPrivate: Bool
+        let pushedAt: String?
+        let defaultBranchRef: Branch?
+        let pullRequests: Count
+        let issues: Count
+        let stargazerCount: Int
+        let forkCount: Int
+    }
+
+    private struct Branch: Decodable {
+        let name: String
+        let target: Target?
+    }
+
+    private struct Target: Decodable {
+        let abbreviatedOid: String?
+        let history: Count?
+    }
+
+    private struct Count: Decodable {
+        let totalCount: Int
+    }
+
+    static func parse(_ data: Data) throws -> ProjectGitHubSnapshot {
+        let response: Response
+        do {
+            response = try JSONDecoder().decode(Response.self, from: data)
+        } catch {
+            throw ProjectPulseError.invalidOutput
+        }
+        guard let repository = response.data?.repository,
+            let name = ProjectPulseConfiguration.normalizedGitHubRepository(
+                repository.nameWithOwner)
+        else { throw ProjectPulseError.invalidOutput }
+        return ProjectGitHubSnapshot(
+            nameWithOwner: name,
+            defaultBranch: String((repository.defaultBranchRef?.name ?? "—").prefix(120)),
+            headOID: repository.defaultBranchRef?.target?.abbreviatedOid.map {
+                String($0.prefix(12))
+            },
+            commitsLastSevenDays: max(
+                repository.defaultBranchRef?.target?.history?.totalCount ?? 0, 0),
+            openPullRequests: max(repository.pullRequests.totalCount, 0),
+            openIssues: max(repository.issues.totalCount, 0),
+            stargazerCount: max(repository.stargazerCount, 0),
+            forkCount: max(repository.forkCount, 0),
+            isPrivate: repository.isPrivate,
+            pushedAt: repository.pushedAt.flatMap(parseDate))
+    }
+
+    private static func parseDate(_ value: String) -> Date? {
+        ISO8601DateFormatter().date(from: value)
+    }
+}
+
+enum GitHubRepositoryListParser {
+    private struct Repository: Decodable {
+        let fullName: String
+        let isPrivate: Bool
+        let isArchived: Bool
+        let pushedAt: String?
+
+        private enum CodingKeys: String, CodingKey {
+            case fullName = "full_name"
+            case isPrivate = "private"
+            case isArchived = "archived"
+            case pushedAt = "pushed_at"
+        }
+    }
+
+    static func parse(_ data: Data) throws -> [GitHubRepositoryOption] {
+        let repositories: [Repository]
+        do {
+            repositories = try JSONDecoder().decode([Repository].self, from: data)
+        } catch {
+            throw ProjectPulseError.invalidOutput
+        }
+        var seen: Set<String> = []
+        let dateFormatter = ISO8601DateFormatter()
+        return repositories.compactMap { repository in
+            guard let name = ProjectPulseConfiguration.normalizedGitHubRepository(
+                repository.fullName),
+                seen.insert(name).inserted
+            else { return nil }
+            return GitHubRepositoryOption(
+                nameWithOwner: name,
+                isPrivate: repository.isPrivate,
+                isArchived: repository.isArchived,
+                pushedAt: repository.pushedAt.flatMap {
+                    dateFormatter.date(from: $0)
+                })
+        }
+    }
+}
+
+enum GitHubRepositoryCatalogStatus: Equatable {
+    case idle
+    case loading
+    case ready
+    case failed(String)
+}
+
+final class GitHubRepositoryCatalog: ObservableObject {
+    @Published private(set) var repositories: [GitHubRepositoryOption] = []
+    @Published private(set) var status: GitHubRepositoryCatalogStatus = .idle
+
+    private let listing: GitHubRepositoryListing
+    private let queue = DispatchQueue(label: "DockDeck.GitHubRepositoryCatalog", qos: .utility)
+    private var requestID: UUID?
+
+    init(listing: GitHubRepositoryListing = GitHubProjectClient()) {
+        self.listing = listing
+    }
+
+    func loadIfNeeded() {
+        guard status == .idle else { return }
+        load()
+    }
+
+    func load() {
+        guard requestID == nil else { return }
+        let requestID = UUID()
+        self.requestID = requestID
+        status = .loading
+        queue.async { [weak self] in
+            guard let self else { return }
+            let result = Result { try self.listing.listRepositories() }
+            DispatchQueue.main.async {
+                guard self.requestID == requestID else { return }
+                self.requestID = nil
+                switch result {
+                case .success(let repositories):
+                    self.repositories = repositories
+                    self.status = .ready
+                case .failure(let error):
+                    self.status = .failed(
+                        (error as? LocalizedError)?.errorDescription
+                            ?? "GitHub repositories are unavailable")
+                }
+            }
+        }
+    }
+}

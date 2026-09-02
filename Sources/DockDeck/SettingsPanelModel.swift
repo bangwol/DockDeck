@@ -51,7 +51,7 @@ enum SettingsPaneID: String, CaseIterable, Identifiable {
         case .clock: "Show local time or another time zone."
         case .battery: "Show charge, power state, and time left."
         case .network: "Show local download and upload throughput."
-        case .projectPulse: "Show local Git and optional GitHub Actions status."
+        case .projectPulse: "Show local Git or remote GitHub repository activity."
         case .focusTimer: "Run persistent focus and break countdowns."
         case .appearance: "Adjust the shared panel surface."
         }
@@ -129,7 +129,7 @@ enum PanelModuleRegistry {
             id: .network, title: "Network", subtitle: "Download and upload rates",
             symbolName: "network", settingsPane: .network),
         PanelModuleDefinition(
-            id: .projectPulse, title: "Project Pulse", subtitle: "Git and Actions status",
+            id: .projectPulse, title: "Project Pulse", subtitle: "Git and GitHub activity",
             symbolName: "point.3.connected.trianglepath.dotted", settingsPane: .projectPulse),
         PanelModuleDefinition(
             id: .focusTimer, title: "Focus Timer", subtitle: "Focus and break countdowns",
@@ -729,6 +729,14 @@ final class SettingsPanelModel: ObservableObject {
 
     func setProjectPulseRepositoryPath(_ path: String?) {
         updateProjectPulseConfiguration { $0.repositoryPath = path }
+    }
+
+    func setProjectPulseSource(_ source: ProjectPulseSource) {
+        updateProjectPulseConfiguration { $0.source = source }
+    }
+
+    func setProjectPulseGitHubRepository(_ repository: String?) {
+        updateProjectPulseConfiguration { $0.githubRepository = repository }
     }
 
     func setProjectPulseIncludesGitHubActions(_ value: Bool) {

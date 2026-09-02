@@ -498,6 +498,48 @@ final class PanelAppearanceTests: XCTestCase {
         }
     }
 
+    func testProjectPulseSettingsRenderRemoteRepository() throws {
+        let model = makeSettingsModel(
+            configuration: .legacy(order: .terminalLeft, enabledPanels: .all))
+        model.setProjectPulseSource(.github)
+        model.setProjectPulseGitHubRepository("bangwol/DockDeck")
+        let option = GitHubRepositoryOption(
+            nameWithOwner: "bangwol/DockDeck",
+            isPrivate: false,
+            isArchived: false,
+            pushedAt: nil)
+        let catalog = GitHubRepositoryCatalog(
+            listing: PanelFakeGitHubRepositoryListing(repositories: [option]))
+        let completed = expectation(description: "Repository choices loaded")
+        var fulfilled = false
+        let cancellable = catalog.$status.sink { status in
+            guard !fulfilled, status == .ready else { return }
+            fulfilled = true
+            completed.fulfill()
+        }
+        catalog.load()
+        wait(for: [completed], timeout: 1)
+
+        let size = NSSize(width: 540, height: 540)
+        let rootView = ProjectPulseSettingsView(
+            model: model, githubRepositories: catalog)
+            .frame(width: size.width, height: size.height)
+            .background(Color(nsColor: .windowBackgroundColor))
+            .environment(\.colorScheme, .dark)
+        let view = NSHostingView(
+            rootView: rootView)
+        view.appearance = NSAppearance(named: .darkAqua)
+        view.frame = NSRect(origin: .zero, size: size)
+        view.layoutSubtreeIfNeeded()
+        let bitmap = try XCTUnwrap(view.bitmapImageRepForCachingDisplay(in: view.bounds))
+        view.cacheDisplay(in: view.bounds, to: bitmap)
+
+        XCTAssertEqual(view.frame.size, size)
+        XCTAssertGreaterThan(bitmap.pixelsWide, 0)
+        XCTAssertGreaterThan(bitmap.pixelsHigh, 0)
+        cancellable.cancel()
+    }
+
     func testEmptyDeckDropZoneRenders() throws {
         let configuration = PanelDeckConfiguration(
             left: [],
@@ -719,5 +761,13 @@ final class PanelAppearanceTests: XCTestCase {
             focusTimer: FocusTimerSettings(),
             appearance: AppearanceSettingsState(
                 cornerRadius: 10, tintOpacity: 0.6))
+    }
+}
+
+private struct PanelFakeGitHubRepositoryListing: GitHubRepositoryListing {
+    let repositories: [GitHubRepositoryOption]
+
+    func listRepositories() throws -> [GitHubRepositoryOption] {
+        repositories
     }
 }
