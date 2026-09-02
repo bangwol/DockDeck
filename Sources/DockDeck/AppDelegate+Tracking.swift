@@ -242,7 +242,7 @@ extension AppDelegate {
         {
             collapsedFrame = frame
         }
-        guard panel.frame != frame else { return }
+        guard panel.frame != frame, animatingTerminalFrame != frame else { return }
         debugLog("frame", "\(frame)")
 
         let layoutTerminal = {
@@ -257,12 +257,18 @@ extension AppDelegate {
             return
         }
 
+        animatingTerminalFrame = frame
         NSAnimationContext.runAnimationGroup(
             { context in
                 context.duration = 0.18
                 context.timingFunction = CAMediaTimingFunction(name: .easeOut)
                 panel.animator().setFrame(frame, display: true)
-            }, completionHandler: layoutTerminal)
+            },
+            completionHandler: { [weak self] in
+                guard let self else { return }
+                if self.animatingTerminalFrame == frame { self.animatingTerminalFrame = nil }
+                layoutTerminal()
+            })
     }
 
     func applyReadOnlyDeckFrame(_ frame: NSRect, on side: PanelSide) {

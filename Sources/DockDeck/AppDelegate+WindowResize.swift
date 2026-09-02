@@ -15,7 +15,7 @@ extension AppDelegate: NSWindowDelegate {
 
     func windowDidEndLiveResize(_ notification: Notification) {
         guard let window = notification.object as? NSWindow, window === panel,
-            isFocusExpanded, !isExpanded, let collapsedFrame,
+            isFocusExpanded, !isExpanded, animatingTerminalFrame == nil, let collapsedFrame,
             collapsedFrame.width > 0, collapsedFrame.height > 0
         else {
             return

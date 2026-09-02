@@ -10,7 +10,9 @@ extension AppDelegate {
     }
 
     func terminalFrame(for presence: DockPresence) -> NSRect? {
-        if panel.inLiveResize { return panel.frame }
+        // Hold the frame only for a user drag; an animated transition also reports inLiveResize
+        // and its intermediate frame must not become the collapsed or focused geometry.
+        if panel.inLiveResize, animatingTerminalFrame == nil { return panel.frame }
         if isExpanded {
             let screen = expansionScreenID.flatMap(screen(for:)) ?? presence.host
             return expandedFrame(on: screen)

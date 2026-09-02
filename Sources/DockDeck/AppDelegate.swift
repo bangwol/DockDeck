@@ -56,6 +56,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     var wasConcealed = false
     var expansionScreenID: CGDirectDisplayID?
     var collapsedFrame: NSRect?
+    /// Target of an in-flight animated terminal frame change. AppKit reports animator-driven
+    /// resizes as live resizes, so this distinguishes them from a user dragging an edge.
+    var animatingTerminalFrame: NSRect?
 
     var accessibilityTrusted = false
     var hintPanel: NSPanel?
