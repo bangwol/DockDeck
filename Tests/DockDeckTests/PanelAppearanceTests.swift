@@ -419,6 +419,31 @@ final class PanelAppearanceTests: XCTestCase {
         XCTAssertNil(DeckScrollDirection.resolved(deltaX: 0, deltaY: 0))
     }
 
+    func testDeckTransitionDirectionAndReduceMotionPlan() {
+        XCTAssertEqual(
+            DeckTransitionPlan.resolved(direction: .next, reduceMotion: false),
+            DeckTransitionPlan(insertionEdge: .bottom, removalEdge: .top))
+        XCTAssertEqual(
+            DeckTransitionPlan.resolved(direction: .previous, reduceMotion: false),
+            DeckTransitionPlan(insertionEdge: .top, removalEdge: .bottom))
+        XCTAssertNil(DeckTransitionPlan.resolved(direction: .next, reduceMotion: true))
+    }
+
+    func testDeckPresentationShowsCurrentPageDuringSelection() {
+        let presentation = ReadOnlyDeckPresentation(
+            activeModule: .usage, theme: Theme.theme(id: ""))
+
+        presentation.select(
+            .weather,
+            direction: .next,
+            enabledModules: [.usage, .weather, .clock],
+            showsIndicator: true)
+
+        XCTAssertEqual(presentation.activeModule, .weather)
+        XCTAssertEqual(presentation.direction, .next)
+        XCTAssertEqual(presentation.pageIndicator, "2/3")
+    }
+
     func testTerminalScrollUsesDeckOnlyWhileDocked() {
         XCTAssertEqual(TerminalScrollRoute.resolved(for: .docked), .deck)
         XCTAssertEqual(TerminalScrollRoute.resolved(for: .focused), .terminal)

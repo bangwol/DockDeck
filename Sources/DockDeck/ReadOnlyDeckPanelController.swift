@@ -21,10 +21,9 @@ final class ReadOnlyDeckPanelController: NSObject, NSMenuDelegate {
     let side: PanelSide
 
     private let surfaceView: PanelSurfaceView
-    private let hostingView: NSHostingView<ReadOnlyDeckPanelView>
     private let services: PanelModuleServices
+    private let presentation: ReadOnlyDeckPresentation
     private weak var menuTarget: AnyObject?
-    private var theme: Theme
     private let onSelectionChange: (PanelSide) -> Void
     private var lastScrollSelectionTime: TimeInterval = 0
     private var appliedModule: PanelModuleID?
@@ -38,10 +37,12 @@ final class ReadOnlyDeckPanelController: NSObject, NSMenuDelegate {
         onSelectionChange: @escaping (PanelSide) -> Void = { _ in }
     ) {
         self.services = services
-        self.theme = theme
         self.menuTarget = menuTarget
         self.side = side
         self.onSelectionChange = onSelectionChange
+        let presentation = ReadOnlyDeckPresentation(
+            activeModule: PanelSettings.activeModule(on: side), theme: theme)
+        self.presentation = presentation
 
         let panel = ReadOnlyPanel(
             contentRect: initialFrame,
@@ -64,8 +65,7 @@ final class ReadOnlyDeckPanelController: NSObject, NSMenuDelegate {
         let hostingView = NSHostingView(
             rootView: ReadOnlyDeckPanelView(
                 services: services,
-                activeModule: PanelSettings.activeModule(on: side),
-                theme: theme))
+                presentation: presentation))
         hostingView.frame = surfaceView.bounds
         hostingView.autoresizingMask = [.width, .height]
         surfaceView.contentContainer.addSubview(hostingView)
@@ -77,7 +77,6 @@ final class ReadOnlyDeckPanelController: NSObject, NSMenuDelegate {
 
         self.panel = panel
         self.surfaceView = surfaceView
-        self.hostingView = hostingView
         super.init()
         surfaceView.onScrollWheel = { [weak self] event in
             self?.handleScrollWheel(event) ?? false
@@ -89,13 +88,15 @@ final class ReadOnlyDeckPanelController: NSObject, NSMenuDelegate {
     var activeModule: PanelModuleID? { PanelSettings.activeModule(on: side) }
 
     func applyTheme(_ theme: Theme) {
-        self.theme = theme
+        presentation.setTheme(theme)
         surfaceView.apply(theme: theme, presentation: .compact)
-        applySettings()
     }
 
     func applySettings() {
-        render(activeModule: PanelSettings.activeModule(on: side))
+        render(
+            activeModule: PanelSettings.activeModule(on: side),
+            direction: .next,
+            showsIndicator: false)
     }
 
     /// Dock-tracking ticks call this up to ten times per second; rebuild the module view
@@ -104,27 +105,33 @@ final class ReadOnlyDeckPanelController: NSObject, NSMenuDelegate {
     func synchronizeActiveModule() -> Bool {
         let activeModule = PanelSettings.activeModule(on: side)
         guard activeModule != appliedModule else { return false }
-        render(activeModule: activeModule)
+        render(activeModule: activeModule, direction: .next, showsIndicator: false)
         return true
     }
 
-    private func render(activeModule: PanelModuleID?) {
+    private func render(
+        activeModule: PanelModuleID?, direction: DeckTransitionDirection,
+        showsIndicator: Bool
+    ) {
         appliedModule = activeModule
         PanelSettings.setActiveModule(activeModule, on: side)
         let title = activeModule.flatMap { PanelModuleRegistry.definition(for: $0)?.title }
             ?? "Modules"
         panel.title = "DockDeck \(title)"
         panel.setAccessibilityLabel("DockDeck \(title)")
-        hostingView.rootView = ReadOnlyDeckPanelView(
-            services: services,
-            activeModule: activeModule,
-            theme: theme)
+        presentation.select(
+            activeModule,
+            direction: direction,
+            enabledModules: PanelSettings.enabledModules(on: side),
+            showsIndicator: showsIndicator)
     }
 
-    func select(_ module: PanelModuleID) {
+    func select(
+        _ module: PanelModuleID, direction: DeckTransitionDirection = .next
+    ) {
         guard PanelSettings.enabledModules(on: side).contains(module) else { return }
         PanelSettings.setActiveModule(module, on: side)
-        applySettings()
+        render(activeModule: module, direction: direction, showsIndicator: true)
         onSelectionChange(side)
     }
 
@@ -134,7 +141,7 @@ final class ReadOnlyDeckPanelController: NSObject, NSMenuDelegate {
                 after: activeModule,
                 enabledModules: PanelSettings.enabledModules(on: side))
         else { return }
-        select(next)
+        select(next, direction: .next)
     }
 
     func selectPrevious() {
@@ -143,7 +150,7 @@ final class ReadOnlyDeckPanelController: NSObject, NSMenuDelegate {
                 before: activeModule,
                 enabledModules: PanelSettings.enabledModules(on: side))
         else { return }
-        select(previous)
+        select(previous, direction: .previous)
     }
 
     func applyCornerRadius() {

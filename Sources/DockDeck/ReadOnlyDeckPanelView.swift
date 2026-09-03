@@ -1,5 +1,63 @@
 import SwiftUI
 
+enum DeckTransitionDirection: Equatable {
+    case previous
+    case next
+}
+
+struct DeckTransitionPlan: Equatable {
+    let insertionEdge: Edge
+    let removalEdge: Edge
+
+    static func resolved(
+        direction: DeckTransitionDirection, reduceMotion: Bool
+    ) -> Self? {
+        guard !reduceMotion else { return nil }
+        switch direction {
+        case .previous:
+            return Self(insertionEdge: .top, removalEdge: .bottom)
+        case .next:
+            return Self(insertionEdge: .bottom, removalEdge: .top)
+        }
+    }
+}
+
+final class ReadOnlyDeckPresentation: ObservableObject {
+    @Published private(set) var activeModule: PanelModuleID?
+    @Published private(set) var theme: Theme
+    @Published private(set) var direction = DeckTransitionDirection.next
+    @Published private(set) var pageIndicator: String?
+    private var indicatorDismissal: DispatchWorkItem?
+
+    init(activeModule: PanelModuleID?, theme: Theme) {
+        self.activeModule = activeModule
+        self.theme = theme
+    }
+
+    func setTheme(_ theme: Theme) {
+        self.theme = theme
+    }
+
+    func select(
+        _ module: PanelModuleID?, direction: DeckTransitionDirection,
+        enabledModules: [PanelModuleID], showsIndicator: Bool
+    ) {
+        self.direction = direction
+        activeModule = module
+        indicatorDismissal?.cancel()
+        guard showsIndicator, let module,
+            let index = enabledModules.firstIndex(of: module), enabledModules.count > 1
+        else {
+            pageIndicator = nil
+            return
+        }
+        pageIndicator = "\(index + 1)/\(enabledModules.count)"
+        let dismissal = DispatchWorkItem { [weak self] in self?.pageIndicator = nil }
+        indicatorDismissal = dismissal
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.9, execute: dismissal)
+    }
+}
+
 final class PanelModuleServices {
     let usage: UsageStore
     let systemStats: SystemStatsStore
@@ -86,35 +144,67 @@ enum ReadOnlyDeckSelection {
 
 struct ReadOnlyDeckPanelView: View {
     let services: PanelModuleServices
-    let activeModule: PanelModuleID?
-    let theme: Theme
+    @ObservedObject var presentation: ReadOnlyDeckPresentation
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    @ViewBuilder var body: some View {
-        switch activeModule {
+    var body: some View {
+        ZStack(alignment: .topTrailing) {
+            moduleView
+                .id(presentation.activeModule?.rawValue ?? "empty")
+                .transition(moduleTransition)
+            if let pageIndicator = presentation.pageIndicator {
+                Text(pageIndicator)
+                    .font(.system(size: 7, weight: .semibold, design: .rounded))
+                    .monospacedDigit()
+                    .foregroundStyle(Color(nsColor: presentation.theme.foregroundColor))
+                    .padding(.horizontal, 5)
+                    .padding(.vertical, 2)
+                    .background(.black.opacity(0.28), in: Capsule())
+                    .padding(4)
+                    .transition(.opacity)
+                    .accessibilityLabel("Module \(pageIndicator)")
+            }
+        }
+        .animation(reduceMotion ? nil : .easeOut(duration: 0.18), value: presentation.activeModule)
+        .animation(reduceMotion ? nil : .easeOut(duration: 0.12), value: presentation.pageIndicator)
+    }
+
+    private var moduleTransition: AnyTransition {
+        guard let plan = DeckTransitionPlan.resolved(
+            direction: presentation.direction, reduceMotion: reduceMotion)
+        else { return .identity }
+        return .asymmetric(
+            insertion: .move(edge: plan.insertionEdge).combined(with: .opacity),
+            removal: .move(edge: plan.removalEdge).combined(with: .opacity))
+    }
+
+    @ViewBuilder private var moduleView: some View {
+        switch presentation.activeModule {
         case .usage:
-            QuotaPanelView(store: services.usage, theme: theme, configuration: .current)
+            QuotaPanelView(
+                store: services.usage, theme: presentation.theme, configuration: .current)
         case .systemStats:
-            SystemStatsPanelView(store: services.systemStats, theme: theme)
+            SystemStatsPanelView(store: services.systemStats, theme: presentation.theme)
         case .serviceMonitor:
-            ServiceMonitorPanelView(store: services.serviceMonitor, theme: theme)
+            ServiceMonitorPanelView(store: services.serviceMonitor, theme: presentation.theme)
         case .weather:
-            WeatherPanelView(store: services.weather, theme: theme)
+            WeatherPanelView(store: services.weather, theme: presentation.theme)
         case .schedule:
-            SchedulePanelView(store: services.schedule, theme: theme)
+            SchedulePanelView(store: services.schedule, theme: presentation.theme)
         case .clock:
             ClockPanelView(
                 store: services.clock,
-                theme: theme,
+                theme: presentation.theme,
                 timeZoneIdentifier: PanelSettings.clockTimeZoneIdentifier,
                 hourFormat: PanelSettings.clockHourFormat)
         case .battery:
-            BatteryPanelView(store: services.battery, theme: theme)
+            BatteryPanelView(store: services.battery, theme: presentation.theme)
         case .network:
-            NetworkPanelView(store: services.network, theme: theme)
+            NetworkPanelView(store: services.network, theme: presentation.theme)
         case .projectPulse:
-            ProjectPulsePanelView(store: services.projectPulse, theme: theme)
+            ProjectPulsePanelView(store: services.projectPulse, theme: presentation.theme)
         case .focusTimer:
-            FocusTimerPanelView(store: services.focusTimer, theme: theme)
+            FocusTimerPanelView(store: services.focusTimer, theme: presentation.theme)
         default:
             EmptyView()
         }
