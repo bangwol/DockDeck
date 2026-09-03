@@ -25,23 +25,23 @@ DockDeck uses the space beside a bottom-aligned Dock for up to two compact modul
 - Persistent [SwiftTerm](https://github.com/migueldeicaza/SwiftTerm) login shell with a compact `% ` prompt that does not change user shell files.
 - Remaining or used Codex and Claude capacity, reset times, and an optional even-use pace marker from their supported local CLIs. Claude can refresh automatically or use only its optional status-line bridge; neither mode reads browser cookies or private web endpoints.
 - Two to four selectable local CPU, memory, disk, network-I/O, and temperature tiles with a configurable 1–10 second sampling interval and in-memory trend lines.
-- HTTPS service availability and latency checks for up to four user-configured endpoints, including recent response-time trends.
+- HTTPS service availability and latency checks for up to four user-configured endpoints, with transient-failure confirmation and recent p50/p95 response time.
 - Current temperature, daily high and low, and conditions for a user-selected city.
-- Current or next macOS Calendar event plus optional due Reminders, with separate explicit permissions and source selection.
+- Current or next macOS Calendar event plus optional due Reminders, with safe join links, separate explicit permissions, and source selection.
 - Local or selected-world-time display with system, 12-hour, and 24-hour formats.
 - Internal battery level, power state, and the system-provided charge or discharge estimate.
-- Local download and upload throughput for the current primary network interface.
+- Local download and upload throughput plus native connection, metered, and Low Data status for the current primary interface.
 - Local Git status, one remote GitHub repository, or the signed-in user's 7-day GitHub contribution summary through the installed `gh` CLI.
-- Account-wide GitHub notifications, mentions, review requests, and optional recent Actions failures through the installed `gh` CLI.
+- Account-wide GitHub notifications, prioritized message previews, review requests, and optional recent Actions failures through the installed `gh` CLI.
 - Local Docker container counts, health, CPU, and memory through the installed Docker CLI.
 - Bounded text or JSON output from a trusted executable or macOS Shortcut.
 - Persistent focus and break countdowns that continue behind other modules and survive an app restart.
-- Opt-in native notifications for quota thresholds, service transitions, low battery, and completed focus timers.
+- Opt-in native notifications for quota thresholds, service transitions, low battery, thermal pressure, and completed focus timers.
 - Dock-aware, symmetric placement across displays, Spaces, and auto-hide transitions.
 - Animated manual module selection per Deck; scroll to switch, double-click a read-only panel for a resizable detail window, or right-click for navigation and settings. Reduce Motion is respected.
 - A shared sectioned Settings sidebar with Deck cards, module detail pages, side placement, and independent module visibility controls.
-- On-demand Diagnostics for local CLI sign-in, Accessibility, the optional temperature reader, and network availability.
-- Disabled modules stop their background work; selected samplers use a coarser cadence while hidden, and all module timers slow in macOS Low Power Mode.
+- On-demand Diagnostics for local dependencies and each module's visible, background, paused, or disabled runtime state.
+- Disabled modules stop their work. Read-only modules suspend while the display or login session is inactive, and timers slow under Low Power Mode or serious thermal pressure.
 - Click-to-focus terminal expansion, forgiving edge resizing, and remembered dimensions.
 - Native Liquid Glass on macOS 26, with a translucent fallback and stronger terminal tint on earlier macOS.
 - Manual large-terminal mode plus 20 themes with configurable fonts, tint, corner radius, and panel placement.
@@ -53,14 +53,14 @@ DockDeck uses the space beside a bottom-aligned Dock for up to two compact modul
 | Terminal | Persistent login shell with compact, focused, and large modes | [Terminal](docs/modules/terminal.md) |
 | Usage | Codex and Claude capacity, reset times, and data freshness | [Usage](docs/modules/usage.md) |
 | System Stats | CPU, memory, disk, network I/O, and temperature | [System Stats](docs/modules/system-stats.md) |
-| Service Monitor | Availability and latency for configured endpoints | [Module catalog](docs/modules/catalog.md#service-monitor) |
+| Service Monitor | Confirmed availability and recent latency distribution | [Module catalog](docs/modules/catalog.md#service-monitor) |
 | Weather | Current conditions for a selected city | [Module catalog](docs/modules/catalog.md#weather) |
-| Schedule | Current Calendar event or next event/Reminder | [Schedule](docs/modules/schedule.md) |
+| Schedule | Current or next event/Reminder with safe meeting links | [Schedule](docs/modules/schedule.md) |
 | World Clock | Local or selected time zone | [Module catalog](docs/modules/catalog.md#world-clock) |
 | Battery | Charge, power state, and time estimate | [Module catalog](docs/modules/catalog.md#battery) |
-| Network | Primary-interface download and upload throughput | [Module catalog](docs/modules/catalog.md#network) |
+| Network | Connection state, interface kind, and transfer throughput | [Module catalog](docs/modules/catalog.md#network) |
 | Project Pulse | Local Git, one GitHub repository, or personal GitHub contribution activity | [Project Pulse](docs/modules/project-pulse.md) |
-| GitHub Inbox | Notifications, mentions, reviews, and optional Actions failures | [GitHub Inbox](docs/modules/github-inbox.md) |
+| GitHub Inbox | Prioritized notifications, reviews, and optional Actions failures | [GitHub Inbox](docs/modules/github-inbox.md) |
 | Docker | Local container state and aggregate resource use | [Module catalog](docs/modules/catalog.md#docker) |
 | Custom Tile | Bounded output from a trusted executable or macOS Shortcut | [Custom Tile](docs/modules/custom-tile.md) |
 | Focus Timer | Persistent focus and break countdowns | [Module catalog](docs/modules/catalog.md#focus-timer) |
@@ -175,14 +175,14 @@ DockDeck does not read browser cookies, browser credential stores, or private we
 | Codex | `codex app-server` using `account/rateLimits/read` | Runs the locally installed official Codex CLI as a long-lived subprocess |
 | Claude | Official Claude Code `/usage`; optional status-line JSON | In Automatic mode, briefly launches the signed-in local CLI in safe mode, captures bounded usage text in memory, then exits. Status Line Only stores only `rate_limits` and an observation timestamp in a local cache. DockDeck never reads Claude OAuth credentials. |
 | System Stats | macOS host, file-system, routing, and `ProcessInfo` APIs; optional validated local Stats SMC tool | Samples only selected CPU, memory, disk, network-counter, and temperature values locally; recent trends stay in memory for at most 15 minutes |
-| Service Monitor | User-configured HTTPS or local HTTP URLs | Sends cookie-free `HEAD` requests; rejects common URL credential fields before local storage; recent latency stays in memory for at most 15 minutes |
+| Service Monitor | User-configured HTTPS or local HTTP URLs | Sends cookie-free `HEAD` requests with a byte-range `GET` fallback when required; rejects common URL credential fields before local storage; recent latency stays in memory for at most 15 minutes |
 | Weather | Open-Meteo forecast and geocoding APIs | Sends submitted searches and selected coordinates over HTTPS only while used; stores the selected city locally |
-| Schedule | Apple EventKit | Reads selected calendars and optional due Reminders into memory after separate explicit permissions; never saves, edits, logs, or uploads items |
+| Schedule | Apple EventKit | Reads selected calendars, safe conference links, and optional due Reminders into memory after separate explicit permissions; never saves, edits, logs, or uploads items |
 | World Clock | macOS time-zone database | Formats time locally and stops its minute timer while disabled |
 | Battery | macOS IOKit | Reads the internal power source locally; does not read battery identifiers or serial numbers |
-| Network | macOS routing and configuration APIs | Reads only primary-interface byte counters; does not inspect network traffic or destinations |
+| Network | macOS routing and Network framework APIs | Reads primary-interface byte counters and connection properties; does not inspect network traffic, addresses, or destinations |
 | Project Pulse | Local `git`; authenticated `gh` REST, GraphQL, and optional Actions calls | Stores a selected local path, GitHub view, or `owner/repository` name. Personal contribution totals stay in memory; command output and GitHub tokens are never stored. |
-| GitHub Inbox | Authenticated `gh` notifications and optional Actions calls | Stores only an optional `owner/repository` name. Counts and command output stay in memory; authentication remains owned by GitHub CLI. |
+| GitHub Inbox | Authenticated `gh` notifications and optional Actions calls | Stores only an optional `owner/repository` name. Bounded message previews, counts, and command output stay in memory; authentication remains owned by GitHub CLI. |
 | Docker | Local Docker CLI and engine socket | Runs read-only `ps` and `stats` commands. Container output stays in memory and Docker credentials are not read by DockDeck. |
 | Custom Tile | User-selected executable or macOS Shortcut | Stores its path, arguments, or Shortcut name. Output stays in memory. The trusted source runs with the user's permissions under strict time and output limits. |
 | Focus Timer | Local countdown state | Stores phase, deadline, and remaining duration only when timer state changes |

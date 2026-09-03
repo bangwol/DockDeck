@@ -26,8 +26,11 @@ DockDeck never starts a GitHub login flow.
 | `FAIL` | Failed, timed-out, startup-failed, or action-required runs during the previous seven days for the selected repository |
 
 The optional Actions query examines at most 100 failed runs, so `FAIL` can be a
-lower bound for unusually active repositories. Hover the panel or use VoiceOver
-for the expanded description.
+lower bound for unusually active repositories. The compact panel also shows one
+bounded message preview, prioritizing review requests, mentions, assignments,
+and CI activity before other notifications. Double-click the panel to see up to
+five prioritized messages with their repository names. Hover the panel or use
+VoiceOver for the expanded description.
 
 ## Data and polling
 
@@ -40,6 +43,13 @@ and the [`gh run list` manual](https://cli.github.com/manual/gh_run_list).
 GitHub CLI owns authentication and token storage. DockDeck stores only the
 optional validated `owner/repository` name. Notification payloads, aggregate
 counts, Actions results, and command output stay in memory and are discarded.
+Titles, repository names, reasons, and timestamps are bounded before they enter
+the panel model.
+
+Project Pulse and GitHub Inbox share a serialized `gh` request broker. Brief
+successful-result caching coalesces duplicate repository, activity, workflow,
+and inbox requests when both modules refresh together; it does not add a second
+credential store or background service.
 
 Disabling the module stops its timer and subprocesses. Hidden polling is three
 times slower than the selected interval; macOS Low Power Mode adds another

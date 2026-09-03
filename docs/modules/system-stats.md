@@ -64,6 +64,11 @@ commands, and shows `--°` when the validated tool is unavailable. This optional
 adapter relies on Stats's undocumented SMC source and may need adjustment after
 a macOS or Stats update.
 
+Under **Settings → Notifications**, an optional thermal alert can report the
+transition into macOS's serious or critical pressure state. It fires once per
+high-pressure episode rather than once per sample. Serious or critical pressure
+also enables DockDeck's reduced timer cadence until the system recovers.
+
 DockDeck does not report system-wide GPU utilization because macOS does not
 provide a supported public source suitable for this module.
 

@@ -63,9 +63,13 @@ the latest blocking reset plus 30 seconds. A missing reset time falls back to an
 hourly check. An exhausted Fable-only allowance does not pause checks for the
 other models.
 
-Click the compact Usage panel to refresh both enabled providers immediately.
-The click and `⌘R` are manual overrides, so they still query Claude while an
-exhausted limit is waiting to reset.
+Click the compact Usage panel or press `⌘R` to request a manual refresh. Codex
+and bridge-cache reads happen immediately. Claude `/usage` remains single-flight
+and starts at most once per minute. A running probe absorbs further requests;
+after it finishes, requests inside that minute share one probe scheduled for the
+cooldown boundary. Rapid panel clicks within 0.75 seconds are ignored. Manual
+refresh still overrides an exhausted-limit pause once the one-minute cooldown
+has elapsed.
 
 DockDeck first passes `/usage` directly to Claude Code. If that version requires
 interactive rendering, it falls back to a hidden pseudo-terminal backed by the

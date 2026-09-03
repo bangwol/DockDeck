@@ -23,3 +23,19 @@ when DockDeck starts as a LaunchAgent.
 Diagnostics reports dependency readiness, not service uptime or entitlement
 details. Use the module's panel help and guide when a dependency is ready but a
 specific refresh still fails.
+
+## Module runtime
+
+The same page reports the latest runtime state for every registered module:
+
+| State | Meaning |
+| --- | --- |
+| `VISIBLE` | Selected on a visible Deck and using its foreground cadence |
+| `BACKGROUND` | Enabled behind another module and using its background cadence |
+| `PAUSED` | Enabled but suspended because the display or login session is inactive |
+| `DISABLED` | Stopped with no module timer, observer, request, or subprocess |
+
+`REDUCED CADENCE` means Low Power Mode or serious/critical thermal pressure is
+slowing eligible timers. The terminal preserves its shell across display sleep
+while read-only modules suspend. This snapshot is refreshed with the diagnostic
+checks and does not add a runtime polling loop.

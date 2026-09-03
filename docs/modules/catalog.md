@@ -7,6 +7,8 @@ requests, and subprocesses instead of merely hiding their panels.
 ## Service Monitor
 
 Service Monitor sends a `HEAD` request every 15–120 seconds to up to four URLs.
+If a server rejects `HEAD` with 405 or 501, DockDeck retries with a `GET` request
+containing `Range: bytes=0-0`; it still discards the body.
 Public endpoints must use HTTPS. Plain HTTP is accepted only for local names and
 private or loopback addresses. The packaged app declares Apple's narrow
 `NSAllowsLocalNetworking` exception instead of disabling App Transport Security
@@ -20,7 +22,13 @@ rejects URL user-info and common secret query fields, and does not use response
 bodies. Do not place secrets in URL paths. Enable the module under
 **Settings → Decks**, then configure it under **Settings → Service Monitor**.
 Successful response times form a 15-minute in-memory trend line. The history is
-never written to disk and disappears when DockDeck exits.
+never written to disk and disappears when DockDeck exits. Panel help includes
+recent p50 and p95 latency when enough history exists.
+
+The first failed check is shown as `WARN`; a second consecutive failure is
+required before the service becomes `DOWN`. This avoids alerting on one
+transient timeout. A system-wide offline route is shown separately as `OFF` and
+does not count as an endpoint outage or send a service-down notification.
 
 On macOS 15 or later, the first local-network check can show Apple's Local
 Network permission prompt. Public HTTPS checks do not require this permission.
@@ -69,14 +77,17 @@ without an internal battery show a neutral unavailable state.
 ## Network
 
 Network calculates download and upload rates from macOS's 64-bit byte counters
-for the current primary interface. It does not open a connection or inspect
-traffic, IP addresses, hostnames, or packet contents.
+for the current primary interface. A native `NWPathMonitor` supplies offline,
+Wi-Fi, wired, cellular, metered, and Low Data status without contacting a probe
+server. DockDeck does not inspect traffic, IP addresses, hostnames, or packet
+contents.
 
 Select a 1-second, 2-second, or 5-second interval under
 **Settings → Network**. Sampling and counter retention stop while the module is
 disabled. The primary interface name remains available in panel help and
 accessibility text. Download and upload trend lines retain at most 15 minutes or
-900 samples in memory and are never written to disk.
+900 samples in memory and are never written to disk. Low Data Mode applies the
+same reduced sampling cadence as Low Power Mode.
 
 ## Docker
 

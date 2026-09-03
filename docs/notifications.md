@@ -5,6 +5,7 @@ DockDeck can send native macOS alerts for selected state changes:
 - A live Codex or Claude quota window crosses 10%, 20%, or 30% remaining
 - A configured service becomes unavailable or recovers
 - A discharging internal battery crosses 10%, 20%, or 30% remaining
+- macOS thermal pressure enters the serious or critical state
 - A Focus Timer focus or break phase completes
 
 Notifications are off by default. macOS permission is requested only when you
@@ -18,7 +19,8 @@ Threshold and health alerts are transition-based rather than repeated on every
 poll. A usage window can alert again after its provider supplies a new reset
 window. A service recovery can alert only after the same endpoint was observed
 down, and a battery alert can occur again after charge rises above the selected
-threshold and later crosses it while discharging.
+threshold and later crosses it while discharging. A thermal alert can occur
+again only after pressure first returns below serious.
 
 DockDeck evaluates rules from the module values already in memory. It does not
 create a second network request or upload notification content. Pending events

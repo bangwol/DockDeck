@@ -18,6 +18,13 @@ date or time, and list name. DockDeck reads incomplete Reminders due within the
 last seven days or next 48 hours; items without a due date are not shown. The
 same 48-hour horizon applies to upcoming Calendar events.
 
+Calendar events can show a compact video button. DockDeck selects only HTTPS
+conference links from the event URL, location, or a bounded portion of its
+notes. Supported hosts include Around, Amazon Chime, BlueJeans, FaceTime,
+Google Meet, Jitsi Meet, Microsoft Teams, Webex, Whereby, and Zoom. URLs with
+embedded credentials, plain HTTP, unrelated hosts, and lookalike domains are
+ignored. Opening a link uses the user's default browser or native handler.
+
 ## Permissions
 
 Calendar and Reminders have separate macOS permissions and separate **Request
@@ -37,10 +44,10 @@ into a provider in Safari alone does not connect it to EventKit.
 ## Selection and privacy
 
 Calendar and Reminder-list selectors are independent. DockDeck retains item
-titles, times, all-day state, and source names only in memory. Local preferences
-contain the selected source identifiers, the all-day and Reminders switches,
-and refresh interval; event and Reminder contents are never persisted, logged,
-or sent over the network.
+titles, times, all-day state, source names, and an accepted meeting URL only in
+memory. Local preferences contain the selected source identifiers, the all-day
+and Reminders switches, and refresh interval; event and Reminder contents are
+never persisted, logged, or sent over the network.
 
 Disabling Schedule stops its timer, removes its EventKit observer, releases the
 event store, and clears both in-memory item lists. Hidden Schedule panels keep

@@ -66,9 +66,15 @@ background probes instead wait until the latest blocking reset plus a short
 grace period. A missing reset time backs off to one probe per hour. An exhausted
 Fable allowance does not pause checks for the other models.
 
-Click the compact Usage panel to refresh both enabled providers immediately.
-This manual refresh and `⌘R` override the exhausted-limit delay. DockDeck does
-not install a global keyboard or pointer idle monitor.
+Click the compact Usage panel or press `⌘R` to request a manual refresh. Codex
+and the optional status-line cache are checked immediately. A Claude `/usage`
+probe starts only when another probe is not running and the previous one began
+at least 60 seconds ago. A running probe absorbs further requests; after it
+finishes, requests inside the remaining cooldown share one probe scheduled for
+the boundary. Rapid panel clicks within 0.75 seconds are ignored, so they cannot
+fan out provider work. The manual request overrides the exhausted-limit delay
+after the cooldown. DockDeck does not install a global keyboard or pointer idle
+monitor.
 
 Each command path has a fixed runtime limit, and the Usage store adds a 30-second
 watchdog. Pipe capture is closed explicitly after the Claude process exits, so a

@@ -24,6 +24,9 @@ swift test
   deselected, Status Line Only is selected, or the display/session is inactive;
   remove only the matching probe transcript afterward. Never auto-accept a
   workspace trust prompt.
+- Keep manual Usage refresh single-flight. Rapid panel clicks must be debounced,
+  and automatic Claude `/usage` probes must retain their one-minute minimum
+  start interval and single pending timer.
 - Do not add browser-cookie, browser-keychain, Full Disk Access, Screen
   Recording, or private usage-endpoint providers.
 - Preserve macOS 13 support and avoid new dependencies when the platform or
@@ -37,7 +40,9 @@ swift test
   optional settings pane in `PanelModuleRegistry`.
 - Register its work in `ModuleRuntimeCoordinator`. Starting and stopping must be
   idempotent; a disabled module must not keep a timer, subprocess, sensor, or
-  network request running.
+  network request running. Read-only work must suspend while the display or
+  login session is inactive and use reduced cadence in Low Power Mode or under
+  serious thermal pressure.
 - Keep placement and visibility in `PanelDeckConfiguration`; its versioned
   storage preserves unknown module IDs for forward compatibility.
 - Keep module state and change events in `SettingsPanelModel`, module-specific
@@ -47,7 +52,9 @@ swift test
   stop their own polling or subprocess when deselected.
 - Keep Service Monitor probes credential-free and on the ephemeral session.
   Public endpoints require HTTPS; local HTTP support must stay within the
-  narrow `NSAllowsLocalNetworking` exception.
+  narrow `NSAllowsLocalNetworking` exception. Keep the Range-request fallback,
+  transient-failure confirmation, and offline state distinct from endpoint
+  failure.
 - Keep Weather opt-in, selected-city only, and on the fixed Open-Meteo HTTPS
   hosts. Do not add IP geolocation or request Location permission. Preserve
   visible attribution, the non-commercial free-API warning, and disabled-state
@@ -55,8 +62,9 @@ swift test
 - Keep Schedule read-only and permission-on-button only. Fetch EventKit data
   off the main thread, map only the displayed fields into value types, and
   release the event store and observer when disabled. Never log or persist
-  event or Reminder content. Calendar and Reminders access remain separate and
-  neither prompt may be triggered by enabling the module.
+  event or Reminder content. Accept join links only from the conference HTTPS
+  allowlist. Calendar and Reminders access remain separate and neither prompt
+  may be triggered by enabling the module.
 - Keep Project Pulse on bounded, non-interactive local `git` and authenticated
   `gh` commands. Persist only a standardized local path or selected
   `owner/repository` name. Never persist file names, command output, remote
@@ -72,7 +80,8 @@ swift test
 - Keep Battery on documented IOKit power-source fields only. Do not read or
   persist battery serial numbers, and stop sampling while disabled.
 - Keep Network on primary-interface byte counters only. Do not inspect packets,
-  addresses, or destinations; clear the previous sample when disabled.
+  addresses, or destinations. Use Network framework only for local route
+  properties, and clear the previous sample when disabled.
 - Read-only modules can be assigned to either Deck and must render correctly at
   the compact panel size before they are registered. Keep module switching
   manual and predictable, preserve enabled-first ordering and independent Deck
