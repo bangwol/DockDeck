@@ -1,5 +1,6 @@
 import Darwin
 import Foundation
+import Network
 import SystemConfiguration
 
 struct NetworkCounters: Equatable {
@@ -12,6 +13,91 @@ struct NetworkSnapshot: Equatable {
     let interfaceName: String
     let downloadBytesPerSecond: Double?
     let uploadBytesPerSecond: Double?
+}
+
+enum NetworkConnectionKind: String, Equatable {
+    case wifi
+    case ethernet
+    case cellular
+    case loopback
+    case other
+
+    var title: String {
+        switch self {
+        case .wifi: "Wi-Fi"
+        case .ethernet: "Ethernet"
+        case .cellular: "Cellular"
+        case .loopback: "Loopback"
+        case .other: "Network"
+        }
+    }
+}
+
+struct NetworkConnectionSnapshot: Equatable {
+    enum Status: Equatable {
+        case unknown
+        case online
+        case offline
+    }
+
+    let status: Status
+    let kind: NetworkConnectionKind?
+    let isExpensive: Bool
+    let isConstrained: Bool
+
+    static let unknown = NetworkConnectionSnapshot(
+        status: .unknown, kind: nil, isExpensive: false, isConstrained: false)
+}
+
+protocol NetworkPathObserving: AnyObject {
+    var onUpdate: ((NetworkConnectionSnapshot) -> Void)? { get set }
+    func start()
+    func stop()
+}
+
+final class SystemNetworkPathObserver: NetworkPathObserving {
+    var onUpdate: ((NetworkConnectionSnapshot) -> Void)?
+
+    private let queue = DispatchQueue(label: "DockDeck.NetworkPath", qos: .utility)
+    private var monitor: NWPathMonitor?
+
+    func start() {
+        guard monitor == nil else { return }
+        let monitor = NWPathMonitor()
+        monitor.pathUpdateHandler = { [weak self] path in
+            let snapshot = Self.snapshot(path)
+            DispatchQueue.main.async { self?.onUpdate?(snapshot) }
+        }
+        self.monitor = monitor
+        monitor.start(queue: queue)
+    }
+
+    func stop() {
+        monitor?.cancel()
+        monitor = nil
+    }
+
+    private static func snapshot(_ path: NWPath) -> NetworkConnectionSnapshot {
+        let kind: NetworkConnectionKind?
+        if path.usesInterfaceType(.wifi) {
+            kind = .wifi
+        } else if path.usesInterfaceType(.wiredEthernet) {
+            kind = .ethernet
+        } else if path.usesInterfaceType(.cellular) {
+            kind = .cellular
+        } else if path.usesInterfaceType(.loopback) {
+            kind = .loopback
+        } else if path.status == .satisfied {
+            kind = .other
+        } else {
+            kind = nil
+        }
+        return NetworkConnectionSnapshot(
+            status: path.status == .satisfied ? .online : .offline,
+            kind: kind,
+            isExpensive: path.isExpensive,
+            isConstrained: path.isConstrained)
+    }
 }
 
 enum NetworkRateCalculator {
@@ -118,6 +204,7 @@ enum NetworkCounterReader {
 
 final class NetworkStore: ObservableObject {
     @Published private(set) var snapshot: NetworkSnapshot?
+    @Published private(set) var connection: NetworkConnectionSnapshot
     private(set) var downloadHistory = MetricHistory()
     private(set) var uploadHistory = MetricHistory()
 
@@ -125,17 +212,25 @@ final class NetworkStore: ObservableObject {
     private var timer: Timer?
     private var refreshInterval: TimeInterval
     private var refreshCadence = ModuleRefreshCadence(backgroundMultiplier: 4)
+    private var runtimeLowPowerMode = false
+    private let pathObserver: NetworkPathObserving
 
     init(
         refreshInterval: TimeInterval = PanelSettings.networkRefreshInterval,
-        initialSnapshot: NetworkSnapshot? = nil
+        initialSnapshot: NetworkSnapshot? = nil,
+        initialConnection: NetworkConnectionSnapshot = .unknown,
+        pathObserver: NetworkPathObserving = SystemNetworkPathObserver()
     ) {
         self.refreshInterval = Self.resolvedRefreshInterval(refreshInterval)
         snapshot = initialSnapshot
+        connection = initialConnection
+        self.pathObserver = pathObserver
+        pathObserver.onUpdate = { [weak self] in self?.receiveConnection($0) }
     }
 
     func start() {
         guard timer == nil else { return }
+        pathObserver.start()
         refresh()
         scheduleTimer()
     }
@@ -144,6 +239,7 @@ final class NetworkStore: ObservableObject {
         timer?.invalidate()
         timer = nil
         previous = nil
+        pathObserver.stop()
     }
 
     func setRefreshInterval(_ interval: TimeInterval) {
@@ -158,7 +254,10 @@ final class NetworkStore: ObservableObject {
     func setRuntimeActivity(
         _ activity: ModuleRuntimeActivity, lowPowerMode: Bool
     ) {
-        guard refreshCadence.update(activity: activity, lowPowerMode: lowPowerMode),
+        runtimeLowPowerMode = lowPowerMode
+        guard refreshCadence.update(
+            activity: activity,
+            lowPowerMode: lowPowerMode || connection.isConstrained),
             timer != nil
         else { return }
         timer?.invalidate()
@@ -193,6 +292,18 @@ final class NetworkStore: ObservableObject {
             interfaceName: counters.interfaceName,
             downloadBytesPerSecond: rates.download,
             uploadBytesPerSecond: rates.upload)
+    }
+
+    private func receiveConnection(_ connection: NetworkConnectionSnapshot) {
+        guard self.connection != connection else { return }
+        self.connection = connection
+        guard refreshCadence.update(
+            activity: refreshCadence.activity,
+            lowPowerMode: runtimeLowPowerMode || connection.isConstrained),
+            timer != nil
+        else { return }
+        timer?.invalidate()
+        scheduleTimer()
     }
 
     private func scheduleTimer() {

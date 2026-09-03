@@ -6,10 +6,12 @@ struct NetworkPanelView: View {
 
     var body: some View {
         Group {
-            if let snapshot = store.snapshot {
+            if store.connection.status == .offline {
+                networkPlaceholder(text: "Network offline", symbol: "network.slash")
+            } else if let snapshot = store.snapshot {
                 HStack(spacing: 7) {
                     metric(
-                        title: "DOWN",
+                        title: downloadTitle,
                         symbol: "arrow.down",
                         value: snapshot.downloadBytesPerSecond,
                         history: store.downloadHistory,
@@ -24,17 +26,11 @@ struct NetworkPanelView: View {
                 }
                 .padding(.horizontal, 8)
                 .padding(.vertical, 6)
-                .help("Primary interface: " + snapshot.interfaceName)
+                .help(helpText(snapshot))
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel(accessibilityText(snapshot))
             } else {
-                HStack(spacing: 7) {
-                    Image(systemName: "network.slash")
-                    Text("No active network")
-                }
-                .font(.system(size: 9.5, weight: .semibold, design: .rounded))
-                .foregroundStyle(baseColor.opacity(0.78))
-                .accessibilityElement(children: .combine)
+                networkPlaceholder(text: "No active network", symbol: "network.slash")
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -63,8 +59,35 @@ struct NetworkPanelView: View {
 
     private var baseColor: Color { Color(theme.foregroundColor) }
 
+    private var downloadTitle: String {
+        guard let kind = store.connection.kind else { return "DOWN" }
+        return "DOWN · \(kind.title.uppercased())"
+    }
+
+    private func networkPlaceholder(text: String, symbol: String) -> some View {
+        HStack(spacing: 7) {
+            Image(systemName: symbol)
+            Text(text)
+        }
+        .font(.system(size: 9.5, weight: .semibold, design: .rounded))
+        .foregroundStyle(baseColor.opacity(0.78))
+        .accessibilityElement(children: .combine)
+    }
+
+    private func helpText(_ snapshot: NetworkSnapshot) -> String {
+        var parts = [
+            "\(store.connection.kind?.title ?? "Primary interface") via \(snapshot.interfaceName)"
+        ]
+        if store.connection.isConstrained { parts.append("Low Data Mode") }
+        if store.connection.isExpensive { parts.append("metered connection") }
+        parts.append("download \(ByteRateFormatter.string(snapshot.downloadBytesPerSecond))")
+        parts.append("upload \(ByteRateFormatter.string(snapshot.uploadBytesPerSecond))")
+        return parts.joined(separator: " · ")
+    }
+
     private func accessibilityText(_ snapshot: NetworkSnapshot) -> String {
-        snapshot.interfaceName + ", download "
+        (store.connection.kind?.title ?? "Network") + " on " + snapshot.interfaceName
+            + ", download "
             + ByteRateFormatter.string(snapshot.downloadBytesPerSecond)
             + ", upload " + ByteRateFormatter.string(snapshot.uploadBytesPerSecond)
     }

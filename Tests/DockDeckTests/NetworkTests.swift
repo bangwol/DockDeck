@@ -32,13 +32,30 @@ final class NetworkTests: XCTestCase {
         XCTAssertLessThan(counters.interfaceName.utf8.count, 64)
     }
 
+    func testStoreTracksNativeConnectionMetadata() {
+        let connection = NetworkConnectionSnapshot(
+            status: .online, kind: .wifi, isExpensive: false, isConstrained: true)
+        let observer = FakeNetworkPathObserver(snapshot: connection)
+        let store = NetworkStore(refreshInterval: 2, pathObserver: observer)
+
+        store.start()
+
+        XCTAssertEqual(store.connection, connection)
+        XCTAssertEqual(observer.startCount, 1)
+        store.stop()
+        XCTAssertEqual(observer.stopCount, 1)
+    }
+
     func testPanelRendersAtCompactSize() throws {
         let store = NetworkStore(
             refreshInterval: 2,
             initialSnapshot: NetworkSnapshot(
                 interfaceName: "en0",
                 downloadBytesPerSecond: 1_572_864,
-                uploadBytesPerSecond: 430_080))
+                uploadBytesPerSecond: 430_080),
+            initialConnection: NetworkConnectionSnapshot(
+                status: .online, kind: .wifi,
+                isExpensive: false, isConstrained: false))
         let size = NSSize(width: 214, height: 59)
         let view = NSHostingView(
             rootView: NetworkPanelView(store: store, theme: Theme.theme(id: "")))
@@ -52,4 +69,20 @@ final class NetworkTests: XCTestCase {
         XCTAssertGreaterThan(bitmap.pixelsWide, 0)
         XCTAssertGreaterThan(bitmap.pixelsHigh, 0)
     }
+}
+
+private final class FakeNetworkPathObserver: NetworkPathObserving {
+    var onUpdate: ((NetworkConnectionSnapshot) -> Void)?
+    private let snapshot: NetworkConnectionSnapshot
+    private(set) var startCount = 0
+    private(set) var stopCount = 0
+
+    init(snapshot: NetworkConnectionSnapshot) { self.snapshot = snapshot }
+
+    func start() {
+        startCount += 1
+        onUpdate?(snapshot)
+    }
+
+    func stop() { stopCount += 1 }
 }

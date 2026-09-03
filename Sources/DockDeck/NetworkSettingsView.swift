@@ -31,6 +31,7 @@ struct NetworkSettingsView: View {
                         Label("Download rate", systemImage: "arrow.down")
                         Label("Upload rate", systemImage: "arrow.up")
                         Label("Current primary interface", systemImage: "network")
+                        Label("Connection and Low Data status", systemImage: "wifi")
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.vertical, 4)
@@ -40,7 +41,7 @@ struct NetworkSettingsView: View {
                 }
 
                 Text(
-                    "Network reads only macOS byte counters for the primary interface. "
+                    "Network reads macOS byte counters and Network framework status. "
                         + "It does not inspect traffic, addresses, hostnames, or packet contents. "
                         + "Sampling stops while disabled.")
                     .font(.caption)
