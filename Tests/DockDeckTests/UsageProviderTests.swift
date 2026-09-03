@@ -388,6 +388,74 @@ final class UsageProviderTests: XCTestCase {
         XCTAssertEqual(snapshot.windows.map(\.usedPercent), [10, 20, 30])
     }
 
+    func testClaudeProviderReturnsWithoutWaitingForInheritedPipeWriters() throws {
+        let fileManager = FileManager.default
+        let root = fileManager.temporaryDirectory
+            .appendingPathComponent("DockDeckClaudePipe-\(UUID().uuidString)")
+        let executable = root.appendingPathComponent("claude")
+        let homeDirectory = root.appendingPathComponent("home", isDirectory: true)
+        defer { try? fileManager.removeItem(at: root) }
+        try fileManager.createDirectory(at: homeDirectory, withIntermediateDirectories: true)
+        try Data(
+            """
+            #!/bin/sh
+            (sleep 4) &
+            printf 'Current session\n10%% used\nResets in 2h\n'
+            printf 'Current week (all models)\n20%% used\nResets in 3 days\n'
+            """.utf8
+        ).write(to: executable)
+        try fileManager.setAttributes(
+            [.posixPermissions: 0o700], ofItemAtPath: executable.path)
+        let provider = ClaudeUsageCommandProvider(
+            environment: [
+                "DOCKDECK_CLAUDE_PATH": executable.path,
+                "PATH": "/usr/bin:/bin",
+            ],
+            homeDirectory: homeDirectory,
+            probeDirectory: root.appendingPathComponent("probe", isDirectory: true))
+
+        let startedAt = Date()
+        for _ in 0..<3 {
+            guard case .success = provider.read(now: Date(timeIntervalSince1970: 2_000)) else {
+                return XCTFail("Expected direct Claude usage output to parse repeatedly")
+            }
+        }
+
+        XCTAssertLessThan(Date().timeIntervalSince(startedAt), 3)
+    }
+
+    func testClaudeProviderCancellationReturnsPromptly() throws {
+        let fileManager = FileManager.default
+        let root = fileManager.temporaryDirectory
+            .appendingPathComponent("DockDeckClaudeCancel-\(UUID().uuidString)")
+        let executable = root.appendingPathComponent("claude")
+        let homeDirectory = root.appendingPathComponent("home", isDirectory: true)
+        defer { try? fileManager.removeItem(at: root) }
+        try fileManager.createDirectory(at: homeDirectory, withIntermediateDirectories: true)
+        try Data("#!/bin/sh\nsleep 5\n".utf8).write(to: executable)
+        try fileManager.setAttributes(
+            [.posixPermissions: 0o700], ofItemAtPath: executable.path)
+        let provider = ClaudeUsageCommandProvider(
+            environment: [
+                "DOCKDECK_CLAUDE_PATH": executable.path,
+                "PATH": "/usr/bin:/bin",
+            ],
+            homeDirectory: homeDirectory,
+            probeDirectory: root.appendingPathComponent("probe", isDirectory: true))
+        let finished = expectation(description: "Cancelled Claude probe returns")
+        let startedAt = Date()
+
+        DispatchQueue.global(qos: .utility).async {
+            _ = provider.read(now: Date(timeIntervalSince1970: 2_000))
+            finished.fulfill()
+        }
+        Thread.sleep(forTimeInterval: 0.1)
+        provider.cancel()
+        wait(for: [finished], timeout: 2)
+
+        XCTAssertLessThan(Date().timeIntervalSince(startedAt), 2)
+    }
+
     func testClaudeProviderRemovesLateSessionArtifact() throws {
         let fileManager = FileManager.default
         let root = fileManager.temporaryDirectory
@@ -569,6 +637,79 @@ final class UsageProviderTests: XCTestCase {
         store.stop()
     }
 
+    func testUsageStoreWatchdogCancelsStuckClaudeProbe() {
+        let command = BlockingClaudeUsageCommandProvider()
+        let store = UsageStore(
+            claudeProvider: ClaudeStatuslineCacheProvider(cacheURL: missingCacheURL()),
+            claudeCommandProvider: command,
+            nextClaudeProbeDelay: { 1_200 },
+            claudeProbeTimeout: 0.05,
+            claudeProbeQueue: DispatchQueue(label: "DockDeckTests.ClaudeWatchdog"))
+        store.setEnabledProviders([.claude])
+        let timedOut = expectation(description: "Claude watchdog publishes timeout")
+        var fulfilled = false
+        let cancellable = store.$providers.sink { providers in
+            guard !fulfilled, providers.first?.detail?.contains("refresh timed out") == true else {
+                return
+            }
+            fulfilled = true
+            timedOut.fulfill()
+        }
+        defer {
+            store.stop()
+            cancellable.cancel()
+        }
+
+        store.start()
+        wait(for: [timedOut], timeout: 2)
+
+        XCTAssertGreaterThanOrEqual(command.cancelCount, 1)
+    }
+
+    func testUsageStoreShowsProbeFailureAlongsideCachedClaudeUsage() throws {
+        let cacheURL = missingCacheURL()
+        try FileManager.default.createDirectory(
+            at: cacheURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: cacheURL.deletingLastPathComponent()) }
+        let now = Date().timeIntervalSince1970
+        try Data(
+            """
+            {
+              "observedAt": \(now),
+              "rate_limits": {
+                "five_hour": {"used_percentage": 20, "resets_at": \(now + 3600)}
+              }
+            }
+            """.utf8
+        ).write(to: cacheURL)
+        let command = FakeClaudeUsageCommandProvider(
+            result: .failure(.transport("Automatic probe failed")))
+        let store = UsageStore(
+            claudeProvider: ClaudeStatuslineCacheProvider(cacheURL: cacheURL),
+            claudeCommandProvider: command,
+            nextClaudeProbeDelay: { 1_200 },
+            claudeProbeQueue: DispatchQueue(label: "DockDeckTests.ClaudeCachedError"))
+        store.setEnabledProviders([.claude])
+        let published = expectation(description: "Cached usage includes automatic probe error")
+        var fulfilled = false
+        let cancellable = store.$providers.sink { providers in
+            guard !fulfilled, let provider = providers.first,
+                provider.windows.first?.usedPercent == 20,
+                provider.detail?.contains("Automatic probe failed") == true
+            else { return }
+            fulfilled = true
+            XCTAssertEqual(provider.freshness, .stale)
+            published.fulfill()
+        }
+        defer {
+            store.stop()
+            cancellable.cancel()
+        }
+
+        store.start()
+        wait(for: [published], timeout: 2)
+    }
+
     func testUsagePanelRendersThreeClaudeWindowsAtCompactSize() throws {
         let snapshot = UsageProviderSnapshot(
             windows: [
@@ -650,4 +791,22 @@ private final class FakeClaudeUsageCommandProvider: ClaudeUsageCommandReading {
     }
 
     func cancel() { lock.withLock { storedCancelCount += 1 } }
+}
+
+private final class BlockingClaudeUsageCommandProvider: ClaudeUsageCommandReading {
+    private let lock = NSLock()
+    private let cancelled = DispatchSemaphore(value: 0)
+    private var storedCancelCount = 0
+
+    var cancelCount: Int { lock.withLock { storedCancelCount } }
+
+    func read(now: Date) -> Result<UsageProviderSnapshot, UsageProviderError> {
+        _ = cancelled.wait(timeout: .now() + 5)
+        return .failure(.transport("Cancelled by watchdog"))
+    }
+
+    func cancel() {
+        lock.withLock { storedCancelCount += 1 }
+        cancelled.signal()
+    }
 }

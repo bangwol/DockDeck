@@ -387,19 +387,33 @@ final class ClaudeUsageCommandProvider: ClaudeUsageCommandReading {
         let outputPipe = Pipe()
         let errorPipe = Pipe()
         let output = ClaudeUsageOutputBuffer(limit: ClaudeUsageCommandParser.maximumOutputBytes)
+        let collector = ClaudeUsagePipeCollector(
+            handles: [outputPipe.fileHandleForReading, errorPipe.fileHandleForReading],
+            output: output)
         process.executableURL = executable
         process.arguments = launchArguments(sessionID: sessionID, command: "/usage")
         process.environment = launchEnvironment(executable: executable)
         process.currentDirectoryURL = probeDirectory
         process.standardOutput = outputPipe
         process.standardError = errorPipe
-        outputPipe.fileHandleForReading.readabilityHandler = { output.append($0.availableData) }
-        errorPipe.fileHandleForReading.readabilityHandler = { output.append($0.availableData) }
 
         let terminated = DispatchSemaphore(value: 0)
         process.terminationHandler = { _ in terminated.signal() }
-        try process.run()
+        do {
+            try process.run()
+        } catch {
+            try? outputPipe.fileHandleForWriting.close()
+            try? errorPipe.fileHandleForWriting.close()
+            collector.finish()
+            throw error
+        }
+        try? outputPipe.fileHandleForWriting.close()
+        try? errorPipe.fileHandleForWriting.close()
         register(process, operation: operation)
+        defer {
+            collector.finish()
+            clear(process, operation: operation)
+        }
         guard isCurrent(operation) else {
             process.terminate()
             throw ProbeFailure.cancelled
@@ -411,14 +425,9 @@ final class ClaudeUsageCommandProvider: ClaudeUsageCommandReading {
                 kill(process.processIdentifier, SIGKILL)
                 _ = terminated.wait(timeout: .now() + 1)
             }
-            clear(process, operation: operation)
             throw ProbeFailure.retryable("Claude /usage timed out")
         }
-        outputPipe.fileHandleForReading.readabilityHandler = nil
-        errorPipe.fileHandleForReading.readabilityHandler = nil
-        output.append(outputPipe.fileHandleForReading.readDataToEndOfFile())
-        output.append(errorPipe.fileHandleForReading.readDataToEndOfFile())
-        clear(process, operation: operation)
+        collector.finish()
         guard isCurrent(operation) else { throw ProbeFailure.cancelled }
         let result = output.value()
         guard !result.exceededLimit else {
@@ -621,6 +630,67 @@ final class ClaudeUsageCommandProvider: ClaudeUsageCommandReading {
     private func clear(_ terminal: HeadlessTerminal, operation: UUID) {
         lock.withLock {
             if operationID == operation, activeTerminal === terminal { activeTerminal = nil }
+        }
+    }
+}
+
+private final class ClaudeUsagePipeCollector {
+    private struct Reader {
+        let handle: FileHandle
+        let source: DispatchSourceRead
+    }
+
+    private let queue = DispatchQueue(label: "DockDeck.ClaudeUsagePipeCollector")
+    private let cancellationGroup = DispatchGroup()
+    private let output: ClaudeUsageOutputBuffer
+    private let lock = NSLock()
+    private var readers: [Reader] = []
+    private var finished = false
+
+    init(handles: [FileHandle], output: ClaudeUsageOutputBuffer) {
+        self.output = output
+        readers = handles.map { handle in
+            let descriptor = handle.fileDescriptor
+            let flags = fcntl(descriptor, F_GETFL)
+            if flags >= 0 { _ = fcntl(descriptor, F_SETFL, flags | O_NONBLOCK) }
+            let source = DispatchSource.makeReadSource(
+                fileDescriptor: descriptor, queue: queue)
+            cancellationGroup.enter()
+            source.setEventHandler { [weak self] in self?.drain(descriptor) }
+            source.setCancelHandler { [cancellationGroup] in cancellationGroup.leave() }
+            source.resume()
+            return Reader(handle: handle, source: source)
+        }
+    }
+
+    func finish() {
+        let shouldFinish = lock.withLock { () -> Bool in
+            guard !finished else { return false }
+            finished = true
+            return true
+        }
+        guard shouldFinish else { return }
+        queue.sync {
+            for reader in readers {
+                drain(reader.handle.fileDescriptor)
+                reader.source.cancel()
+            }
+        }
+        _ = cancellationGroup.wait(timeout: .now() + 1)
+        readers.forEach { try? $0.handle.close() }
+    }
+
+    private func drain(_ descriptor: Int32) {
+        var bytes = [UInt8](repeating: 0, count: 16_384)
+        while true {
+            let count = Darwin.read(descriptor, &bytes, bytes.count)
+            if count > 0 {
+                output.append(Data(bytes.prefix(count)))
+            } else if count == -1, errno == EINTR {
+                continue
+            } else {
+                return
+            }
         }
     }
 }

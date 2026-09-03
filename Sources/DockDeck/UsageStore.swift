@@ -113,6 +113,7 @@ enum UsageProviderError: LocalizedError {
 final class UsageStore: ObservableObject {
     private static let refreshInterval: TimeInterval = 60
     private static let menuProbeMinimumAge: TimeInterval = 60
+    private static let defaultClaudeProbeTimeout: TimeInterval = 30
 
     @Published private(set) var providers: [ProviderUsage]
 
@@ -120,14 +121,17 @@ final class UsageStore: ObservableObject {
     private let claudeProvider: ClaudeStatuslineCacheProvider
     private let claudeCommandProvider: ClaudeUsageCommandReading
     private let nextClaudeProbeDelay: () -> TimeInterval
+    private let claudeProbeTimeout: TimeInterval
     private let claudeProbeQueue: DispatchQueue
     private let logger: (String) -> Void
     private var providerSnapshots: [UsageProviderID: ProviderUsage]
     private var claudeBridgeSnapshot: UsageProviderSnapshot?
     private var claudeCommandSnapshot: UsageProviderSnapshot?
+    private var claudeProbeError: UsageProviderError?
     private var enabledProviderIDs = Set(UsageProviderID.allCases)
     private var refreshTimer: Timer?
     private var claudeProbeTimer: Timer?
+    private var claudeProbeWatchdogTimer: Timer?
     private var claudeProbeInFlight = false
     private var claudeProbeGeneration = 0
     private var lastClaudeProbeUptime: TimeInterval?
@@ -143,6 +147,7 @@ final class UsageStore: ObservableObject {
         nextClaudeProbeDelay: @escaping () -> TimeInterval = {
             ClaudeUsageProbeSchedule.delay(unitValue: Double.random(in: 0...1))
         },
+        claudeProbeTimeout: TimeInterval = UsageStore.defaultClaudeProbeTimeout,
         claudeProbeQueue: DispatchQueue = DispatchQueue(
             label: "DockDeck.ClaudeUsageProbe", qos: .utility),
         logger: @escaping (String) -> Void = { _ in }
@@ -158,6 +163,7 @@ final class UsageStore: ObservableObject {
         self.claudeProvider = claudeProvider
         self.claudeCommandProvider = claudeCommandProvider
         self.nextClaudeProbeDelay = nextClaudeProbeDelay
+        self.claudeProbeTimeout = max(claudeProbeTimeout, 0.01)
         self.claudeProbeQueue = claudeProbeQueue
         self.logger = logger
     }
@@ -228,6 +234,7 @@ final class UsageStore: ObservableObject {
         if mode == .statusLineOnly {
             cancelClaudeProbe()
             claudeCommandSnapshot = nil
+            claudeProbeError = nil
             if let claudeBridgeSnapshot {
                 apply(.success(claudeBridgeSnapshot), providerID: .claude)
             } else {
@@ -317,6 +324,7 @@ final class UsageStore: ObservableObject {
         claudeProbeInFlight = true
         lastClaudeProbeUptime = uptime
         let generation = claudeProbeGeneration
+        scheduleClaudeProbeWatchdog(generation: generation)
         claudeProbeQueue.async { [weak self] in
             guard let self else { return }
             let result = self.claudeCommandProvider.read(now: Date())
@@ -325,13 +333,16 @@ final class UsageStore: ObservableObject {
                     self.enabledProviderIDs.contains(.claude),
                     self.claudeProbeGeneration == generation
                 else { return }
+                self.claudeProbeWatchdogTimer?.invalidate()
+                self.claudeProbeWatchdogTimer = nil
                 self.claudeProbeInFlight = false
                 switch result {
                 case .success(let snapshot):
                     self.claudeCommandSnapshot = snapshot
+                    self.claudeProbeError = nil
                     self.publishClaudeSources()
                 case .failure(let error):
-                    self.claudeCommandSnapshot = nil
+                    self.claudeProbeError = error
                     self.publishClaudeSources(fallbackError: error)
                 }
                 self.scheduleClaudeProbe()
@@ -342,7 +353,26 @@ final class UsageStore: ObservableObject {
     private func publishClaudeSources(fallbackError: UsageProviderError? = nil) {
         let snapshots = [claudeBridgeSnapshot, claudeCommandSnapshot].compactMap { $0 }
         if let snapshot = ClaudeUsageSnapshotMerger.merge(snapshots) {
-            apply(.success(snapshot), providerID: .claude)
+            let error = claudeProbeError ?? (claudeCommandSnapshot == nil ? fallbackError : nil)
+            guard let error else {
+                apply(.success(snapshot), providerID: .claude)
+                return
+            }
+            let freshness: UsageFreshness
+            if case .authenticationRequired = error {
+                freshness = .signIn
+            } else {
+                freshness = .stale
+            }
+            let details = [snapshot.detail, "Refresh failed: \(error.localizedDescription)"]
+                .compactMap { $0 }
+            apply(
+                .success(UsageProviderSnapshot(
+                    windows: snapshot.windows,
+                    freshness: freshness,
+                    detail: details.joined(separator: " · "),
+                    observedAt: snapshot.observedAt)),
+                providerID: .claude)
         } else if let fallbackError {
             apply(.failure(fallbackError), providerID: .claude)
         }
@@ -351,9 +381,31 @@ final class UsageStore: ObservableObject {
     private func cancelClaudeProbe() {
         claudeProbeTimer?.invalidate()
         claudeProbeTimer = nil
+        claudeProbeWatchdogTimer?.invalidate()
+        claudeProbeWatchdogTimer = nil
         claudeProbeGeneration += 1
         claudeProbeInFlight = false
         claudeCommandProvider.cancel()
+    }
+
+    private func scheduleClaudeProbeWatchdog(generation: Int) {
+        claudeProbeWatchdogTimer?.invalidate()
+        let timer = Timer(timeInterval: claudeProbeTimeout, repeats: false) { [weak self] _ in
+            guard let self, self.claudeProbeInFlight,
+                self.claudeProbeGeneration == generation
+            else { return }
+            self.claudeProbeGeneration += 1
+            self.claudeProbeInFlight = false
+            self.claudeProbeWatchdogTimer = nil
+            self.claudeCommandProvider.cancel()
+            let error = UsageProviderError.transport("Claude /usage refresh timed out")
+            self.claudeProbeError = error
+            self.publishClaudeSources(fallbackError: error)
+            self.scheduleClaudeProbe()
+        }
+        timer.tolerance = min(claudeProbeTimeout * 0.05, 1)
+        RunLoop.main.add(timer, forMode: .common)
+        claudeProbeWatchdogTimer = timer
     }
 
     private func resetClaudeProviderForBridge() {
