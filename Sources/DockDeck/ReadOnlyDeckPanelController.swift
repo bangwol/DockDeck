@@ -22,16 +22,7 @@ final class ReadOnlyDeckPanelController: NSObject, NSMenuDelegate {
 
     private let surfaceView: PanelSurfaceView
     private let hostingView: NSHostingView<ReadOnlyDeckPanelView>
-    private let usageStore: UsageStore
-    private let systemStatsStore: SystemStatsStore
-    private let serviceMonitorStore: ServiceMonitorStore
-    private let weatherStore: WeatherStore
-    private let scheduleStore: ScheduleStore
-    private let clockStore: ClockStore
-    private let batteryStore: BatteryStore
-    private let networkStore: NetworkStore
-    private let projectPulseStore: ProjectPulseStore
-    private let focusTimerStore: FocusTimerStore
+    private let services: PanelModuleServices
     private weak var menuTarget: AnyObject?
     private var theme: Theme
     private let onSelectionChange: (PanelSide) -> Void
@@ -41,30 +32,12 @@ final class ReadOnlyDeckPanelController: NSObject, NSMenuDelegate {
     init(
         initialFrame: NSRect,
         theme: Theme,
-        usageStore: UsageStore,
-        systemStatsStore: SystemStatsStore,
-        serviceMonitorStore: ServiceMonitorStore,
-        weatherStore: WeatherStore,
-        scheduleStore: ScheduleStore,
-        clockStore: ClockStore,
-        batteryStore: BatteryStore,
-        networkStore: NetworkStore,
-        projectPulseStore: ProjectPulseStore,
-        focusTimerStore: FocusTimerStore,
+        services: PanelModuleServices,
         menuTarget: AnyObject,
         side: PanelSide = .right,
         onSelectionChange: @escaping (PanelSide) -> Void = { _ in }
     ) {
-        self.usageStore = usageStore
-        self.systemStatsStore = systemStatsStore
-        self.serviceMonitorStore = serviceMonitorStore
-        self.weatherStore = weatherStore
-        self.scheduleStore = scheduleStore
-        self.clockStore = clockStore
-        self.batteryStore = batteryStore
-        self.networkStore = networkStore
-        self.projectPulseStore = projectPulseStore
-        self.focusTimerStore = focusTimerStore
+        self.services = services
         self.theme = theme
         self.menuTarget = menuTarget
         self.side = side
@@ -90,16 +63,7 @@ final class ReadOnlyDeckPanelController: NSObject, NSMenuDelegate {
             frame: NSRect(origin: .zero, size: initialFrame.size), theme: theme)
         let hostingView = NSHostingView(
             rootView: ReadOnlyDeckPanelView(
-                usageStore: usageStore,
-                systemStatsStore: systemStatsStore,
-                serviceMonitorStore: serviceMonitorStore,
-                weatherStore: weatherStore,
-                scheduleStore: scheduleStore,
-                clockStore: clockStore,
-                batteryStore: batteryStore,
-                networkStore: networkStore,
-                projectPulseStore: projectPulseStore,
-                focusTimerStore: focusTimerStore,
+                services: services,
                 activeModule: PanelSettings.activeModule(on: side),
                 theme: theme))
         hostingView.frame = surfaceView.bounds
@@ -152,16 +116,7 @@ final class ReadOnlyDeckPanelController: NSObject, NSMenuDelegate {
         panel.title = "DockDeck \(title)"
         panel.setAccessibilityLabel("DockDeck \(title)")
         hostingView.rootView = ReadOnlyDeckPanelView(
-            usageStore: usageStore,
-            systemStatsStore: systemStatsStore,
-            serviceMonitorStore: serviceMonitorStore,
-            weatherStore: weatherStore,
-            scheduleStore: scheduleStore,
-            clockStore: clockStore,
-            batteryStore: batteryStore,
-            networkStore: networkStore,
-            projectPulseStore: projectPulseStore,
-            focusTimerStore: focusTimerStore,
+            services: services,
             activeModule: activeModule,
             theme: theme)
     }
@@ -197,7 +152,7 @@ final class ReadOnlyDeckPanelController: NSObject, NSMenuDelegate {
 
     func menuWillOpen(_ menu: NSMenu) {
         menu.removeAllItems()
-        if activeModule == .usage { usageStore.refreshClaudeUsageIfDue() }
+        if activeModule == .usage { services.usage.refreshClaudeUsageIfDue() }
 
         addItem(
             to: menu,
@@ -242,7 +197,7 @@ final class ReadOnlyDeckPanelController: NSObject, NSMenuDelegate {
         if activeModule == .focusTimer {
             menu.addItem(.separator())
             let toggle = NSMenuItem(
-                title: focusTimerStore.snapshot.mode == .running ? "Pause Timer" : "Start Timer",
+                title: services.focusTimer.snapshot.mode == .running ? "Pause Timer" : "Start Timer",
                 action: #selector(toggleFocusTimer(_:)), keyEquivalent: "")
             toggle.target = self
             menu.addItem(toggle)
@@ -251,7 +206,7 @@ final class ReadOnlyDeckPanelController: NSObject, NSMenuDelegate {
             reset.target = self
             menu.addItem(reset)
             let skip = NSMenuItem(
-                title: "Skip to \(focusTimerStore.snapshot.phase.next.title.capitalized)",
+                title: "Skip to \(services.focusTimer.snapshot.phase.next.title.capitalized)",
                 action: #selector(skipFocusTimer(_:)), keyEquivalent: "")
             skip.target = self
             menu.addItem(skip)
@@ -281,15 +236,15 @@ final class ReadOnlyDeckPanelController: NSObject, NSMenuDelegate {
     }
 
     @objc private func toggleFocusTimer(_ sender: Any?) {
-        focusTimerStore.toggle()
+        services.focusTimer.toggle()
     }
 
     @objc private func resetFocusTimer(_ sender: Any?) {
-        focusTimerStore.reset()
+        services.focusTimer.reset()
     }
 
     @objc private func skipFocusTimer(_ sender: Any?) {
-        focusTimerStore.skip()
+        services.focusTimer.skip()
     }
 
     private func handleScrollWheel(_ event: NSEvent) -> Bool {

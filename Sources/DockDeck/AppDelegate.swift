@@ -46,6 +46,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         onCompletion: { [weak self] phase in
             self?.notificationCoordinator.notifyFocusTimerCompleted(phase)
         })
+    lazy var moduleServices = PanelModuleServices(
+        usage: usageStore,
+        systemStats: systemStatsStore,
+        serviceMonitor: serviceMonitorStore,
+        weather: weatherStore,
+        schedule: scheduleStore,
+        clock: clockStore,
+        battery: batteryStore,
+        network: networkStore,
+        projectPulse: projectPulseStore,
+        focusTimer: focusTimerStore)
     let notificationCoordinator = DockNotificationCoordinator(
         settings: PanelSettings.notifications)
     lazy var dockCoordinator = DockCoordinator { [weak self] channel, message in
@@ -153,16 +164,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         leftReadOnlyDeckPanelController = ReadOnlyDeckPanelController(
             initialFrame: initialLeftFrame,
             theme: currentTheme,
-            usageStore: usageStore,
-            systemStatsStore: systemStatsStore,
-            serviceMonitorStore: serviceMonitorStore,
-            weatherStore: weatherStore,
-            scheduleStore: scheduleStore,
-            clockStore: clockStore,
-            batteryStore: batteryStore,
-            networkStore: networkStore,
-            projectPulseStore: projectPulseStore,
-            focusTimerStore: focusTimerStore,
+            services: moduleServices,
             menuTarget: self,
             side: .left,
             onSelectionChange: { [weak self] side in
@@ -171,16 +173,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         rightReadOnlyDeckPanelController = ReadOnlyDeckPanelController(
             initialFrame: initialRightFrame,
             theme: currentTheme,
-            usageStore: usageStore,
-            systemStatsStore: systemStatsStore,
-            serviceMonitorStore: serviceMonitorStore,
-            weatherStore: weatherStore,
-            scheduleStore: scheduleStore,
-            clockStore: clockStore,
-            batteryStore: batteryStore,
-            networkStore: networkStore,
-            projectPulseStore: projectPulseStore,
-            focusTimerStore: focusTimerStore,
+            services: moduleServices,
             menuTarget: self,
             side: .right,
             onSelectionChange: { [weak self] side in
@@ -295,82 +288,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             .terminal,
             start: { [weak self] in self?.terminalPanelController.startShell() },
             stop: { [weak self] in self?.terminalPanelController.stopShell() })
-        moduleRuntimeCoordinator.register(
-            .usage,
-            start: { [weak self] in self?.usageStore.start() },
-            stop: { [weak self] in self?.usageStore.stop() },
-            updateActivity: { [weak self] activity, lowPowerMode in
-                self?.usageStore.setRuntimeActivity(
-                    activity, lowPowerMode: lowPowerMode)
-            })
-        moduleRuntimeCoordinator.register(
-            .systemStats,
-            start: { [weak self] in self?.systemStatsStore.start() },
-            stop: { [weak self] in self?.systemStatsStore.stop() },
-            updateActivity: { [weak self] activity, lowPowerMode in
-                self?.systemStatsStore.setRuntimeActivity(
-                    activity, lowPowerMode: lowPowerMode)
-            })
-        moduleRuntimeCoordinator.register(
-            .serviceMonitor,
-            start: { [weak self] in self?.serviceMonitorStore.start() },
-            stop: { [weak self] in self?.serviceMonitorStore.stop() },
-            updateActivity: { [weak self] activity, lowPowerMode in
-                self?.serviceMonitorStore.setRuntimeActivity(
-                    activity, lowPowerMode: lowPowerMode)
-            })
-        moduleRuntimeCoordinator.register(
-            .weather,
-            start: { [weak self] in self?.weatherStore.start() },
-            stop: { [weak self] in self?.weatherStore.stop() },
-            updateActivity: { [weak self] activity, lowPowerMode in
-                self?.weatherStore.setRuntimeActivity(
-                    activity, lowPowerMode: lowPowerMode)
-            })
-        moduleRuntimeCoordinator.register(
-            .schedule,
-            start: { [weak self] in self?.scheduleStore.start() },
-            stop: { [weak self] in self?.scheduleStore.stop() },
-            updateActivity: { [weak self] activity, lowPowerMode in
-                self?.scheduleStore.setRuntimeActivity(
-                    activity, lowPowerMode: lowPowerMode)
-            })
-        moduleRuntimeCoordinator.register(
-            .clock,
-            start: { [weak self] in self?.clockStore.start() },
-            stop: { [weak self] in self?.clockStore.stop() })
-        moduleRuntimeCoordinator.register(
-            .battery,
-            start: { [weak self] in self?.batteryStore.start() },
-            stop: { [weak self] in self?.batteryStore.stop() },
-            updateActivity: { [weak self] activity, lowPowerMode in
-                self?.batteryStore.setRuntimeActivity(
-                    activity, lowPowerMode: lowPowerMode)
-            })
-        moduleRuntimeCoordinator.register(
-            .network,
-            start: { [weak self] in self?.networkStore.start() },
-            stop: { [weak self] in self?.networkStore.stop() },
-            updateActivity: { [weak self] activity, lowPowerMode in
-                self?.networkStore.setRuntimeActivity(
-                    activity, lowPowerMode: lowPowerMode)
-            })
-        moduleRuntimeCoordinator.register(
-            .projectPulse,
-            start: { [weak self] in self?.projectPulseStore.start() },
-            stop: { [weak self] in self?.projectPulseStore.stop() },
-            updateActivity: { [weak self] activity, lowPowerMode in
-                self?.projectPulseStore.setRuntimeActivity(
-                    activity, lowPowerMode: lowPowerMode)
-            })
-        moduleRuntimeCoordinator.register(
-            .focusTimer,
-            start: { [weak self] in self?.focusTimerStore.start() },
-            stop: { [weak self] in self?.focusTimerStore.stop() },
-            updateActivity: { [weak self] activity, lowPowerMode in
-                self?.focusTimerStore.setRuntimeActivity(
-                    activity, lowPowerMode: lowPowerMode)
-            })
+        for module in PanelModuleID.readOnlyBuiltIns {
+            guard let runtime = moduleServices.runtime(for: module) else {
+                preconditionFailure("Missing module runtime: \(module.rawValue)")
+            }
+            moduleRuntimeCoordinator.register(
+                module,
+                start: { runtime.start() },
+                stop: { runtime.stop() },
+                updateActivity: { runtime.setRuntimeActivity(
+                    $0, lowPowerMode: $1)
+                })
+        }
     }
 
     private func configureNotifications() {

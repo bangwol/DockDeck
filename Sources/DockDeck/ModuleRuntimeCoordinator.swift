@@ -54,6 +54,27 @@ extension Timer {
     }
 }
 
+protocol PanelModuleRuntime: AnyObject {
+    func start()
+    func stop()
+    func setRuntimeActivity(_ activity: ModuleRuntimeActivity, lowPowerMode: Bool)
+}
+
+extension PanelModuleRuntime {
+    func setRuntimeActivity(_ activity: ModuleRuntimeActivity, lowPowerMode: Bool) {}
+}
+
+extension UsageStore: PanelModuleRuntime {}
+extension SystemStatsStore: PanelModuleRuntime {}
+extension ServiceMonitorStore: PanelModuleRuntime {}
+extension WeatherStore: PanelModuleRuntime {}
+extension ScheduleStore: PanelModuleRuntime {}
+extension ClockStore: PanelModuleRuntime {}
+extension BatteryStore: PanelModuleRuntime {}
+extension NetworkStore: PanelModuleRuntime {}
+extension ProjectPulseStore: PanelModuleRuntime {}
+extension FocusTimerStore: PanelModuleRuntime {}
+
 final class ModuleRuntimeCoordinator {
     enum State: Equatable {
         case stopped

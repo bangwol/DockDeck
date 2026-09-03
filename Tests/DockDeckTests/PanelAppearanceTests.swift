@@ -233,6 +233,14 @@ final class PanelAppearanceTests: XCTestCase {
         XCTAssertEqual(model.sidebarSections[2].panes, [.appearance])
     }
 
+    func testEveryBuiltInModuleHasMetadataAndRuntime() {
+        XCTAssertEqual(PanelModuleRegistry.all.map(\.id), PanelModuleID.builtIns)
+        let services = PanelModuleServices()
+        for module in PanelModuleID.readOnlyBuiltIns {
+            XCTAssertNotNil(services.runtime(for: module), module.rawValue)
+        }
+    }
+
     func testModuleRuntimeCoordinatorStartsAndStopsOnlyChangedModules() {
         let coordinator = ModuleRuntimeCoordinator()
         var terminalStarts = 0
@@ -746,16 +754,7 @@ final class PanelAppearanceTests: XCTestCase {
         ReadOnlyDeckPanelController(
             initialFrame: NSRect(x: 0, y: 0, width: 214, height: 59),
             theme: Theme.theme(id: ""),
-            usageStore: UsageStore(),
-            systemStatsStore: SystemStatsStore(),
-            serviceMonitorStore: ServiceMonitorStore(),
-            weatherStore: WeatherStore(),
-            scheduleStore: ScheduleStore(),
-            clockStore: ClockStore(),
-            batteryStore: BatteryStore(),
-            networkStore: NetworkStore(),
-            projectPulseStore: ProjectPulseStore(),
-            focusTimerStore: FocusTimerStore(),
+            services: PanelModuleServices(),
             menuTarget: NSObject(),
             side: side)
     }
