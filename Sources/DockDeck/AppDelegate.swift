@@ -330,6 +330,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             .receive(on: RunLoop.main)
             .sink { [weak self] in self?.notificationCoordinator.observeBattery($0) }
             .store(in: &notificationCancellables)
+        systemStatsStore.$snapshot
+            .receive(on: RunLoop.main)
+            .sink { [weak self] in self?.notificationCoordinator.observeSystemStats($0) }
+            .store(in: &notificationCancellables)
     }
 
     func synchronizeModuleRuntimes() {

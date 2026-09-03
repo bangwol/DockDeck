@@ -90,6 +90,24 @@ final class NotificationTests: XCTestCase {
                 remainingThreshold: 20, enabled: true).isEmpty)
     }
 
+    func testThermalAlertOnlyFiresWhenEnteringHighPressure() {
+        var detector = DockNotificationEventDetector()
+
+        XCTAssertTrue(detector.systemThermalEvents(
+            snapshot: SystemStatsSnapshot(thermalPressure: .fair), enabled: true).isEmpty)
+        XCTAssertEqual(detector.systemThermalEvents(
+            snapshot: SystemStatsSnapshot(
+                temperatureCelsius: 91, thermalPressure: .serious),
+            enabled: true).first?.identifier, "dockdeck.system.thermal")
+        XCTAssertTrue(detector.systemThermalEvents(
+            snapshot: SystemStatsSnapshot(thermalPressure: .critical), enabled: true).isEmpty)
+        XCTAssertTrue(detector.systemThermalEvents(
+            snapshot: SystemStatsSnapshot(thermalPressure: .nominal), enabled: true).isEmpty)
+        XCTAssertEqual(detector.systemThermalEvents(
+            snapshot: SystemStatsSnapshot(thermalPressure: .serious),
+            enabled: true).count, 1)
+    }
+
     func testCoordinatorRequestsPermissionOnlyAfterExplicitCall() {
         let delivery = FakeNotificationDelivery(
             status: .notDetermined, requestedStatus: .authorized)
@@ -132,6 +150,7 @@ final class NotificationTests: XCTestCase {
         XCTAssertTrue(settings.serviceFailureAlerts)
         XCTAssertTrue(settings.serviceRecoveryAlerts)
         XCTAssertTrue(settings.batteryAlerts)
+        XCTAssertFalse(settings.systemThermalAlerts)
         XCTAssertTrue(settings.focusTimerAlerts)
     }
 

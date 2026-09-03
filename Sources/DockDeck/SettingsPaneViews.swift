@@ -266,6 +266,20 @@ struct NotificationSettingsView: View {
 
                 GroupBox {
                     SettingsSwitchRow(
+                        title: "Thermal pressure",
+                        subtitle: "Alert when macOS reports serious or critical thermal pressure.",
+                        isOn: Binding(
+                            get: { model.values.notifications.systemThermalAlerts },
+                            set: model.setSystemThermalAlertsEnabled))
+                        .padding(.top, 4)
+                } label: {
+                    Label("System Stats", systemImage: "thermometer.medium")
+                        .font(.headline)
+                }
+                .disabled(!model.values.notifications.enabled)
+
+                GroupBox {
+                    SettingsSwitchRow(
                         title: "Timer completion",
                         subtitle: "Alert when a focus or break countdown finishes.",
                         isOn: Binding(

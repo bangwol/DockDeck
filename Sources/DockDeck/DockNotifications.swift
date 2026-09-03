@@ -143,6 +143,13 @@ final class DockNotificationCoordinator {
                 enabled: settings.enabled && settings.batteryAlerts))
     }
 
+    func observeSystemStats(_ snapshot: SystemStatsSnapshot) {
+        emit(
+            detector.systemThermalEvents(
+                snapshot: snapshot,
+                enabled: settings.enabled && settings.systemThermalAlerts))
+    }
+
     func notifyFocusTimerCompleted(
         _ phase: FocusTimerPhase, now: Date = Date()
     ) {
@@ -211,6 +218,7 @@ struct DockNotificationEventDetector {
     private var lowUsage: Set<UsageKey> = []
     private var serviceHealth: [UUID: ServiceHealth] = [:]
     private var batteryLow: Bool?
+    private var thermalPressureHigh: Bool?
 
     mutating func usageEvents(
         providers: [ProviderUsage], remainingThreshold: Int, enabled: Bool
@@ -298,6 +306,25 @@ struct DockNotificationEventDetector {
                 identifier: "dockdeck.battery.low",
                 title: "Battery is low",
                 body: "\(Int(snapshot.percent.rounded()))% remaining. Connect power.")
+        ]
+    }
+
+    mutating func systemThermalEvents(
+        snapshot: SystemStatsSnapshot, enabled: Bool
+    ) -> [DockNotificationEvent] {
+        guard let pressure = snapshot.thermalPressure else { return [] }
+        let isHigh = pressure == .serious || pressure == .critical
+        let entered = isHigh && thermalPressureHigh != true
+        thermalPressureHigh = isHigh
+        guard enabled, entered else { return [] }
+        let temperature = snapshot.temperatureCelsius.map {
+            " Hottest available CPU sensor: \(Int($0.rounded()))°C."
+        } ?? ""
+        return [
+            DockNotificationEvent(
+                identifier: "dockdeck.system.thermal",
+                title: "Mac thermal pressure is \(pressure.accessibilityTitle.lowercased())",
+                body: "DockDeck reduced background refresh frequency.\(temperature)")
         ]
     }
 

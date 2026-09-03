@@ -93,6 +93,7 @@ struct DockNotificationSettings: Codable, Equatable {
     var serviceRecoveryAlerts = true
     var batteryAlerts = true
     var batteryRemainingThreshold = 20
+    var systemThermalAlerts = false
     var focusTimerAlerts = true
 
     func normalized() -> Self {
@@ -116,6 +117,7 @@ struct DockNotificationSettings: Codable, Equatable {
         case serviceRecoveryAlerts
         case batteryAlerts
         case batteryRemainingThreshold
+        case systemThermalAlerts
         case focusTimerAlerts
     }
 
@@ -134,6 +136,8 @@ struct DockNotificationSettings: Codable, Equatable {
         batteryAlerts = try values.decodeIfPresent(Bool.self, forKey: .batteryAlerts) ?? true
         batteryRemainingThreshold = try values.decodeIfPresent(
             Int.self, forKey: .batteryRemainingThreshold) ?? 20
+        systemThermalAlerts = try values.decodeIfPresent(
+            Bool.self, forKey: .systemThermalAlerts) ?? false
         focusTimerAlerts = try values.decodeIfPresent(
             Bool.self, forKey: .focusTimerAlerts) ?? true
         self = normalized()

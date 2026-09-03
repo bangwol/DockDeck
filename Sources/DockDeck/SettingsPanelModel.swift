@@ -529,6 +529,10 @@ final class SettingsPanelModel: ObservableObject {
         updateNotifications { $0.batteryRemainingThreshold = threshold }
     }
 
+    func setSystemThermalAlertsEnabled(_ enabled: Bool) {
+        updateNotifications { $0.systemThermalAlerts = enabled }
+    }
+
     func setFocusTimerAlertsEnabled(_ enabled: Bool) {
         updateNotifications { $0.focusTimerAlerts = enabled }
     }
