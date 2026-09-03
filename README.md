@@ -67,18 +67,18 @@ DockDeck uses the space beside a bottom-aligned Dock for up to two compact modul
 
 ## Decks and settings
 
-Settings are organized into **General**, **Modules**, and **Interface** sections. Module pages are generated from the same registry that drives the Deck editor. The sidebar lists enabled modules first and sorts each visibility group by name; Deck cards retain their user-defined cycle order. Drag a card from its `≡` handle within a Deck to set that order or into the other Deck to change sides. Cards preview their destination and animate into place while dragging; macOS Reduce Motion is respected. The same moves are available from each card's context menu. Move every card to one Deck if you want the other side completely empty and hidden. You can also swap the complete left and right Decks. At least one module remains enabled so Settings stays reachable. DockDeck remembers each Deck's selected module and the last Settings page you opened.
+Settings are organized into **General**, **Modules**, and **Interface** sections. Module pages are generated from the same registry that drives the Deck editor. Active cards appear in the Left and Right Decks in their user-defined cycle order; hidden cards are collected in a full-width, two-column **Inactive Modules** tray. Drag a card by its `≡` handle to reorder it, move it between Decks, or hide it in the tray. Dragging an inactive card into either Deck enables it there. Checking **Show** in the tray places it in the Deck with fewer active cards, using the left Deck when both counts match. Relocations animate between sections and newly activated cards receive a brief blue emphasis; macOS Reduce Motion is respected. Equivalent moves are available from each card's context menu. Move every active card to one Deck if you want the other side empty and hidden, or swap the complete left and right Decks. At least one module remains enabled so Settings stays reachable. DockDeck remembers each Deck's selected module and the last Settings page you opened.
 
 Scroll over a compact Deck to cycle every enabled module; a transient page indicator shows the new position. Automatic Slide is off by default. In **Settings → Decks**, check **Auto** on at least two enabled read-only modules in the same Deck and choose a 5–300 second interval. Participating left and right Decks advance together on one shared timer. A Deck cycles only its checked modules; selecting an unchecked module pauses that Deck while the other can continue. Hovering either participating panel, opening Settings, a participating panel's menu or detail window, locking the Mac, or turning off the display defers that shared tick. Terminal always remains manual.
 
 <p align="center">
   <a href="assets/dockdeck-decks-settings.png">
-    <img src="assets/dockdeck-decks-settings.png" width="620" alt="DockDeck Decks settings with Automatic Slide selections and modules arranged across both Decks" />
+    <img src="assets/dockdeck-decks-settings.png" width="620" alt="DockDeck Decks settings with active modules in Left and Right Decks and inactive modules in a two-column tray" />
   </a>
 </p>
 
 <p align="center">
-  <sub>Auto controls choose which read-only cards rotate together; every enabled card remains available by scrolling.</sub>
+  <sub>Active modules stay in their Decks; inactive modules remain available in the shared tray.</sub>
 </p>
 
 ## Documentation

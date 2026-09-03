@@ -174,6 +174,53 @@ final class PanelAppearanceTests: XCTestCase {
         XCTAssertTrue(model.moduleDefinitions.dropFirst(2).allSatisfy { !model.isEnabled($0.id) })
     }
 
+    func testDeckEditorSeparatesActiveAndInactiveModules() {
+        let model = makeSettingsModel(
+            configuration: PanelDeckConfiguration(
+                left: [.terminal, .weather],
+                right: [.usage, .battery],
+                enabled: [.terminal, .usage]))
+
+        XCTAssertEqual(model.enabledModuleDefinitions(on: .left).map(\.id), [.terminal])
+        XCTAssertEqual(model.enabledModuleDefinitions(on: .right).map(\.id), [.usage])
+        XCTAssertTrue(model.inactiveModuleDefinitions.map(\.id).contains(.weather))
+        XCTAssertTrue(model.inactiveModuleDefinitions.map(\.id).contains(.battery))
+        XCTAssertTrue(model.inactiveModuleDefinitions.allSatisfy { !model.isEnabled($0.id) })
+    }
+
+    func testShowPlacesInactiveModuleInShorterDeckWithLeftTieBreak() {
+        let model = makeSettingsModel(
+            configuration: PanelDeckConfiguration(
+                left: [.terminal, .weather],
+                right: [.usage, .clock],
+                enabled: [.terminal, .usage]))
+
+        model.setEnabled(true, for: .weather)
+
+        XCTAssertEqual(model.side(containing: .weather), .left)
+        XCTAssertTrue(model.isEnabled(.weather))
+
+        model.setEnabled(true, for: .clock)
+
+        XCTAssertEqual(model.side(containing: .clock), .right)
+        XCTAssertTrue(model.isEnabled(.clock))
+        XCTAssertEqual(model.recentlyActivatedModule, .clock)
+    }
+
+    func testDroppingInactiveModuleIntoDeckActivatesAtTarget() {
+        let model = makeSettingsModel(
+            configuration: PanelDeckConfiguration(
+                left: [.terminal],
+                right: [.usage, .weather],
+                enabled: [.terminal, .usage]))
+
+        model.activateModule(.weather, on: .left, before: .terminal)
+
+        XCTAssertEqual(model.enabledModuleDefinitions(on: .left).map(\.id), [.weather, .terminal])
+        XCTAssertTrue(model.isEnabled(.weather))
+        XCTAssertEqual(model.recentlyActivatedModule, .weather)
+    }
+
     func testSettingsSidebarSortsEnabledModulesThenTitlesWithoutChangingDeckOrder() {
         let model = makeSettingsModel(
             configuration: PanelDeckConfiguration(

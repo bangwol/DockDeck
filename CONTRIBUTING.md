@@ -83,13 +83,15 @@ swift test
   addresses, or destinations. Use Network framework only for local route
   properties, and clear the previous sample when disabled.
 - Read-only modules can be assigned to either Deck and must render correctly at
-  the compact panel size before they are registered. Preserve enabled-first
-  ordering and independent Deck selections, and test settings changes against
-  the runtime. Automatic rotation must be opt-in, skip Terminal and unchecked
-  modules, use one shared timer to advance participating Decks in one batch,
-  pause on an unchecked selection or interaction, and suspend with an inactive
-  display or login session. Manual scrolling must continue to include every
-  enabled module.
+  the compact panel size before they are registered. Keep active cards in their
+  assigned Deck and inactive cards in the shared tray. Show must choose the
+  shorter active Deck with a left-side tie break; an explicit drop must activate
+  the module in its target Deck. Preserve independent Deck selections and test
+  settings changes against the runtime. Automatic rotation must be opt-in, skip
+  Terminal and unchecked modules, use one shared timer to advance participating
+  Decks in one batch, pause on an unchecked selection or interaction, and
+  suspend with an inactive display or login session. Manual scrolling must
+  continue to include every enabled module.
 
 ## PR guidelines
 

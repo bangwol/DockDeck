@@ -361,6 +361,7 @@ final class SettingsPanelModel: ObservableObject {
         didSet { onPaneChange?(selectedPane) }
     }
     @Published private(set) var values: SettingsPanelValues
+    @Published private(set) var recentlyActivatedModule: PanelModuleID?
 
     let fontNames: [String]
 
@@ -368,6 +369,7 @@ final class SettingsPanelModel: ObservableObject {
     var onChange: ((SettingsPanelChange) -> Void)?
     var onReset: (() -> Void)?
     var onCancel: (() -> Void)?
+    private var activationHighlightGeneration = UUID()
 
     init(
         selectedPane: SettingsPaneID,
@@ -420,6 +422,14 @@ final class SettingsPanelModel: ObservableObject {
         return modules.compactMap { PanelModuleRegistry.definition(for: $0) }
     }
 
+    func enabledModuleDefinitions(on side: PanelSide) -> [PanelModuleDefinition] {
+        moduleDefinitions(on: side).filter { isEnabled($0.id) }
+    }
+
+    var inactiveModuleDefinitions: [PanelModuleDefinition] {
+        moduleDefinitions.filter { !isEnabled($0.id) }
+    }
+
     func side(containing module: PanelModuleID) -> PanelSide? {
         values.deckConfiguration.side(containing: module)
     }
@@ -451,15 +461,37 @@ final class SettingsPanelModel: ObservableObject {
     }
 
     func setEnabled(_ enabled: Bool, for module: PanelModuleID) {
+        guard enabled != isEnabled(module) else { return }
         guard enabled || canDisable(module) else { return }
-        if !enabled, isAutoSliding(module) {
+        if enabled {
+            activateModule(module, on: preferredActivationSide())
+            return
+        }
+        if isAutoSliding(module) {
             var settings = values.deckAutoSlide
             settings.setEnabled(false, for: module)
             publishDeckAutoSlide(settings)
         }
         var configuration = values.deckConfiguration
-        configuration.setEnabled(enabled, for: module)
+        configuration.setEnabled(false, for: module)
         publishDeck(configuration)
+    }
+
+    func activateModule(
+        _ module: PanelModuleID, on side: PanelSide, before target: PanelModuleID? = nil
+    ) {
+        guard PanelModuleRegistry.definition(for: module) != nil else { return }
+        guard !isEnabled(module) else {
+            moveModule(module, to: side, before: target)
+            return
+        }
+        var configuration = values.deckConfiguration
+        configuration.setEnabled(true, for: module)
+        let destination = configuration.modules(on: side).filter { $0 != module }
+        let index = target.flatMap(destination.firstIndex(of:)) ?? destination.count
+        configuration.move(module, to: side, at: index)
+        publishDeck(configuration)
+        emphasizeActivatedModule(module)
     }
 
     func setAutoSlideEnabled(_ enabled: Bool, for module: PanelModuleID) {
@@ -528,6 +560,28 @@ final class SettingsPanelModel: ObservableObject {
         var configuration = values.deckConfiguration
         swap(&configuration.left, &configuration.right)
         publishDeck(configuration)
+    }
+
+    private func preferredActivationSide() -> PanelSide {
+        let configuration = values.deckConfiguration
+        let leftCount = configuration.enabledModules(on: .left).count
+        let rightCount = configuration.enabledModules(on: .right).count
+        return leftCount <= rightCount ? .left : .right
+    }
+
+    private func emphasizeActivatedModule(_ module: PanelModuleID) {
+        let generation = UUID()
+        activationHighlightGeneration = generation
+        recentlyActivatedModule = module
+        let phases: [(TimeInterval, PanelModuleID?)] = [
+            (0.22, nil), (0.42, module), (0.72, nil),
+        ]
+        for (delay, value) in phases {
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
+                guard let self, self.activationHighlightGeneration == generation else { return }
+                self.recentlyActivatedModule = value
+            }
+        }
     }
 
     func setNotificationsEnabled(_ enabled: Bool) {

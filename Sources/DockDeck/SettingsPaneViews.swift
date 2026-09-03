@@ -200,6 +200,8 @@ private struct DiagnosticSettingsRow: View {
 
 struct DecksSettingsView: View {
     @ObservedObject var model: SettingsPanelModel
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Namespace private var moduleRelocation
 
     var body: some View {
         ScrollView {
@@ -207,9 +209,13 @@ struct DecksSettingsView: View {
                 DeckAutoSlideControls(model: model)
 
                 HStack(alignment: .top, spacing: 14) {
-                    DeckPreviewCard(side: .left, model: model)
-                    DeckPreviewCard(side: .right, model: model)
+                    DeckPreviewCard(
+                        side: .left, model: model, namespace: moduleRelocation)
+                    DeckPreviewCard(
+                        side: .right, model: model, namespace: moduleRelocation)
                 }
+
+                InactiveModulesCard(model: model, namespace: moduleRelocation)
 
                 HStack {
                     Button(action: model.swapDecks) {
@@ -217,13 +223,18 @@ struct DecksSettingsView: View {
                     }
                     .buttonStyle(.bordered)
                     Spacer()
-                    Text("Drag the ≡ handle to arrange. Enabled modules stay above hidden modules.")
+                    Text("Drag the ≡ handle to arrange, activate, or hide modules.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
             }
             .padding(24)
+            .animation(relocationAnimation, value: model.values.deckConfiguration)
         }
+    }
+
+    private var relocationAnimation: Animation? {
+        reduceMotion ? nil : .easeInOut(duration: 0.28)
     }
 }
 
@@ -906,11 +917,14 @@ struct AppearanceSettingsView: View {
 private struct DeckPreviewCard: View {
     let side: PanelSide
     @ObservedObject var model: SettingsPanelModel
+    let namespace: Namespace.ID
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var isDropTarget = false
 
     private var title: String { side == .left ? "Left Deck" : "Right Deck" }
-    private var definitions: [PanelModuleDefinition] { model.moduleDefinitions(on: side) }
+    private var definitions: [PanelModuleDefinition] {
+        model.enabledModuleDefinitions(on: side)
+    }
 
     var body: some View {
         GroupBox {
@@ -934,7 +948,8 @@ private struct DeckPreviewCard: View {
                         DeckModuleCard(
                             definition: definition,
                             side: side,
-                            model: model)
+                            model: model,
+                            namespace: namespace)
                     }
                 }
             }
@@ -998,10 +1013,177 @@ private struct EmptyDeckDropZone: View {
     }
 }
 
+private struct InactiveModulesCard: View {
+    @ObservedObject var model: SettingsPanelModel
+    let namespace: Namespace.ID
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var isDropTarget = false
+
+    private let columns = [
+        GridItem(.flexible(), spacing: 6),
+        GridItem(.flexible(), spacing: 6),
+    ]
+
+    var body: some View {
+        GroupBox {
+            VStack(alignment: .leading, spacing: 8) {
+                Text(
+                    "Drag into a Deck to activate. Show places a module in the shorter Deck; "
+                        + "ties go left.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                if model.inactiveModuleDefinitions.isEmpty {
+                    VStack(spacing: 5) {
+                        Image(systemName: "checkmark.circle")
+                            .font(.title3)
+                        Text("All modules are active")
+                            .font(.callout.weight(.medium))
+                        Text("Drop a Deck card here to hide it.")
+                            .font(.caption)
+                    }
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, minHeight: 70)
+                } else {
+                    LazyVGrid(columns: columns, spacing: 6) {
+                        ForEach(model.inactiveModuleDefinitions) { definition in
+                            InactiveDeckModuleCard(
+                                definition: definition,
+                                model: model,
+                                namespace: namespace)
+                        }
+                    }
+                }
+            }
+            .padding(.vertical, 4)
+            .animation(relocationAnimation, value: model.inactiveModuleDefinitions.map(\.id))
+        } label: {
+            Label("Inactive Modules", systemImage: "archivebox")
+                .font(.headline)
+        }
+        .scaleEffect(isDropTarget ? 1.004 : 1)
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(
+                    isDropTarget ? Color.accentColor : .clear,
+                    lineWidth: isDropTarget ? 1.5 : 0))
+        .animation(targetAnimation, value: isDropTarget)
+        .onDrop(
+            of: [DeckModuleDragPayload.contentType],
+            delegate: InactiveModuleDropDelegate(
+                model: model,
+                relocationAnimation: relocationAnimation,
+                isTargeted: $isDropTarget))
+    }
+
+    private var relocationAnimation: Animation? {
+        reduceMotion ? nil : .easeInOut(duration: 0.28)
+    }
+
+    private var targetAnimation: Animation? {
+        reduceMotion ? nil : .easeOut(duration: 0.12)
+    }
+}
+
+private struct InactiveDeckModuleCard: View {
+    let definition: PanelModuleDefinition
+    @ObservedObject var model: SettingsPanelModel
+    let namespace: Namespace.ID
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "line.3.horizontal")
+                .font(.caption)
+                .foregroundStyle(.tertiary)
+                .frame(width: 18, height: 28)
+                .contentShape(Rectangle())
+                .onDrag {
+                    DeckModuleDragPayload.itemProvider(for: definition.id)
+                } preview: {
+                    DeckModuleDragPreview(definition: definition, isEnabled: false)
+                }
+                .accessibilityLabel("Drag \(definition.title)")
+            Image(systemName: definition.symbolName)
+                .frame(width: 18)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(definition.title)
+                    .fontWeight(.medium)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                    .allowsTightening(true)
+                Text(definition.subtitle)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+            }
+            Spacer()
+            Toggle(
+                "Show \(definition.title)",
+                isOn: Binding(
+                    get: { false },
+                    set: { enabled in
+                        guard enabled else { return }
+                        withAnimation(relocationAnimation) {
+                            model.setEnabled(true, for: definition.id)
+                        }
+                    }))
+                .labelsHidden()
+                .toggleStyle(.checkbox)
+                .frame(width: 36)
+                .help("Show in the Deck with fewer active modules")
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 7)
+        .background(
+            RoundedRectangle(cornerRadius: 8)
+                .fill(Color(nsColor: .controlBackgroundColor).opacity(0.72)))
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(Color.primary.opacity(0.07), lineWidth: 1))
+        .opacity(0.72)
+        .matchedGeometryEffect(id: definition.id, in: namespace)
+        .transition(.scale(scale: 0.97).combined(with: .opacity))
+        .contentShape(Rectangle())
+        .contextMenu {
+            if let pane = definition.settingsPane {
+                Button("Configure \(definition.title)…") { model.selectPane(pane) }
+                Divider()
+            }
+            Button("Show in Left Deck") {
+                withAnimation(relocationAnimation) {
+                    model.activateModule(definition.id, on: .left)
+                }
+            }
+            Button("Show in Right Deck") {
+                withAnimation(relocationAnimation) {
+                    model.activateModule(definition.id, on: .right)
+                }
+            }
+        }
+        .accessibilityAction(named: Text("Show in Left Deck")) {
+            withAnimation(relocationAnimation) {
+                model.activateModule(definition.id, on: .left)
+            }
+        }
+        .accessibilityAction(named: Text("Show in Right Deck")) {
+            withAnimation(relocationAnimation) {
+                model.activateModule(definition.id, on: .right)
+            }
+        }
+        .help("Drag the ≡ handle into a Deck, or check Show to activate")
+    }
+
+    private var relocationAnimation: Animation? {
+        reduceMotion ? nil : .easeInOut(duration: 0.28)
+    }
+}
+
 private struct DeckModuleCard: View {
     let definition: PanelModuleDefinition
     let side: PanelSide
     @ObservedObject var model: SettingsPanelModel
+    let namespace: Namespace.ID
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var isDropTarget = false
 
@@ -1054,7 +1236,11 @@ private struct DeckModuleCard: View {
                 "Show \(definition.title)",
                 isOn: Binding(
                     get: { model.isEnabled(definition.id) },
-                    set: { model.setEnabled($0, for: definition.id) }))
+                    set: { enabled in
+                        withAnimation(relocationAnimation) {
+                            model.setEnabled(enabled, for: definition.id)
+                        }
+                    }))
                 .labelsHidden()
                 .toggleStyle(.checkbox)
                 .frame(width: 36)
@@ -1071,19 +1257,24 @@ private struct DeckModuleCard: View {
                 .fill(
                     isDropTarget
                         ? Color.accentColor.opacity(0.12)
-                        : Color(nsColor: .controlBackgroundColor)))
+                        : isRecentlyActivated
+                            ? Color.accentColor.opacity(0.16)
+                            : Color(nsColor: .controlBackgroundColor)))
         .overlay(
             RoundedRectangle(cornerRadius: 8)
                 .stroke(
-                    isDropTarget ? Color.accentColor : Color.primary.opacity(0.08),
-                    lineWidth: isDropTarget ? 1.5 : 1))
-        .opacity(model.isEnabled(definition.id) ? 1 : 0.55)
+                    isDropTarget || isRecentlyActivated
+                        ? Color.accentColor : Color.primary.opacity(0.08),
+                    lineWidth: isDropTarget || isRecentlyActivated ? 1.5 : 1))
         .scaleEffect(isDropTarget ? 1.015 : 1)
         .shadow(
-            color: isDropTarget ? Color.accentColor.opacity(0.14) : .clear,
+            color: isDropTarget || isRecentlyActivated
+                ? Color.accentColor.opacity(0.18) : .clear,
             radius: 5,
             y: 2)
         .animation(targetAnimation, value: isDropTarget)
+        .animation(highlightAnimation, value: isRecentlyActivated)
+        .matchedGeometryEffect(id: definition.id, in: namespace)
         .transition(.scale(scale: 0.97).combined(with: .opacity))
         .contentShape(Rectangle())
         .onDrop(
@@ -1101,8 +1292,16 @@ private struct DeckModuleCard: View {
             }
             let destination = side.opposite
             Button("Move to \(destination == .left ? "Left" : "Right") Deck") {
-                model.moveModule(definition.id, to: destination)
+                withAnimation(relocationAnimation) {
+                    model.moveModule(definition.id, to: destination)
+                }
             }
+            Button("Move to Inactive Modules") {
+                withAnimation(relocationAnimation) {
+                    model.setEnabled(false, for: definition.id)
+                }
+            }
+            .disabled(!model.canDisable(definition.id))
             Divider()
             Button("Move Up") { model.moveModuleUp(definition.id) }
                 .disabled(!model.canMoveModuleUp(definition.id))
@@ -1112,13 +1311,24 @@ private struct DeckModuleCard: View {
         .accessibilityAction(
             named: Text("Move to \(side.opposite == .left ? "Left" : "Right") Deck")
         ) {
-            model.moveModule(definition.id, to: side.opposite)
+            withAnimation(relocationAnimation) {
+                model.moveModule(definition.id, to: side.opposite)
+            }
+        }
+        .accessibilityAction(named: Text("Move to Inactive Modules")) {
+            guard model.canDisable(definition.id) else { return }
+            withAnimation(relocationAnimation) {
+                model.setEnabled(false, for: definition.id)
+            }
         }
         .help("Drag the ≡ handle to move or reorder \(definition.title)")
     }
 
     private var isEnabled: Bool { model.isEnabled(definition.id) }
     private var isAutoSlideEligible: Bool { definition.id != .terminal }
+    private var isRecentlyActivated: Bool {
+        !reduceMotion && model.recentlyActivatedModule == definition.id
+    }
 
     private var relocationAnimation: Animation? {
         reduceMotion ? nil : .easeInOut(duration: 0.22)
@@ -1126,6 +1336,10 @@ private struct DeckModuleCard: View {
 
     private var targetAnimation: Animation? {
         reduceMotion ? nil : .easeOut(duration: 0.12)
+    }
+
+    private var highlightAnimation: Animation? {
+        reduceMotion ? nil : .easeInOut(duration: 0.12)
     }
 }
 
@@ -1202,9 +1416,58 @@ private struct DeckModuleDropDelegate: DropDelegate {
                 let module = DeckModuleDragPayload.moduleID(from: text as String)
             else { return }
             DispatchQueue.main.async {
-                guard !onlyWhileTargeted || isTargeted else { return }
+                guard !onlyWhileTargeted
+                    || (isTargeted && model.isEnabled(module))
+                else { return }
                 withAnimation(relocationAnimation) {
-                    model.moveModule(module, to: side, before: target)
+                    if model.isEnabled(module) {
+                        model.moveModule(module, to: side, before: target)
+                    } else {
+                        model.activateModule(module, on: side, before: target)
+                    }
+                }
+            }
+        }
+        return true
+    }
+}
+
+private struct InactiveModuleDropDelegate: DropDelegate {
+    let model: SettingsPanelModel
+    let relocationAnimation: Animation?
+    @Binding var isTargeted: Bool
+
+    func validateDrop(info: DropInfo) -> Bool {
+        info.hasItemsConforming(to: [DeckModuleDragPayload.contentType])
+    }
+
+    func dropUpdated(info: DropInfo) -> DropProposal? {
+        DropProposal(operation: .move)
+    }
+
+    func dropEntered(info: DropInfo) {
+        isTargeted = true
+    }
+
+    func dropExited(info: DropInfo) {
+        isTargeted = false
+    }
+
+    func performDrop(info: DropInfo) -> Bool {
+        isTargeted = false
+        guard
+            let provider = info.itemProviders(
+                for: [DeckModuleDragPayload.contentType]
+            ).first
+        else { return false }
+
+        provider.loadObject(ofClass: NSString.self) { object, _ in
+            guard let text = object as? NSString,
+                let module = DeckModuleDragPayload.moduleID(from: text as String)
+            else { return }
+            DispatchQueue.main.async {
+                withAnimation(relocationAnimation) {
+                    model.setEnabled(false, for: module)
                 }
             }
         }
