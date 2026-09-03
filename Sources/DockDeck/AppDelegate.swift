@@ -277,6 +277,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             name: Notification.Name.NSProcessInfoPowerStateDidChange,
             object: nil
         )
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(powerStateDidChange(_:)),
+            name: ProcessInfo.thermalStateDidChangeNotification,
+            object: nil
+        )
     }
 
     func applicationWillTerminate(_ notification: Notification) {
@@ -294,7 +300,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         moduleRuntimeCoordinator.register(
             .terminal,
             start: { [weak self] in self?.terminalPanelController.startShell() },
-            stop: { [weak self] in self?.terminalPanelController.stopShell() })
+            stop: { [weak self] in self?.terminalPanelController.stopShell() },
+            suspendsWhenInactive: false)
         for module in PanelModuleID.readOnlyBuiltIns {
             guard let runtime = moduleServices.runtime(for: module) else {
                 preconditionFailure("Missing module runtime: \(module.rawValue)")
@@ -329,10 +336,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let visibleModules = PanelSide.allCases.compactMap {
             PanelSettings.activeModule(on: $0)
         }
+        let processInfo = ProcessInfo.processInfo
         moduleRuntimeCoordinator.synchronize(
             enabledModules: PanelSettings.deckConfiguration.enabled,
             visibleModules: visibleModules,
-            lowPowerMode: ProcessInfo.processInfo.isLowPowerModeEnabled)
+            lowPowerMode: ModuleRuntimePolicy.isConstrained(
+                lowPowerMode: processInfo.isLowPowerModeEnabled,
+                thermalState: processInfo.thermalState),
+            systemActive: usageDisplayAwake && usageSessionActive)
     }
 
     @objc private func powerStateDidChange(_ notification: Notification) {
@@ -341,25 +352,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func usageDisplayDidSleep(_ notification: Notification) {
         usageDisplayAwake = false
-        synchronizeUsageSystemActivity()
+        synchronizeModuleRuntimes()
     }
 
     @objc private func usageDisplayDidWake(_ notification: Notification) {
         usageDisplayAwake = true
-        synchronizeUsageSystemActivity()
+        synchronizeModuleRuntimes()
     }
 
     @objc private func usageSessionDidResignActive(_ notification: Notification) {
         usageSessionActive = false
-        synchronizeUsageSystemActivity()
+        synchronizeModuleRuntimes()
     }
 
     @objc private func usageSessionDidBecomeActive(_ notification: Notification) {
         usageSessionActive = true
-        synchronizeUsageSystemActivity()
-    }
-
-    private func synchronizeUsageSystemActivity() {
-        usageStore.setSystemRefreshActive(usageDisplayAwake && usageSessionActive)
+        synchronizeModuleRuntimes()
     }
 }

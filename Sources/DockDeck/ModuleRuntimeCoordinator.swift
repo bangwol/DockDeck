@@ -1,5 +1,18 @@
 import Foundation
 
+enum ModuleRuntimePolicy {
+    static func isConstrained(
+        lowPowerMode: Bool, thermalState: ProcessInfo.ThermalState
+    ) -> Bool {
+        if lowPowerMode { return true }
+        switch thermalState {
+        case .serious, .critical: return true
+        case .nominal, .fair: return false
+        @unknown default: return true
+        }
+    }
+}
+
 enum ModuleRuntimeActivity: Equatable {
     case background
     case visible
@@ -81,22 +94,26 @@ extension FocusTimerStore: PanelModuleRuntime {}
 final class ModuleRuntimeCoordinator {
     enum State: Equatable {
         case stopped
+        case suspended
         case background
         case visible
 
         var activity: ModuleRuntimeActivity? {
             switch self {
-            case .stopped: nil
+            case .stopped, .suspended: nil
             case .background: .background
             case .visible: .visible
             }
         }
+
+        var isRunning: Bool { activity != nil }
     }
 
     private struct Runtime {
         let start: () -> Void
         let stop: () -> Void
         let updateActivity: (ModuleRuntimeActivity, Bool) -> Void
+        let suspendsWhenInactive: Bool
     }
 
     private var runtimes: [PanelModuleID: Runtime] = [:]
@@ -107,51 +124,76 @@ final class ModuleRuntimeCoordinator {
         _ module: PanelModuleID,
         start: @escaping () -> Void,
         stop: @escaping () -> Void,
+        suspendsWhenInactive: Bool = true,
         updateActivity: @escaping (ModuleRuntimeActivity, Bool) -> Void = { _, _ in }
     ) {
         precondition(runtimes[module] == nil, "Module runtime registered twice: \(module.rawValue)")
         runtimes[module] = Runtime(
-            start: start, stop: stop, updateActivity: updateActivity)
+            start: start, stop: stop, updateActivity: updateActivity,
+            suspendsWhenInactive: suspendsWhenInactive)
         states[module] = .stopped
     }
 
     func synchronize(
         enabledModules: [PanelModuleID],
         visibleModules: [PanelModuleID] = [],
-        lowPowerMode: Bool = false
+        lowPowerMode: Bool = false,
+        systemActive: Bool = true
     ) {
-        let enabledModules = Set(enabledModules).intersection(Set(runtimes.keys))
-        let visibleModules = Set(visibleModules).intersection(enabledModules)
+        let registeredModules = Set(runtimes.keys)
+        let enabledSet = Set(enabledModules).intersection(registeredModules)
+        let visibleSet = Set(visibleModules).intersection(enabledSet)
+        let previousStates = states
+        var nextStates: [PanelModuleID: State] = [:]
 
         for (module, runtime) in runtimes {
-            let previous = states[module] ?? .stopped
             let next: State
-            if !enabledModules.contains(module) {
+            if !enabledSet.contains(module) {
                 next = .stopped
-            } else if visibleModules.contains(module) {
+            } else if !systemActive, runtime.suspendsWhenInactive {
+                next = .suspended
+            } else if visibleSet.contains(module) {
                 next = .visible
             } else {
                 next = .background
             }
+            nextStates[module] = next
+        }
 
-            if let activity = next.activity,
-                previous != next || self.lowPowerMode != lowPowerMode
-            {
+        // Stop inactive work before starting anything else. The interactive terminal opts out
+        // so its shell survives display sleep and fast-user switching.
+        for (module, runtime) in runtimes {
+            let previous = states[module] ?? .stopped
+            let next = nextStates[module] ?? .stopped
+            if previous.isRunning, !next.isRunning { runtime.stop() }
+            states[module] = next
+        }
+
+        // Preserve deck order and start visible modules first after wake. This avoids a burst
+        // of hidden network and CLI work delaying the information currently on screen.
+        var activated: Set<PanelModuleID> = []
+        let activationOrder = (visibleModules + enabledModules).filter {
+            enabledSet.contains($0) && activated.insert($0).inserted
+        }
+        for module in activationOrder {
+            guard let runtime = runtimes[module], let next = nextStates[module],
+                let activity = next.activity
+            else { continue }
+            let previous = previousStates[module] ?? .stopped
+            if previous != next || self.lowPowerMode != lowPowerMode {
                 runtime.updateActivity(activity, lowPowerMode)
             }
-            if previous == .stopped, next != .stopped {
-                runtime.start()
-            } else if previous != .stopped, next == .stopped {
-                runtime.stop()
-            }
-            states[module] = next
+            if !previous.isRunning { runtime.start() }
         }
         self.lowPowerMode = lowPowerMode
     }
 
     func stopAll() {
-        for (module, runtime) in runtimes where states[module] != .stopped {
+        for (module, runtime) in runtimes where states[module]?.isRunning == true {
             runtime.stop()
+            states[module] = .stopped
+        }
+        for module in runtimes.keys where states[module] == .suspended {
             states[module] = .stopped
         }
     }

@@ -365,6 +365,50 @@ final class PanelAppearanceTests: XCTestCase {
         XCTAssertTrue(usageActivities[1].1)
     }
 
+    func testModuleRuntimeCoordinatorSuspendsBackgroundWorkAndPreservesTerminal() {
+        let coordinator = ModuleRuntimeCoordinator()
+        var starts: [PanelModuleID] = []
+        var terminalStops = 0
+        var usageStops = 0
+        coordinator.register(
+            .terminal, start: { starts.append(.terminal) },
+            stop: { terminalStops += 1 }, suspendsWhenInactive: false)
+        coordinator.register(
+            .usage, start: { starts.append(.usage) }, stop: { usageStops += 1 })
+
+        coordinator.synchronize(
+            enabledModules: [.terminal, .usage], visibleModules: [.terminal])
+        coordinator.synchronize(
+            enabledModules: [.terminal, .usage], visibleModules: [.terminal],
+            systemActive: false)
+
+        XCTAssertEqual(starts, [.terminal, .usage])
+        XCTAssertEqual(terminalStops, 0)
+        XCTAssertEqual(usageStops, 1)
+        XCTAssertEqual(coordinator.state(for: .terminal), .visible)
+        XCTAssertEqual(coordinator.state(for: .usage), .suspended)
+
+        coordinator.synchronize(
+            enabledModules: [.terminal, .usage], visibleModules: [.usage])
+
+        XCTAssertEqual(starts, [.terminal, .usage, .usage])
+        XCTAssertEqual(coordinator.state(for: .terminal), .background)
+        XCTAssertEqual(coordinator.state(for: .usage), .visible)
+    }
+
+    func testModuleRuntimePolicyCombinesPowerAndThermalPressure() {
+        XCTAssertFalse(ModuleRuntimePolicy.isConstrained(
+            lowPowerMode: false, thermalState: .nominal))
+        XCTAssertFalse(ModuleRuntimePolicy.isConstrained(
+            lowPowerMode: false, thermalState: .fair))
+        XCTAssertTrue(ModuleRuntimePolicy.isConstrained(
+            lowPowerMode: false, thermalState: .serious))
+        XCTAssertTrue(ModuleRuntimePolicy.isConstrained(
+            lowPowerMode: false, thermalState: .critical))
+        XCTAssertTrue(ModuleRuntimePolicy.isConstrained(
+            lowPowerMode: true, thermalState: .nominal))
+    }
+
     func testModuleRefreshCadenceCombinesVisibilityAndLowPower() {
         var cadence = ModuleRefreshCadence(backgroundMultiplier: 4)
 
