@@ -5,6 +5,34 @@ import XCTest
 @testable import DockDeck
 
 final class ScheduleTests: XCTestCase {
+    func testMeetingLinkResolverFindsSupportedHTTPSLinks() {
+        XCTAssertEqual(
+            ScheduleMeetingLinkResolver.resolve(
+                eventURL: URL(string: "https://us02web.zoom.us/j/123"),
+                location: nil, notes: nil)?.host,
+            "us02web.zoom.us")
+        XCTAssertEqual(
+            ScheduleMeetingLinkResolver.resolve(
+                eventURL: nil, location: "Room 4",
+                notes: "Join at https://meet.google.com/abc-defg-hij when ready")?.host,
+            "meet.google.com")
+    }
+
+    func testMeetingLinkResolverRejectsUnsafeAndLookalikeLinks() {
+        XCTAssertNil(ScheduleMeetingLinkResolver.resolve(
+            eventURL: URL(string: "http://meet.google.com/abc"),
+            location: nil, notes: nil))
+        XCTAssertNil(ScheduleMeetingLinkResolver.resolve(
+            eventURL: URL(string: "https://zoom.us@example.com/j/123"),
+            location: nil, notes: nil))
+        XCTAssertNil(ScheduleMeetingLinkResolver.resolve(
+            eventURL: nil, location: nil,
+            notes: "https://zoom.us.example.com/j/123"))
+        XCTAssertNil(ScheduleMeetingLinkResolver.resolve(
+            eventURL: URL(string: "https://example.com/meeting"),
+            location: nil, notes: nil))
+    }
+
     func testTimelinePrefersTimedCurrentEventAndCalculatesProgress() throws {
         let now = Date(timeIntervalSince1970: 1_000)
         let allDay = event(
@@ -191,7 +219,7 @@ final class ScheduleTests: XCTestCase {
     }
 
     func testPanelRendersCurrentEventAtCompactSize() throws {
-        let provider = FakeScheduleProvider(authorization: .granted)
+        let provider = FakeScheduleProvider(authorization: .granted, showsJoinLink: true)
         let store = ScheduleStore(provider: provider)
         store.start()
         let size = NSSize(width: 214, height: 59)
@@ -325,15 +353,18 @@ private final class FakeScheduleProvider: ScheduleEventProviding {
     private(set) var lastIncludeAllDay = false
     private(set) var lastIncludeReminders = false
     private let showsEvent: Bool
+    private let showsJoinLink: Bool
 
     init(
         authorization: ScheduleAuthorizationState,
         reminderAuthorization: ScheduleAuthorizationState = .denied,
-        showsEvent: Bool = true
+        showsEvent: Bool = true,
+        showsJoinLink: Bool = false
     ) {
         authorizationState = authorization
         reminderAuthorizationState = reminderAuthorization
         self.showsEvent = showsEvent
+        self.showsJoinLink = showsJoinLink
     }
 
     func requestReminderAccess(completion: @escaping (ScheduleAuthorizationState) -> Void) {
@@ -377,7 +408,9 @@ private final class FakeScheduleProvider: ScheduleEventProviding {
                         id: "current", title: "Planning",
                         startDate: now.addingTimeInterval(-600),
                         endDate: now.addingTimeInterval(600),
-                        isAllDay: false, calendarTitle: "Work")
+                        isAllDay: false, calendarTitle: "Work",
+                        joinURL: showsJoinLink
+                            ? URL(string: "https://meet.google.com/abc-defg-hij") : nil)
                 ] : [],
                 reminderLists: includeReminders
                     ? [ScheduleReminderListSource(id: "tasks", title: "Tasks")] : [],

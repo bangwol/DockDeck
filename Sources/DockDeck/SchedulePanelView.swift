@@ -103,6 +103,16 @@ struct SchedulePanelView: View {
                     .font(.system(size: 10, weight: .semibold, design: .rounded))
                     .foregroundStyle(baseColor)
                     .lineLimit(1)
+                if let joinURL = item.joinURL {
+                    Link(destination: joinURL) {
+                        Image(systemName: "video.fill")
+                            .font(.system(size: 8, weight: .semibold))
+                            .foregroundStyle(Color.accentColor)
+                    }
+                    .buttonStyle(.plain)
+                    .help("Join meeting on \(joinURL.host ?? "conference service")")
+                    .accessibilityLabel("Join \(item.title)")
+                }
                 Spacer(minLength: 2)
                 Text(relativeText(presentation, now: now))
                     .font(.system(size: 8, weight: .semibold, design: .monospaced))
@@ -135,7 +145,7 @@ struct SchedulePanelView: View {
         .padding(.horizontal, 9)
         .padding(.vertical, 6)
         .help(accessibilitySummary(presentation, now: now))
-        .accessibilityElement(children: .ignore)
+        .accessibilityElement(children: item.joinURL == nil ? .ignore : .contain)
         .accessibilityLabel(item.title)
         .accessibilityValue(accessibilitySummary(presentation, now: now))
     }

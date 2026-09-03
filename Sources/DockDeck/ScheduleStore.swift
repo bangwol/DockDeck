@@ -28,6 +28,64 @@ struct ScheduleEventItem: Identifiable, Equatable {
     let endDate: Date
     let isAllDay: Bool
     let calendarTitle: String
+    let joinURL: URL?
+
+    init(
+        id: String, title: String, startDate: Date, endDate: Date,
+        isAllDay: Bool, calendarTitle: String, joinURL: URL? = nil
+    ) {
+        self.id = id
+        self.title = title
+        self.startDate = startDate
+        self.endDate = endDate
+        self.isAllDay = isAllDay
+        self.calendarTitle = calendarTitle
+        self.joinURL = joinURL
+    }
+}
+
+enum ScheduleMeetingLinkResolver {
+    private static let supportedDomains = [
+        "around.co", "bluejeans.com", "chime.aws", "facetime.apple.com",
+        "meet.google.com", "meet.jit.si", "teams.live.com", "teams.microsoft.com",
+        "webex.com", "whereby.com", "zoom.us",
+    ]
+
+    static func resolve(
+        eventURL: URL?, location: String?, notes: String?
+    ) -> URL? {
+        if let eventURL, validated(eventURL) != nil { return eventURL }
+        for text in [location, notes].compactMap({ $0 }) {
+            let bounded = String(text.prefix(8_192))
+            guard let detector = try? NSDataDetector(
+                types: NSTextCheckingResult.CheckingType.link.rawValue)
+            else { continue }
+            let range = NSRange(bounded.startIndex..., in: bounded)
+            var match: URL?
+            detector.enumerateMatches(in: bounded, range: range) { result, _, stop in
+                guard let url = result?.url, validated(url) != nil else { return }
+                match = url
+                stop.pointee = true
+            }
+            if let match { return match }
+        }
+        return nil
+    }
+
+    private static func validated(_ url: URL) -> URL? {
+        guard url.absoluteString.count <= 2_048,
+            let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
+            components.scheme?.lowercased() == "https",
+            components.user == nil, components.password == nil,
+            let rawHost = components.host
+        else { return nil }
+        let host = rawHost.lowercased().trimmingCharacters(
+            in: CharacterSet(charactersIn: "."))
+        guard supportedDomains.contains(where: {
+            host == $0 || host.hasSuffix(".\($0)")
+        }) else { return nil }
+        return url
+    }
 }
 
 struct ScheduleReminderItem: Identifiable, Equatable {
@@ -276,7 +334,9 @@ final class EventKitScheduleProvider: ScheduleEventProviding {
             endDate: event.endDate ?? startDate,
             isAllDay: event.isAllDay,
             calendarTitle: bounded(
-                event.calendar?.title, maximumLength: 60, fallback: "Calendar"))
+                event.calendar?.title, maximumLength: 60, fallback: "Calendar"),
+            joinURL: ScheduleMeetingLinkResolver.resolve(
+                eventURL: event.url, location: event.location, notes: event.notes))
     }
 
     private static func item(_ reminder: EKReminder) -> ScheduleReminderItem? {
