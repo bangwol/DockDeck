@@ -107,6 +107,20 @@ final class PanelAppearanceTests: XCTestCase {
         XCTAssertTrue(allRight.enabledModules(on: .left).isEmpty)
     }
 
+    func testDeckAutoSlideSettingsNormalizeSelectionsAndInterval() throws {
+        let futureModule = PanelModuleID(rawValue: "future-module")
+        let settings = DeckAutoSlideSettings(
+            modules: [.terminal, .usage, .usage, futureModule], interval: 1)
+        let decoded = try JSONDecoder().decode(
+            DeckAutoSlideSettings.self,
+            from: Data(#"{"modules":["weather"]}"#.utf8))
+
+        XCTAssertEqual(settings.modules, [.usage, futureModule])
+        XCTAssertEqual(settings.interval, DeckAutoSlideSettings.minimumInterval)
+        XCTAssertEqual(decoded.modules, [.weather])
+        XCTAssertEqual(decoded.interval, DeckAutoSlideSettings.defaultInterval)
+    }
+
     func testSettingsModelSwapsCompleteDecksWithoutDroppingFutureModules() {
         let futureModule = PanelModuleID(rawValue: "future-clock")
         let model = makeSettingsModel(
@@ -190,6 +204,28 @@ final class PanelAppearanceTests: XCTestCase {
         model.moveModule(.usage, to: .right, before: .systemStats)
 
         XCTAssertEqual(callbackCount, 0)
+    }
+
+    func testSettingsModelUpdatesAutoSlideAndClearsHiddenModules() {
+        let model = makeSettingsModel(
+            configuration: PanelDeckConfiguration(
+                left: [.terminal], right: [.usage, .weather],
+                enabled: [.terminal, .usage, .weather]))
+        var emittedSettings: [DeckAutoSlideSettings] = []
+        model.onChange = {
+            if case .deckAutoSlide(let settings) = $0 { emittedSettings.append(settings) }
+        }
+
+        model.setAutoSlideEnabled(true, for: .terminal)
+        model.setAutoSlideEnabled(true, for: .usage)
+        model.setAutoSlideEnabled(true, for: .weather)
+        model.setAutoSlideInterval(7.4)
+        model.setEnabled(false, for: .weather)
+
+        XCTAssertEqual(model.values.deckAutoSlide.modules, [.usage])
+        XCTAssertEqual(model.values.deckAutoSlide.interval, 7)
+        XCTAssertEqual(emittedSettings.count, 4)
+        XCTAssertEqual(emittedSettings.last?.modules, [.usage])
     }
 
     func testSettingsModelCanEmptyADeck() {
@@ -543,6 +579,53 @@ final class PanelAppearanceTests: XCTestCase {
         XCTAssertEqual(
             ReadOnlyDeckSelection.previous(before: .systemStats, enabledModules: modules),
             .usage)
+    }
+
+    func testAutoSlideCyclesSelectedModulesAndPausesOnManualSelection() {
+        let previousConfiguration = PanelSettings.deckConfiguration
+        let previousAutoSlide = PanelSettings.deckAutoSlideSettings
+        let previousRight = PanelSettings.activeModule(on: .right)
+        defer {
+            PanelSettings.deckConfiguration = previousConfiguration
+            PanelSettings.deckAutoSlideSettings = previousAutoSlide
+            PanelSettings.setActiveModule(previousRight, on: .right)
+        }
+        PanelSettings.deckConfiguration = PanelDeckConfiguration(
+            left: [.terminal], right: [.usage, .weather, .systemStats],
+            enabled: [.terminal, .usage, .weather, .systemStats])
+        PanelSettings.deckAutoSlideSettings = DeckAutoSlideSettings(
+            modules: [.usage, .systemStats], interval: 10)
+        PanelSettings.setActiveModule(.usage, on: .right)
+        var isEligible = true
+        let controller = ReadOnlyDeckPanelController(
+            initialFrame: NSRect(x: 0, y: 0, width: 214, height: 59),
+            theme: Theme.theme(id: ""), services: PanelModuleServices(),
+            menuTarget: NSObject(), side: .right,
+            canAutoSlide: { _ in isEligible })
+        defer { controller.stopAutoSlide() }
+
+        XCTAssertTrue(controller.advanceAutoSlideIfPossible())
+        XCTAssertEqual(controller.activeModule, .systemStats)
+
+        controller.select(.weather)
+        XCTAssertFalse(controller.advanceAutoSlideIfPossible())
+        XCTAssertEqual(controller.activeModule, .weather)
+
+        controller.select(.usage)
+        isEligible = false
+        XCTAssertFalse(controller.advanceAutoSlideIfPossible())
+        XCTAssertEqual(controller.activeModule, .usage)
+
+        isEligible = true
+        PanelSettings.deckAutoSlideSettings = DeckAutoSlideSettings(modules: [.usage])
+        controller.applySettings()
+        XCTAssertFalse(controller.advanceAutoSlideIfPossible())
+
+        PanelSettings.deckAutoSlideSettings = DeckAutoSlideSettings(
+            modules: [.usage, .systemStats])
+        controller.applySettings()
+        controller.setAutoSlideSystemActive(false)
+        XCTAssertFalse(controller.advanceAutoSlideIfPossible())
     }
 
     func testDeckScrollDirectionUsesVerticalAxis() {
@@ -956,6 +1039,7 @@ final class PanelAppearanceTests: XCTestCase {
     ) -> SettingsPanelValues {
         SettingsPanelValues(
             deckConfiguration: configuration,
+            deckAutoSlide: DeckAutoSlideSettings(),
             notifications: DockNotificationSettings(),
             terminal: TerminalSettingsState(
                 focusWidthMultiplier: 2, focusHeightMultiplier: 4,

@@ -203,7 +203,9 @@ struct DecksSettingsView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
+            VStack(alignment: .leading, spacing: 16) {
+                DeckAutoSlideControls(model: model)
+
                 HStack(alignment: .top, spacing: 14) {
                     DeckPreviewCard(side: .left, model: model)
                     DeckPreviewCard(side: .right, model: model)
@@ -222,6 +224,55 @@ struct DecksSettingsView: View {
             }
             .padding(24)
         }
+    }
+}
+
+private struct DeckAutoSlideControls: View {
+    @ObservedObject var model: SettingsPanelModel
+
+    var body: some View {
+        GroupBox {
+            VStack(alignment: .leading, spacing: 10) {
+                Text("Check Auto on at least two enabled cards in the same Deck.")
+                Text(
+                    "The wheel still visits every enabled card. Selecting a manual-only "
+                        + "card pauses that Deck until an Auto card is selected.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Divider()
+                HStack(spacing: 8) {
+                    Text("Interval")
+                    Spacer()
+                    Button("5s") { model.setAutoSlideInterval(5) }
+                        .buttonStyle(.bordered)
+                    Button("10s") { model.setAutoSlideInterval(10) }
+                        .buttonStyle(.bordered)
+                    HStack(spacing: 4) {
+                        TextField("Seconds", value: interval, format: .number)
+                            .multilineTextAlignment(.trailing)
+                            .frame(width: 42)
+                        Text("sec")
+                            .foregroundStyle(.secondary)
+                        Stepper("Auto-slide interval", value: interval, in: intervalRange)
+                            .labelsHidden()
+                    }
+                }
+            }
+            .padding(.vertical, 4)
+        } label: {
+            Label("Automatic Slide", systemImage: "play.square.stack")
+                .font(.headline)
+        }
+    }
+
+    private var intervalRange: ClosedRange<Int> {
+        Int(DeckAutoSlideSettings.minimumInterval)...Int(DeckAutoSlideSettings.maximumInterval)
+    }
+
+    private var interval: Binding<Int> {
+        Binding(
+            get: { Int(model.values.deckAutoSlide.interval) },
+            set: { model.setAutoSlideInterval(TimeInterval($0)) })
     }
 }
 
@@ -863,12 +914,22 @@ private struct DeckPreviewCard: View {
 
     var body: some View {
         GroupBox {
-            VStack(spacing: 8) {
+            VStack(spacing: 6) {
                 if definitions.isEmpty {
                     EmptyDeckDropZone(
                         isTargeted: isDropTarget,
                         targetAnimation: targetAnimation)
                 } else {
+                    HStack(spacing: 8) {
+                        Text("MODULE")
+                        Spacer()
+                        Text("AUTO").frame(width: 36)
+                        Text("SHOW").frame(width: 36)
+                    }
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 10)
+
                     ForEach(definitions) { definition in
                         DeckModuleCard(
                             definition: definition,
@@ -945,7 +1006,7 @@ private struct DeckModuleCard: View {
     @State private var isDropTarget = false
 
     var body: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: 8) {
             Image(systemName: "line.3.horizontal")
                 .font(.caption)
                 .foregroundStyle(.tertiary)
@@ -963,12 +1024,32 @@ private struct DeckModuleCard: View {
                 Text(definition.title)
                     .fontWeight(.medium)
                     .lineLimit(1)
-                    .minimumScaleFactor(0.85)
+                    .minimumScaleFactor(0.8)
+                    .allowsTightening(true)
                 Text(definition.subtitle)
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                    .lineLimit(2)
             }
             Spacer()
+            if isAutoSlideEligible {
+                Toggle(
+                    "Automatically slide \(definition.title)",
+                    isOn: Binding(
+                        get: { model.isAutoSliding(definition.id) },
+                        set: { model.setAutoSlideEnabled($0, for: definition.id) }))
+                    .labelsHidden()
+                    .toggleStyle(.checkbox)
+                    .frame(width: 36)
+                    .disabled(!isEnabled)
+                    .help("Include \(definition.title) in automatic slides")
+            } else {
+                Text("—")
+                    .foregroundStyle(.tertiary)
+                    .frame(width: 36)
+                    .accessibilityLabel("Automatic Slide unavailable for Terminal")
+                    .help("The interactive terminal stays manual")
+            }
             Toggle(
                 "Show \(definition.title)",
                 isOn: Binding(
@@ -976,13 +1057,15 @@ private struct DeckModuleCard: View {
                     set: { model.setEnabled($0, for: definition.id) }))
                 .labelsHidden()
                 .toggleStyle(.checkbox)
+                .frame(width: 36)
                 .disabled(!model.canDisable(definition.id))
                 .help(
                     model.canDisable(definition.id)
                         ? "Run and show \(definition.title)"
                         : "DockDeck keeps one module enabled so Settings remains accessible")
         }
-        .padding(10)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 7)
         .background(
             RoundedRectangle(cornerRadius: 8)
                 .fill(
@@ -1035,6 +1118,7 @@ private struct DeckModuleCard: View {
     }
 
     private var isEnabled: Bool { model.isEnabled(definition.id) }
+    private var isAutoSlideEligible: Bool { definition.id != .terminal }
 
     private var relocationAnimation: Animation? {
         reduceMotion ? nil : .easeInOut(duration: 0.22)

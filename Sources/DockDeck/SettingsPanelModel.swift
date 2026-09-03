@@ -230,6 +230,7 @@ struct AppearanceSettingsState: Equatable {
 
 struct SettingsPanelValues: Equatable {
     var deckConfiguration: PanelDeckConfiguration
+    var deckAutoSlide: DeckAutoSlideSettings
     var notifications: DockNotificationSettings
     var terminal: TerminalSettingsState
     var usage: UsageSettingsState
@@ -250,6 +251,7 @@ struct SettingsPanelValues: Equatable {
     func normalized() -> Self {
         var values = self
         values.deckConfiguration = deckConfiguration.normalized()
+        values.deckAutoSlide = deckAutoSlide.normalized()
         values.systemStats.metrics = SystemStatsMetric.normalized(systemStats.metrics)
         values.projectPulse = projectPulse.normalized()
         values.githubInbox = githubInbox.normalized()
@@ -335,6 +337,7 @@ enum AppearanceSettingsChange {
 
 enum SettingsPanelChange {
     case deck(PanelDeckConfiguration)
+    case deckAutoSlide(DeckAutoSlideSettings)
     case notifications(DockNotificationSettings)
     case terminal(TerminalSettingsChange)
     case usage(UsageSettingsChange)
@@ -425,6 +428,14 @@ final class SettingsPanelModel: ObservableObject {
         values.deckConfiguration.contains(module)
     }
 
+    func isAutoSliding(_ module: PanelModuleID) -> Bool {
+        values.deckAutoSlide.contains(module)
+    }
+
+    func autoSlideModules(on side: PanelSide) -> [PanelModuleID] {
+        values.deckAutoSlide.modules(on: side, configuration: values.deckConfiguration)
+    }
+
     func moduleDefinition(for pane: SettingsPaneID) -> PanelModuleDefinition? {
         PanelModuleRegistry.definition(for: pane)
     }
@@ -441,9 +452,27 @@ final class SettingsPanelModel: ObservableObject {
 
     func setEnabled(_ enabled: Bool, for module: PanelModuleID) {
         guard enabled || canDisable(module) else { return }
+        if !enabled, isAutoSliding(module) {
+            var settings = values.deckAutoSlide
+            settings.setEnabled(false, for: module)
+            publishDeckAutoSlide(settings)
+        }
         var configuration = values.deckConfiguration
         configuration.setEnabled(enabled, for: module)
         publishDeck(configuration)
+    }
+
+    func setAutoSlideEnabled(_ enabled: Bool, for module: PanelModuleID) {
+        guard module != .terminal, isEnabled(module) else { return }
+        var settings = values.deckAutoSlide
+        settings.setEnabled(enabled, for: module)
+        publishDeckAutoSlide(settings)
+    }
+
+    func setAutoSlideInterval(_ interval: TimeInterval) {
+        var settings = values.deckAutoSlide
+        settings.interval = interval
+        publishDeckAutoSlide(settings)
     }
 
     func moveModule(
@@ -885,6 +914,13 @@ final class SettingsPanelModel: ObservableObject {
         guard configuration != values.deckConfiguration else { return }
         updateValues { $0.deckConfiguration = configuration }
         onChange?(.deck(configuration))
+    }
+
+    private func publishDeckAutoSlide(_ settings: DeckAutoSlideSettings) {
+        let settings = settings.normalized()
+        guard settings != values.deckAutoSlide else { return }
+        updateValues { $0.deckAutoSlide = settings }
+        onChange?(.deckAutoSlide(settings))
     }
 
     private func updateNotifications(

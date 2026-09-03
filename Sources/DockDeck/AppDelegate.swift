@@ -178,6 +178,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             side: .left,
             onSelectionChange: { [weak self] side in
                 self?.deckSelectionDidChange(on: side)
+            },
+            canAutoSlide: { [weak self] side in
+                self?.canAutoSlideDeck(on: side) == true
             })
         rightReadOnlyDeckPanelController = ReadOnlyDeckPanelController(
             initialFrame: initialRightFrame,
@@ -187,6 +190,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             side: .right,
             onSelectionChange: { [weak self] side in
                 self?.deckSelectionDidChange(on: side)
+            },
+            canAutoSlide: { [weak self] side in
+                self?.canAutoSlideDeck(on: side) == true
             })
         panel.delegate = self
         configureNotifications()
@@ -294,6 +300,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if let terminalGlobalMouseMonitor { NSEvent.removeMonitor(terminalGlobalMouseMonitor) }
         if let terminalScrollMonitor { NSEvent.removeMonitor(terminalScrollMonitor) }
         trackingTimer?.invalidate()
+        for controller in readOnlyDeckPanelControllers { controller.stopAutoSlide() }
         moduleRuntimeCoordinator.stopAll()
         notificationCancellables.removeAll()
     }
@@ -343,13 +350,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             PanelSettings.activeModule(on: $0)
         }
         let processInfo = ProcessInfo.processInfo
+        let systemActive = usageDisplayAwake && usageSessionActive
         moduleRuntimeCoordinator.synchronize(
             enabledModules: PanelSettings.deckConfiguration.enabled,
             visibleModules: visibleModules,
             lowPowerMode: ModuleRuntimePolicy.isConstrained(
                 lowPowerMode: processInfo.isLowPowerModeEnabled,
                 thermalState: processInfo.thermalState),
-            systemActive: usageDisplayAwake && usageSessionActive)
+            systemActive: systemActive)
+        let autoSlideActive = systemActive && settingsPanel?.isVisible != true
+        for controller in readOnlyDeckPanelControllers {
+            controller.setAutoSlideSystemActive(autoSlideActive)
+        }
     }
 
     @objc private func powerStateDidChange(_ notification: Notification) {

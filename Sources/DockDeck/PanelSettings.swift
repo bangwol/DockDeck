@@ -310,6 +310,68 @@ struct PanelDeckConfiguration: Codable, Equatable {
     }
 }
 
+struct DeckAutoSlideSettings: Codable, Equatable {
+    static let minimumInterval: TimeInterval = 5
+    static let maximumInterval: TimeInterval = 300
+    static let defaultInterval: TimeInterval = 10
+
+    var modules: [PanelModuleID]
+    var interval: TimeInterval
+
+    init(modules: [PanelModuleID] = [], interval: TimeInterval = defaultInterval) {
+        self.modules = modules
+        self.interval = interval
+        self = normalized()
+    }
+
+    func contains(_ module: PanelModuleID) -> Bool {
+        modules.contains(module)
+    }
+
+    func modules(
+        on side: PanelSide, configuration: PanelDeckConfiguration
+    ) -> [PanelModuleID] {
+        let selected = Set(modules)
+        return configuration.enabledModules(on: side).filter(selected.contains)
+    }
+
+    mutating func setEnabled(_ enabled: Bool, for module: PanelModuleID) {
+        guard module != .terminal else { return }
+        modules.removeAll { $0 == module }
+        if enabled { modules.append(module) }
+        self = normalized()
+    }
+
+    func normalized() -> Self {
+        var seen: Set<PanelModuleID> = []
+        let modules = modules.filter {
+            $0 != .terminal && !$0.rawValue.isEmpty && seen.insert($0).inserted
+        }.prefix(100)
+        let interval = interval.isFinite ? interval.rounded() : Self.defaultInterval
+        return Self(
+            normalizedModules: Array(modules),
+            interval: min(max(interval, Self.minimumInterval), Self.maximumInterval))
+    }
+
+    private init(normalizedModules: [PanelModuleID], interval: TimeInterval) {
+        modules = normalizedModules
+        self.interval = interval
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case modules
+        case interval
+    }
+
+    init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(
+            modules: try values.decodeIfPresent([PanelModuleID].self, forKey: .modules) ?? [],
+            interval: try values.decodeIfPresent(TimeInterval.self, forKey: .interval)
+                ?? Self.defaultInterval)
+    }
+}
+
 enum PanelSettings {
     static let minimumUsageFontSize: CGFloat = 8
     static let maximumUsageFontSize: CGFloat = 14
@@ -378,6 +440,8 @@ enum PanelSettings {
     private static let enabledPanelsKey = "DockDeck.settings.enabledPanels"
     private static let panelDeckConfigurationKey =
         "DockDeck.settings.panelDeckConfiguration.v1"
+    private static let deckAutoSlideSettingsKey =
+        "DockDeck.settings.deckAutoSlide.v1"
 
     static var cornerRadius: CGFloat {
         get {
@@ -897,6 +961,19 @@ enum PanelSettings {
         set { persistDeckConfiguration(newValue.normalized(), defaults: .standard) }
     }
 
+    static var deckAutoSlideSettings: DeckAutoSlideSettings {
+        get {
+            guard let data = UserDefaults.standard.data(forKey: deckAutoSlideSettingsKey),
+                let settings = try? JSONDecoder().decode(DeckAutoSlideSettings.self, from: data)
+            else { return DeckAutoSlideSettings() }
+            return settings.normalized()
+        }
+        set {
+            guard let data = try? JSONEncoder().encode(newValue.normalized()) else { return }
+            UserDefaults.standard.set(data, forKey: deckAutoSlideSettingsKey)
+        }
+    }
+
     static func migratePanelDeckIfNeeded() {
         let defaults = UserDefaults.standard
         guard
@@ -986,6 +1063,7 @@ enum PanelSettings {
         defaults.removeObject(forKey: panelOrderKey)
         defaults.removeObject(forKey: enabledPanelsKey)
         defaults.removeObject(forKey: panelDeckConfigurationKey)
+        defaults.removeObject(forKey: deckAutoSlideSettingsKey)
     }
 
     private static func legacyDeckConfiguration(

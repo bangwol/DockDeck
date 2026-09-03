@@ -310,6 +310,7 @@ final class ScheduleTests: XCTestCase {
     private func makeSettingsValues() -> SettingsPanelValues {
         SettingsPanelValues(
             deckConfiguration: .legacy(order: .terminalLeft, enabledPanels: .all),
+            deckAutoSlide: DeckAutoSlideSettings(),
             notifications: DockNotificationSettings(),
             terminal: TerminalSettingsState(
                 focusWidthMultiplier: 2, focusHeightMultiplier: 4, fontName: "Menlo"),

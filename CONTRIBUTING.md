@@ -83,11 +83,12 @@ swift test
   addresses, or destinations. Use Network framework only for local route
   properties, and clear the previous sample when disabled.
 - Read-only modules can be assigned to either Deck and must render correctly at
-  the compact panel size before they are registered. Keep module switching
-  manual and predictable, preserve enabled-first ordering and independent Deck
-  selections, and test settings changes against the runtime. Do not add
-  automatic rotation or module installation without implementing and testing
-  those runtime behaviors.
+  the compact panel size before they are registered. Preserve enabled-first
+  ordering and independent Deck selections, and test settings changes against
+  the runtime. Automatic rotation must be opt-in, skip Terminal and unchecked
+  modules, pause on an unchecked selection or interaction, and suspend with an
+  inactive display or login session. Manual scrolling must continue to include
+  every enabled module.
 
 ## PR guidelines
 

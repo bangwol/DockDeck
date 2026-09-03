@@ -109,6 +109,16 @@ extension AppDelegate {
         runEvaluation()
     }
 
+    func canAutoSlideDeck(on side: PanelSide) -> Bool {
+        guard usageDisplayAwake, usageSessionActive,
+            settingsPanel?.isVisible != true,
+            let activeModule = PanelSettings.activeModule(on: side),
+            activeModule != .terminal
+        else { return false }
+        let deckPanel = readOnlyDeckPanelController(on: side).panel
+        return deckPanel.isVisible && !deckPanel.frame.contains(NSEvent.mouseLocation)
+    }
+
     /// The accessory app may be inactive while its floating panel stays visible, in which
     /// case ordering front alone leaves keyboard focus in the previous application.
     private func focusSettingsPanel(_ settingsPanel: NSWindow) {
@@ -215,11 +225,13 @@ extension AppDelegate {
         settingsPanel = settingsPanelWindow
         NSApp.activate(ignoringOtherApps: true)
         settingsPanelWindow.makeKeyAndOrderFront(nil)
+        synchronizeModuleRuntimes()
     }
 
     private var currentSettingsValues: SettingsPanelValues {
         SettingsPanelValues(
             deckConfiguration: PanelSettings.deckConfiguration,
+            deckAutoSlide: PanelSettings.deckAutoSlideSettings,
             notifications: PanelSettings.notifications,
             terminal: TerminalSettingsState(
                 focusWidthMultiplier: PanelSettings.focusWidthMultiplier,
@@ -280,6 +292,9 @@ extension AppDelegate {
             }
             for controller in readOnlyDeckPanelControllers { controller.applySettings() }
             applyPanelVisibility()
+        case .deckAutoSlide(let settings):
+            PanelSettings.deckAutoSlideSettings = settings
+            for controller in readOnlyDeckPanelControllers { controller.applySettings() }
         case .notifications(let settings):
             let wasEnabled = PanelSettings.notifications.enabled
             PanelSettings.notifications = settings
@@ -421,6 +436,7 @@ extension AppDelegate {
         let restoreTerminalFocus = settingsPanelRestoresTerminalFocus
         settingsPanel = nil
         settingsPanelRestoresTerminalFocus = false
+        synchronizeModuleRuntimes()
 
         guard restoreTerminalFocus, panel.isVisible else { return }
         DispatchQueue.main.async { [weak self] in

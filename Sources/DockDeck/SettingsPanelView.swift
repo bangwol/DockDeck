@@ -2,7 +2,7 @@ import Cocoa
 import SwiftUI
 
 final class SettingsPanelView: NSView {
-    static let preferredSize = NSSize(width: 740, height: 540)
+    static let preferredSize = NSSize(width: 900, height: 540)
     static let sidebarWidth: CGFloat = 200
 
     private let model: SettingsPanelModel
