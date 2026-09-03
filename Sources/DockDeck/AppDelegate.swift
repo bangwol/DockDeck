@@ -41,6 +41,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     lazy var projectPulseStore = ProjectPulseStore()
     lazy var githubInboxStore = GitHubInboxStore()
     lazy var dockerStore = DockerStore()
+    lazy var customTileStore = CustomTileStore()
     lazy var diagnosticsStore = DiagnosticsStore()
     lazy var focusTimerStore = FocusTimerStore(
         settings: PanelSettings.focusTimerSettings,
@@ -61,6 +62,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         projectPulse: projectPulseStore,
         githubInbox: githubInboxStore,
         docker: dockerStore,
+        customTile: customTileStore,
         focusTimer: focusTimerStore)
     let notificationCoordinator = DockNotificationCoordinator(
         settings: PanelSettings.notifications)

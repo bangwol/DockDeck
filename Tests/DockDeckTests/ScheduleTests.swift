@@ -306,6 +306,7 @@ final class ScheduleTests: XCTestCase {
             projectPulse: ProjectPulseConfiguration(),
             githubInbox: GitHubInboxConfiguration(),
             docker: DockerConfiguration(),
+            customTile: CustomTileConfiguration(),
             focusTimer: FocusTimerSettings(),
             appearance: AppearanceSettingsState(cornerRadius: 10, tintOpacity: 0.6))
     }

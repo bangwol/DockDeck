@@ -17,6 +17,7 @@ enum SettingsPaneID: String, CaseIterable, Identifiable {
     case projectPulse
     case githubInbox
     case docker
+    case customTile
     case focusTimer
     case appearance
 
@@ -39,6 +40,7 @@ enum SettingsPaneID: String, CaseIterable, Identifiable {
         case .projectPulse: "Project Pulse"
         case .githubInbox: "GitHub Inbox"
         case .docker: "Docker"
+        case .customTile: "Custom Tile"
         case .focusTimer: "Focus Timer"
         case .appearance: "Appearance"
         }
@@ -61,6 +63,7 @@ enum SettingsPaneID: String, CaseIterable, Identifiable {
         case .projectPulse: "Show local Git or remote GitHub repository activity."
         case .githubInbox: "Summarize account notifications, reviews, and Actions failures."
         case .docker: "Show local container health and resource use."
+        case .customTile: "Show bounded output from a trusted executable or Shortcut."
         case .focusTimer: "Run persistent focus and break countdowns."
         case .appearance: "Adjust the shared panel surface."
         }
@@ -83,6 +86,7 @@ enum SettingsPaneID: String, CaseIterable, Identifiable {
         case .projectPulse: "point.3.connected.trianglepath.dotted"
         case .githubInbox: "bell.badge"
         case .docker: "shippingbox"
+        case .customTile: "command"
         case .focusTimer: "timer"
         case .appearance: "paintbrush"
         }
@@ -149,6 +153,9 @@ enum PanelModuleRegistry {
         PanelModuleDefinition(
             id: .docker, title: "Docker", subtitle: "Containers and resources",
             symbolName: "shippingbox", settingsPane: .docker),
+        PanelModuleDefinition(
+            id: .customTile, title: "Custom Tile", subtitle: "Command or Shortcut output",
+            symbolName: "command", settingsPane: .customTile),
         PanelModuleDefinition(
             id: .focusTimer, title: "Focus Timer", subtitle: "Focus and break countdowns",
             symbolName: "timer", settingsPane: .focusTimer),
@@ -236,6 +243,7 @@ struct SettingsPanelValues: Equatable {
     var projectPulse: ProjectPulseConfiguration
     var githubInbox: GitHubInboxConfiguration
     var docker: DockerConfiguration
+    var customTile: CustomTileConfiguration
     var focusTimer: FocusTimerSettings
     var appearance: AppearanceSettingsState
 
@@ -246,6 +254,7 @@ struct SettingsPanelValues: Equatable {
         values.projectPulse = projectPulse.normalized()
         values.githubInbox = githubInbox.normalized()
         values.docker = docker.normalized()
+        values.customTile = customTile.normalized()
         values.focusTimer = focusTimer.normalized()
         return values
     }
@@ -339,6 +348,7 @@ enum SettingsPanelChange {
     case projectPulse(ProjectPulseSettingsChange)
     case githubInbox(GitHubInboxSettingsChange)
     case docker(DockerSettingsChange)
+    case customTile(CustomTileConfiguration)
     case focusTimer(FocusTimerSettingsChange)
     case appearance(AppearanceSettingsChange)
 }
@@ -807,6 +817,31 @@ final class SettingsPanelModel: ObservableObject {
         onChange?(.docker(.configuration(configuration)))
     }
 
+    func setCustomTileTitle(_ value: String) {
+        updateCustomTileConfiguration { $0.title = value }
+    }
+
+    func setCustomTileSource(_ value: CustomTileSource) {
+        updateCustomTileConfiguration { $0.source = value }
+    }
+
+    func setCustomTileExecutablePath(_ value: String) {
+        updateCustomTileConfiguration { $0.executablePath = value }
+    }
+
+    func setCustomTileArguments(_ value: String) {
+        let arguments = value.split(whereSeparator: { $0.isNewline }).map(String.init)
+        updateCustomTileConfiguration { $0.arguments = arguments }
+    }
+
+    func setCustomTileShortcutName(_ value: String) {
+        updateCustomTileConfiguration { $0.shortcutName = value }
+    }
+
+    func setCustomTileRefreshInterval(_ value: TimeInterval) {
+        updateCustomTileConfiguration { $0.refreshInterval = value }
+    }
+
     func setFocusTimerFocusMinutes(_ value: Int) {
         updateFocusTimerSettings { $0.focusMinutes = value }
     }
@@ -895,6 +930,16 @@ final class SettingsPanelModel: ObservableObject {
         configuration = configuration.normalized()
         updateValues { $0.githubInbox = configuration }
         onChange?(.githubInbox(.configuration(configuration)))
+    }
+
+    private func updateCustomTileConfiguration(
+        _ update: (inout CustomTileConfiguration) -> Void
+    ) {
+        var configuration = values.customTile
+        update(&configuration)
+        configuration = configuration.normalized()
+        updateValues { $0.customTile = configuration }
+        onChange?(.customTile(configuration))
     }
 
     private func updateFocusTimerSettings(

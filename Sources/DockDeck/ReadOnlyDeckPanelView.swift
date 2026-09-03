@@ -70,6 +70,7 @@ final class PanelModuleServices {
     let projectPulse: ProjectPulseStore
     let githubInbox: GitHubInboxStore
     let docker: DockerStore
+    let customTile: CustomTileStore
     let focusTimer: FocusTimerStore
 
     private let runtimes: [PanelModuleID: any PanelModuleRuntime]
@@ -86,6 +87,7 @@ final class PanelModuleServices {
         projectPulse: ProjectPulseStore = ProjectPulseStore(),
         githubInbox: GitHubInboxStore = GitHubInboxStore(),
         docker: DockerStore = DockerStore(),
+        customTile: CustomTileStore = CustomTileStore(),
         focusTimer: FocusTimerStore = FocusTimerStore()
     ) {
         self.usage = usage
@@ -99,6 +101,7 @@ final class PanelModuleServices {
         self.projectPulse = projectPulse
         self.githubInbox = githubInbox
         self.docker = docker
+        self.customTile = customTile
         self.focusTimer = focusTimer
         runtimes = [
             .usage: usage,
@@ -112,6 +115,7 @@ final class PanelModuleServices {
             .projectPulse: projectPulse,
             .githubInbox: githubInbox,
             .docker: docker,
+            .customTile: customTile,
             .focusTimer: focusTimer,
         ]
     }
@@ -215,6 +219,8 @@ struct ReadOnlyDeckPanelView: View {
             GitHubInboxPanelView(store: services.githubInbox, theme: presentation.theme)
         case .docker:
             DockerPanelView(store: services.docker, theme: presentation.theme)
+        case .customTile:
+            CustomTilePanelView(store: services.customTile, theme: presentation.theme)
         case .focusTimer:
             FocusTimerPanelView(store: services.focusTimer, theme: presentation.theme)
         default:

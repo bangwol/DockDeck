@@ -75,6 +75,7 @@ extension NetworkStore: PanelModuleRuntime {}
 extension ProjectPulseStore: PanelModuleRuntime {}
 extension GitHubInboxStore: PanelModuleRuntime {}
 extension DockerStore: PanelModuleRuntime {}
+extension CustomTileStore: PanelModuleRuntime {}
 extension FocusTimerStore: PanelModuleRuntime {}
 
 final class ModuleRuntimeCoordinator {

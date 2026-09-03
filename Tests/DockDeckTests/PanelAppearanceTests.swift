@@ -23,6 +23,7 @@ final class PanelAppearanceTests: XCTestCase {
                 .projectPulse,
                 .githubInbox,
                 .docker,
+                .customTile,
                 .focusTimer,
             ])
         XCTAssertEqual(configuration.right, [.terminal])
@@ -49,6 +50,7 @@ final class PanelAppearanceTests: XCTestCase {
                 .projectPulse,
                 .githubInbox,
                 .docker,
+                .customTile,
                 .focusTimer,
             ])
         XCTAssertEqual(decoded.enabled, [futureModule])
@@ -69,6 +71,7 @@ final class PanelAppearanceTests: XCTestCase {
                 .projectPulse,
                 .githubInbox,
                 .docker,
+                .customTile,
                 .focusTimer,
             ])
     }
@@ -127,6 +130,7 @@ final class PanelAppearanceTests: XCTestCase {
                 .projectPulse,
                 .githubInbox,
                 .docker,
+                .customTile,
                 .focusTimer,
             ])
         XCTAssertEqual(model.values.deckConfiguration.right, [.terminal, futureModule])
@@ -221,7 +225,7 @@ final class PanelAppearanceTests: XCTestCase {
             [
                 .decks, .notifications, .diagnostics, .terminal, .usage, .systemStats,
                 .serviceMonitor, .weather, .schedule, .clock, .battery, .network,
-                .projectPulse, .githubInbox, .docker, .focusTimer, .appearance,
+                .projectPulse, .githubInbox, .docker, .customTile, .focusTimer, .appearance,
             ])
         XCTAssertEqual(model.moduleDefinition(for: .usage)?.id, .usage)
         XCTAssertEqual(model.moduleDefinition(for: .systemStats)?.id, .systemStats)
@@ -234,6 +238,7 @@ final class PanelAppearanceTests: XCTestCase {
         XCTAssertEqual(model.moduleDefinition(for: .projectPulse)?.id, .projectPulse)
         XCTAssertEqual(model.moduleDefinition(for: .githubInbox)?.id, .githubInbox)
         XCTAssertEqual(model.moduleDefinition(for: .docker)?.id, .docker)
+        XCTAssertEqual(model.moduleDefinition(for: .customTile)?.id, .customTile)
         XCTAssertEqual(model.moduleDefinition(for: .focusTimer)?.id, .focusTimer)
         XCTAssertEqual(model.sidebarSections.map(\.id), [.general, .modules, .interface])
         XCTAssertEqual(model.sidebarSections[0].panes, [.decks, .notifications, .diagnostics])
@@ -885,6 +890,7 @@ final class PanelAppearanceTests: XCTestCase {
             projectPulse: ProjectPulseConfiguration(),
             githubInbox: GitHubInboxConfiguration(),
             docker: DockerConfiguration(),
+            customTile: CustomTileConfiguration(),
             focusTimer: FocusTimerSettings(),
             appearance: AppearanceSettingsState(
                 cornerRadius: 10, tintOpacity: 0.6))

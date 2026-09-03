@@ -156,6 +156,8 @@ private struct SettingsRootView: View {
             GitHubInboxSettingsView(model: model)
         case .docker:
             DockerSettingsView(model: model)
+        case .customTile:
+            CustomTileSettingsView(model: model)
         case .focusTimer:
             FocusTimerSettingsView(model: model)
         case .appearance:
