@@ -724,7 +724,12 @@ final class UsageProviderTests: XCTestCase {
             side: .right)
 
         uptime += 61
-        XCTAssertTrue(controller.refreshUsageIfActive())
+        XCTAssertTrue(controller.refreshUsageIfActive(at: 100))
+        queue.sync {}
+        XCTAssertEqual(command.readCount, 2)
+
+        XCTAssertFalse(controller.refreshUsageIfActive(at: 100.5))
+        XCTAssertTrue(controller.refreshUsageIfActive(at: 100.75))
         queue.sync {}
         XCTAssertEqual(command.readCount, 2)
     }
@@ -776,8 +781,12 @@ final class UsageProviderTests: XCTestCase {
         }
 
         store.start()
+        store.refresh()
+        store.refresh()
+        store.refresh()
         wait(for: [timedOut], timeout: 2)
 
+        XCTAssertEqual(command.readCount, 1)
         XCTAssertGreaterThanOrEqual(command.cancelCount, 1)
     }
 
@@ -911,11 +920,14 @@ private final class FakeClaudeUsageCommandProvider: ClaudeUsageCommandReading {
 private final class BlockingClaudeUsageCommandProvider: ClaudeUsageCommandReading {
     private let lock = NSLock()
     private let cancelled = DispatchSemaphore(value: 0)
+    private var storedReadCount = 0
     private var storedCancelCount = 0
 
+    var readCount: Int { lock.withLock { storedReadCount } }
     var cancelCount: Int { lock.withLock { storedCancelCount } }
 
     func read(now: Date) -> Result<UsageProviderSnapshot, UsageProviderError> {
+        lock.withLock { storedReadCount += 1 }
         _ = cancelled.wait(timeout: .now() + 5)
         return .failure(.transport("Cancelled by watchdog"))
     }

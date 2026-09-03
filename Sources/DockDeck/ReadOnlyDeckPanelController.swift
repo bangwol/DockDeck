@@ -22,6 +22,8 @@ enum DeckScrollDirection: Equatable {
 }
 
 final class ReadOnlyDeckPanelController: NSObject, NSMenuDelegate, NSGestureRecognizerDelegate {
+    private static let usageRefreshClickDebounce: TimeInterval = 0.75
+
     let panel: NSPanel
     let side: PanelSide
 
@@ -31,6 +33,7 @@ final class ReadOnlyDeckPanelController: NSObject, NSMenuDelegate, NSGestureReco
     private weak var menuTarget: AnyObject?
     private let onSelectionChange: (PanelSide) -> Void
     private var lastScrollSelectionTime: TimeInterval = 0
+    private var lastUsageRefreshClickTime: TimeInterval?
     private var appliedModule: PanelModuleID?
     private var detailPanel: NSPanel?
 
@@ -282,8 +285,17 @@ final class ReadOnlyDeckPanelController: NSObject, NSMenuDelegate, NSGestureReco
     }
 
     @discardableResult
-    func refreshUsageIfActive() -> Bool {
+    func refreshUsageIfActive(
+        at currentUptime: TimeInterval = ProcessInfo.processInfo.systemUptime
+    ) -> Bool {
         guard activeModule == .usage else { return false }
+        if let lastUsageRefreshClickTime,
+            currentUptime - lastUsageRefreshClickTime
+                < Self.usageRefreshClickDebounce
+        {
+            return false
+        }
+        lastUsageRefreshClickTime = currentUptime
         services.usage.refresh()
         return true
     }
