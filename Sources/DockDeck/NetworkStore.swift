@@ -118,6 +118,8 @@ enum NetworkCounterReader {
 
 final class NetworkStore: ObservableObject {
     @Published private(set) var snapshot: NetworkSnapshot?
+    private(set) var downloadHistory = MetricHistory()
+    private(set) var uploadHistory = MetricHistory()
 
     private var previous: (counters: NetworkCounters, date: Date)?
     private var timer: Timer?
@@ -185,6 +187,8 @@ final class NetworkStore: ObservableObject {
             rates = (nil, nil)
         }
         previous = (counters, now)
+        downloadHistory.append(rates.download, at: now)
+        uploadHistory.append(rates.upload, at: now)
         snapshot = NetworkSnapshot(
             interfaceName: counters.interfaceName,
             downloadBytesPerSecond: rates.download,

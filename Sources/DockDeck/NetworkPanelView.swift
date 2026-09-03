@@ -12,12 +12,14 @@ struct NetworkPanelView: View {
                         title: "DOWN",
                         symbol: "arrow.down",
                         value: snapshot.downloadBytesPerSecond,
+                        history: store.downloadHistory,
                         color: .cyan)
                     Divider().overlay(baseColor.opacity(0.15))
                     metric(
                         title: "UP",
                         symbol: "arrow.up",
                         value: snapshot.uploadBytesPerSecond,
+                        history: store.uploadHistory,
                         color: .mint)
                 }
                 .padding(.horizontal, 8)
@@ -40,7 +42,7 @@ struct NetworkPanelView: View {
     }
 
     private func metric(
-        title: String, symbol: String, value: Double?, color: Color
+        title: String, symbol: String, value: Double?, history: MetricHistory, color: Color
     ) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             Label(title, systemImage: symbol)
@@ -51,6 +53,10 @@ struct NetworkPanelView: View {
                 .foregroundStyle(baseColor)
                 .lineLimit(1)
                 .minimumScaleFactor(0.65)
+            if history.samples.count >= 2 {
+                MetricSparkline(samples: history.samples, color: color)
+                    .frame(height: 6)
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }

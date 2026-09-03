@@ -178,6 +178,7 @@ struct ServiceMonitorItem: Identifiable, Equatable {
 
 final class ServiceMonitorStore: ObservableObject {
     @Published private(set) var items: [ServiceMonitorItem]
+    private(set) var latencyHistories: [UUID: MetricHistory] = [:]
 
     private var endpoints: [ServiceMonitorEndpoint]
     private var refreshInterval: TimeInterval
@@ -241,6 +242,7 @@ final class ServiceMonitorStore: ObservableObject {
     ) {
         let endpoints = Self.limitedUniqueEndpoints(endpoints)
         let previousItems = Dictionary(uniqueKeysWithValues: items.map { ($0.id, $0) })
+        let previousHistories = latencyHistories
         self.endpoints = endpoints
         self.refreshInterval = Self.resolvedRefreshInterval(refreshInterval)
         items = endpoints.map {
@@ -249,6 +251,12 @@ final class ServiceMonitorStore: ObservableObject {
             return ServiceMonitorItem(
                 endpoint: $0, state: unchanged ? previous?.state ?? .idle : .idle)
         }
+        latencyHistories = Dictionary(uniqueKeysWithValues: endpoints.compactMap { endpoint in
+            guard previousItems[endpoint.id]?.endpoint.urlString == endpoint.urlString,
+                let history = previousHistories[endpoint.id]
+            else { return nil }
+            return (endpoint.id, history)
+        })
         guard isRunning else { return }
         generation += 1
         cancelTasks()
@@ -333,7 +341,16 @@ final class ServiceMonitorStore: ObservableObject {
 
     private func update(_ endpointID: UUID, state: ServiceMonitorState) {
         guard let index = items.firstIndex(where: { $0.id == endpointID }) else { return }
+        if case .up(_, let latencyMilliseconds) = state {
+            var history = latencyHistories[endpointID] ?? MetricHistory()
+            history.append(Double(latencyMilliseconds))
+            latencyHistories[endpointID] = history
+        }
         items[index].state = state
+    }
+
+    func latencyHistory(for endpointID: UUID) -> MetricHistory {
+        latencyHistories[endpointID] ?? MetricHistory()
     }
 
     private func scheduleTimer() {

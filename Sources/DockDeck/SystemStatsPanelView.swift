@@ -31,6 +31,7 @@ struct SystemStatsPanelView: View {
 
     private func percentMetric(_ metric: SystemStatsMetric, value: Double?) -> some View {
         let color = percentColor(value)
+        let history = store.history(for: metric)
         return VStack(spacing: 3) {
             metricHeader(metric)
             Text(value.map { "\(Int($0.rounded()))%" } ?? "--")
@@ -39,7 +40,12 @@ struct SystemStatsPanelView: View {
                 .monospacedDigit()
                 .lineLimit(1)
                 .minimumScaleFactor(0.75)
-            indicatorBar(value: (value ?? 0) / 100, color: color)
+            if history.samples.count >= 2 {
+                MetricSparkline(samples: history.samples, color: color)
+                    .frame(height: 5)
+            } else {
+                indicatorBar(value: (value ?? 0) / 100, color: color)
+            }
         }
         .frame(maxWidth: .infinity)
         .help(value.map { "\(metric.title) \(Int($0.rounded())) percent used" }
@@ -50,7 +56,8 @@ struct SystemStatsPanelView: View {
     }
 
     private var networkMetric: some View {
-        VStack(spacing: 2) {
+        let history = store.history(for: .network)
+        return VStack(spacing: 2) {
             metricHeader(.network)
             rateRow(
                 symbol: "arrow.down",
@@ -60,6 +67,10 @@ struct SystemStatsPanelView: View {
                 symbol: "arrow.up",
                 value: store.snapshot.uploadBytesPerSecond,
                 color: .mint)
+            if history.samples.count >= 2 {
+                MetricSparkline(samples: history.samples, color: .cyan)
+                    .frame(height: 4)
+            }
         }
         .frame(maxWidth: .infinity)
         .help(

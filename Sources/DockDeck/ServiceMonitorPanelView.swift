@@ -15,7 +15,10 @@ struct ServiceMonitorPanelView: View {
             GeometryReader { _ in
                 LazyVGrid(columns: columns, spacing: 4) {
                     ForEach(store.items) { item in
-                        ServiceMonitorCell(item: item, baseColor: baseColor)
+                        ServiceMonitorCell(
+                            item: item,
+                            history: store.latencyHistory(for: item.id),
+                            baseColor: baseColor)
                     }
                 }
                 .padding(.horizontal, 6)
@@ -37,6 +40,7 @@ struct ServiceMonitorPanelView: View {
 
 private struct ServiceMonitorCell: View {
     let item: ServiceMonitorItem
+    let history: MetricHistory
     let baseColor: Color
 
     var body: some View {
@@ -58,6 +62,14 @@ private struct ServiceMonitorCell: View {
         .padding(.horizontal, 6)
         .frame(maxWidth: .infinity, minHeight: 20, maxHeight: .infinity)
         .background(Capsule().fill(baseColor.opacity(0.09)))
+        .overlay(alignment: .bottom) {
+            if history.samples.count >= 2 {
+                MetricSparkline(samples: history.samples, color: statusColor)
+                    .frame(height: 3)
+                    .padding(.horizontal, 7)
+                    .padding(.bottom, 1)
+            }
+        }
         .help("\(item.endpoint.displayName): \(item.state.detail)")
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(item.endpoint.displayName)

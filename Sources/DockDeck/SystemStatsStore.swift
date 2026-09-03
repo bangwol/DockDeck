@@ -170,6 +170,7 @@ final class SystemStatsStore: ObservableObject {
 
     @Published private(set) var snapshot: SystemStatsSnapshot
     @Published private(set) var selectedMetrics: [SystemStatsMetric]
+    private(set) var histories: [SystemStatsMetric: MetricHistory] = [:]
 
     private var timer: Timer?
     private var previousCPU: CPUCounters?
@@ -228,6 +229,7 @@ final class SystemStatsStore: ObservableObject {
         guard selectedMetrics != metrics else { return }
         let hadTemperature = selectedMetrics.contains(.thermal)
         selectedMetrics = metrics
+        histories = histories.filter { metrics.contains($0.key) }
         if !metrics.contains(.cpu) { previousCPU = nil }
         if !metrics.contains(.network) { previousNetwork = nil }
         if !metrics.contains(.thermal) || !hadTemperature { resetTemperatureSampling() }
@@ -247,17 +249,40 @@ final class SystemStatsStore: ObservableObject {
             previous: previousNetwork, current: reading.network, now: now)
         previousNetwork = reading.network.map { (counters: $0, date: now) }
 
-        snapshot = SystemStatsSnapshot(
+        let memoryPercent = metrics.contains(.memory)
+            ? Self.percent(used: reading.memoryUsed, total: reading.memoryTotal) : nil
+        let nextSnapshot = SystemStatsSnapshot(
             cpuPercent: metrics.contains(.cpu) ? cpuPercent ?? snapshot.cpuPercent : nil,
-            memoryPercent: metrics.contains(.memory)
-                ? Self.percent(used: reading.memoryUsed, total: reading.memoryTotal) : nil,
+            memoryPercent: memoryPercent,
             diskPercent: metrics.contains(.disk)
                 ? Self.percent(used: reading.diskUsed, total: reading.diskTotal) : nil,
             downloadBytesPerSecond: metrics.contains(.network) ? networkRates.download : nil,
             uploadBytesPerSecond: metrics.contains(.network) ? networkRates.upload : nil,
             temperatureCelsius: metrics.contains(.thermal) ? cachedTemperatureCelsius : nil,
             thermalPressure: metrics.contains(.thermal) ? reading.thermalPressure : nil)
+        appendHistory(.cpu, value: cpuPercent, at: now)
+        appendHistory(.memory, value: memoryPercent, at: now)
+        let totalNetworkRate = [networkRates.download, networkRates.upload]
+            .compactMap { $0 }
+            .reduce(0, +)
+        appendHistory(
+            .network,
+            value: networkRates.download == nil && networkRates.upload == nil
+                ? nil : totalNetworkRate,
+            at: now)
+        snapshot = nextSnapshot
         if metrics.contains(.thermal) { refreshTemperatureIfNeeded(now: now) }
+    }
+
+    func history(for metric: SystemStatsMetric) -> MetricHistory {
+        histories[metric] ?? MetricHistory()
+    }
+
+    private func appendHistory(_ metric: SystemStatsMetric, value: Double?, at date: Date) {
+        guard selectedMetrics.contains(metric) else { return }
+        var history = histories[metric] ?? MetricHistory()
+        history.append(value, at: date)
+        histories[metric] = history
     }
 
     private func scheduleTimer() {

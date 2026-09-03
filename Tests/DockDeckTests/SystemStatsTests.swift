@@ -5,6 +5,32 @@ import XCTest
 @testable import DockDeck
 
 final class SystemStatsTests: XCTestCase {
+    func testMetricHistoryPrunesOldSamplesAndBoundsMemory() {
+        let now = Date(timeIntervalSinceReferenceDate: 10_000)
+        var history = MetricHistory()
+        history.append(1, at: now.addingTimeInterval(-901))
+        for offset in 0...MetricHistory.maximumSampleCount {
+            history.append(Double(offset), at: now.addingTimeInterval(Double(offset) / 10))
+        }
+
+        XCTAssertEqual(history.samples.count, MetricHistory.maximumSampleCount)
+        XCTAssertEqual(history.samples.first?.value, 1)
+        XCTAssertEqual(history.samples.last?.value, Double(MetricHistory.maximumSampleCount))
+        XCTAssertFalse(history.samples.contains { $0.timestamp < now.addingTimeInterval(-900) })
+    }
+
+    func testMetricHistoryRejectsInvalidValuesAndResetsOnClockRollback() {
+        let now = Date(timeIntervalSinceReferenceDate: 10_000)
+        var history = MetricHistory()
+        history.append(10, at: now)
+        history.append(.infinity, at: now.addingTimeInterval(1))
+        history.append(-1, at: now.addingTimeInterval(2))
+        history.append(20, at: now.addingTimeInterval(-1))
+
+        XCTAssertEqual(history.samples, [MetricSample(
+            timestamp: now.addingTimeInterval(-1), value: 20)])
+    }
+
     func testMetricSelectionUsesStableTwoToFourTileBounds() {
         XCTAssertEqual(SystemStatsMetric.normalized([]), [.cpu, .memory, .disk, .network])
         XCTAssertEqual(SystemStatsMetric.normalized([.thermal]), [.cpu, .thermal])

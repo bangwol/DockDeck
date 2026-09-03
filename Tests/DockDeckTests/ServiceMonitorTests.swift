@@ -106,6 +106,8 @@ final class ServiceMonitorTests: XCTestCase {
         store.start()
         wait(for: [completed], timeout: 1)
 
+        XCTAssertEqual(store.latencyHistory(for: endpoint.id).samples.count, 1)
+
         cancellable.cancel()
         store.stop()
         session.invalidateAndCancel()
