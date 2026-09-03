@@ -285,6 +285,26 @@ final class PanelAppearanceTests: XCTestCase {
             false)
     }
 
+    func testDiagnosticCommandRunnerResolvesSiblingRuntime() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(
+            "DockDeckDiagnostics-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let helper = directory.appendingPathComponent("diagnostic-helper")
+        let wrapper = directory.appendingPathComponent("diagnostic-wrapper")
+        try Data("#!/bin/sh\nexit 0\n".utf8).write(to: helper)
+        try Data("#!/bin/sh\ndiagnostic-helper\n".utf8).write(to: wrapper)
+        try FileManager.default.setAttributes(
+            [.posixPermissions: 0o700], ofItemAtPath: helper.path)
+        try FileManager.default.setAttributes(
+            [.posixPermissions: 0o700], ofItemAtPath: wrapper.path)
+
+        XCTAssertEqual(
+            DiagnosticCommandRunner.exitsSuccessfully(
+                wrapper, arguments: [], environment: ["PATH": "/usr/bin:/bin"]),
+            true)
+    }
+
     func testModuleRuntimeCoordinatorStartsAndStopsOnlyChangedModules() {
         let coordinator = ModuleRuntimeCoordinator()
         var terminalStarts = 0

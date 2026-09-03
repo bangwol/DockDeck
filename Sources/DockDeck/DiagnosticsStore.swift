@@ -33,11 +33,16 @@ struct DiagnosticCheckItem: Identifiable, Equatable {
 
 enum DiagnosticCommandRunner {
     static func exitsSuccessfully(
-        _ executable: URL, arguments: [String], timeout: TimeInterval = 3
+        _ executable: URL,
+        arguments: [String],
+        environment: [String: String] = ProcessInfo.processInfo.environment,
+        timeout: TimeInterval = 3
     ) -> Bool? {
         let process = Process()
         process.executableURL = executable
         process.arguments = arguments
+        process.environment = CodexBinaryLocator.launchEnvironment(
+            for: executable, environment: environment)
         process.standardOutput = FileHandle.nullDevice
         process.standardError = FileHandle.nullDevice
         let terminated = DispatchSemaphore(value: 0)
@@ -67,16 +72,17 @@ enum DiagnosticsChecker {
             cliCheck(
                 id: .codex, title: "Codex", symbolName: "chevron.left.forwardslash.chevron.right",
                 executable: CodexBinaryLocator.locate(environment: environment),
-                arguments: ["login", "status"], now: now),
+                arguments: ["login", "status"], environment: environment, now: now),
             cliCheck(
                 id: .claude, title: "Claude Code", symbolName: "sparkles",
                 executable: ClaudeBinaryLocator.locate(environment: environment),
-                arguments: ["auth", "status"], now: now),
+                arguments: ["auth", "status"], environment: environment, now: now),
             cliCheck(
                 id: .github, title: "GitHub CLI", symbolName: "point.3.connected.trianglepath.dotted",
                 executable: locateExecutable(
                     named: "gh", overrideKey: "DOCKDECK_GH_PATH", environment: environment),
-                arguments: ["auth", "status", "--hostname", "github.com"], now: now),
+                arguments: ["auth", "status", "--hostname", "github.com"],
+                environment: environment, now: now),
             item(
                 id: .accessibility, title: "Accessibility", symbolName: "accessibility",
                 ready: AXIsProcessTrusted(),
@@ -94,7 +100,7 @@ enum DiagnosticsChecker {
 
     private static func cliCheck(
         id: DiagnosticCheckID, title: String, symbolName: String,
-        executable: URL?, arguments: [String], now: Date
+        executable: URL?, arguments: [String], environment: [String: String], now: Date
     ) -> DiagnosticCheckItem {
         guard let executable else {
             return DiagnosticCheckItem(
@@ -102,7 +108,7 @@ enum DiagnosticsChecker {
                 detail: "Executable not found", checkedAt: now, lastSuccessfulAt: nil)
         }
         let status = DiagnosticCommandRunner.exitsSuccessfully(
-            executable, arguments: arguments)
+            executable, arguments: arguments, environment: environment)
         return DiagnosticCheckItem(
             id: id,
             title: title,
