@@ -112,7 +112,7 @@ enum UsageProviderError: LocalizedError {
 
 final class UsageStore: ObservableObject {
     private static let refreshInterval: TimeInterval = 60
-    private static let menuProbeMinimumAge: TimeInterval = 60
+    private static let manualProbeMinimumInterval: TimeInterval = 60
     private static let defaultClaudeProbeTimeout: TimeInterval = 30
 
     @Published private(set) var providers: [ProviderUsage]
@@ -123,6 +123,7 @@ final class UsageStore: ObservableObject {
     private let nextClaudeProbeDelay: () -> TimeInterval
     private let claudeProbeTimeout: TimeInterval
     private let claudeProbeQueue: DispatchQueue
+    private let uptime: () -> TimeInterval
     private let logger: (String) -> Void
     private var providerSnapshots: [UsageProviderID: ProviderUsage]
     private var claudeBridgeSnapshot: UsageProviderSnapshot?
@@ -150,6 +151,7 @@ final class UsageStore: ObservableObject {
         claudeProbeTimeout: TimeInterval = UsageStore.defaultClaudeProbeTimeout,
         claudeProbeQueue: DispatchQueue = DispatchQueue(
             label: "DockDeck.ClaudeUsageProbe", qos: .utility),
+        uptime: @escaping () -> TimeInterval = { ProcessInfo.processInfo.systemUptime },
         logger: @escaping (String) -> Void = { _ in }
     ) {
         let initialProviders = UsageProviderID.allCases.map {
@@ -165,6 +167,7 @@ final class UsageStore: ObservableObject {
         self.nextClaudeProbeDelay = nextClaudeProbeDelay
         self.claudeProbeTimeout = max(claudeProbeTimeout, 0.01)
         self.claudeProbeQueue = claudeProbeQueue
+        self.uptime = uptime
         self.logger = logger
     }
 
@@ -185,7 +188,9 @@ final class UsageStore: ObservableObject {
         if enabledProviderIDs.contains(.codex) { codexProvider.refresh() }
         if enabledProviderIDs.contains(.claude) {
             refreshClaudeBridge()
-            if claudeRefreshMode == .automatic { requestClaudeProbe(force: true) }
+            if claudeRefreshMode == .automatic {
+                requestClaudeProbe(force: true, respectsCooldown: true)
+            }
         }
     }
 
@@ -194,7 +199,9 @@ final class UsageStore: ObservableObject {
             return
         }
         refreshClaudeBridge()
-        if claudeRefreshMode == .automatic { requestClaudeProbe(force: false) }
+        if claudeRefreshMode == .automatic {
+            requestClaudeProbe(force: false, respectsCooldown: true)
+        }
     }
 
     func stop() {
@@ -307,23 +314,25 @@ final class UsageStore: ObservableObject {
         }
     }
 
-    private func requestClaudeProbe(force: Bool) {
+    private func requestClaudeProbe(force: Bool, respectsCooldown: Bool = false) {
         guard started, systemRefreshActive, claudeRefreshMode == .automatic,
             enabledProviderIDs.contains(.claude),
             !claudeProbeInFlight
         else { return }
         if !force, postponeClaudeProbeIfExhausted() { return }
-        let uptime = ProcessInfo.processInfo.systemUptime
-        if !force, let lastClaudeProbeUptime,
-            uptime - lastClaudeProbeUptime < Self.menuProbeMinimumAge
+        let currentUptime = uptime()
+        if respectsCooldown, let lastClaudeProbeUptime,
+            currentUptime - lastClaudeProbeUptime < Self.manualProbeMinimumInterval
         {
+            scheduleClaudeProbeAfterCooldown(
+                Self.manualProbeMinimumInterval - (currentUptime - lastClaudeProbeUptime))
             return
         }
 
         claudeProbeTimer?.invalidate()
         claudeProbeTimer = nil
         claudeProbeInFlight = true
-        lastClaudeProbeUptime = uptime
+        lastClaudeProbeUptime = currentUptime
         let generation = claudeProbeGeneration
         scheduleClaudeProbeWatchdog(generation: generation)
         claudeProbeQueue.async { [weak self] in
@@ -353,7 +362,7 @@ final class UsageStore: ObservableObject {
 
     private func requestClaudeProbeWhenAvailable() {
         guard !postponeClaudeProbeIfExhausted() else { return }
-        requestClaudeProbe(force: true)
+        requestClaudeProbe(force: true, respectsCooldown: true)
     }
 
     private func postponeClaudeProbeIfExhausted() -> Bool {
@@ -453,6 +462,24 @@ final class UsageStore: ObservableObject {
             self?.requestClaudeProbe(force: true)
         }
         timer.tolerance = min(interval * 0.05, 30)
+        RunLoop.main.add(timer, forMode: .common)
+        claudeProbeTimer = timer
+    }
+
+    private func scheduleClaudeProbeAfterCooldown(_ delay: TimeInterval) {
+        guard started, systemRefreshActive, claudeRefreshMode == .automatic,
+            enabledProviderIDs.contains(.claude)
+        else { return }
+        let fireDate = Date(timeIntervalSinceNow: max(delay, 0.1))
+        if let claudeProbeTimer {
+            if claudeProbeTimer.fireDate > fireDate { claudeProbeTimer.fireDate = fireDate }
+            return
+        }
+        let timer = Timer(fire: fireDate, interval: 0, repeats: false) { [weak self] _ in
+            self?.claudeProbeTimer = nil
+            self?.requestClaudeProbe(force: true)
+        }
+        timer.tolerance = min(max(delay, 0.1) * 0.05, 1)
         RunLoop.main.add(timer, forMode: .common)
         claudeProbeTimer = timer
     }

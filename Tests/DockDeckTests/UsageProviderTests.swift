@@ -673,11 +673,13 @@ final class UsageProviderTests: XCTestCase {
         let command = FakeClaudeUsageCommandProvider(result: .success(snapshot))
         let cache = ClaudeStatuslineCacheProvider(cacheURL: missingCacheURL())
         let queue = DispatchQueue(label: "DockDeckTests.ExhaustedClaudeProbe")
+        var uptime: TimeInterval = 100
         let store = UsageStore(
             claudeProvider: cache,
             claudeCommandProvider: command,
             nextClaudeProbeDelay: { 600 },
-            claudeProbeQueue: queue)
+            claudeProbeQueue: queue,
+            uptime: { uptime })
         store.setEnabledProviders([.claude])
         let loaded = expectation(description: "Exhausted Claude usage loaded")
         var fulfilled = false
@@ -706,6 +708,11 @@ final class UsageProviderTests: XCTestCase {
         queue.sync {}
         XCTAssertEqual(command.readCount, 1)
 
+        store.refresh()
+        store.refresh()
+        queue.sync {}
+        XCTAssertEqual(command.readCount, 1)
+
         PanelSettings.deckConfiguration = PanelDeckConfiguration(
             left: [.terminal], right: [.usage], enabled: [.terminal, .usage])
         PanelSettings.setActiveModule(.usage, on: .right)
@@ -716,6 +723,7 @@ final class UsageProviderTests: XCTestCase {
             menuTarget: NSObject(),
             side: .right)
 
+        uptime += 61
         XCTAssertTrue(controller.refreshUsageIfActive())
         queue.sync {}
         XCTAssertEqual(command.readCount, 2)
