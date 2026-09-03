@@ -133,14 +133,15 @@ struct GitHubInboxClient: GitHubInboxReading {
         }
         let notifications: Data
         do {
-            notifications = try ProjectPulseCommand.run(
+            notifications = try GitHubCLIRequestBroker.shared.run(
                 executableURL: gh,
                 arguments: [
                     "api", "--paginate", "--slurp", "-X", "GET", "notifications",
                     "-f", "all=false", "-f", "participating=false", "-F", "per_page=100",
                 ],
                 currentDirectoryURL: FileManager.default.homeDirectoryForCurrentUser,
-                environment: Self.environment)
+                environment: Self.environment,
+                cacheKey: "inbox", cacheDuration: 30)
         } catch {
             throw GitHubInboxError.requestFailed
         }
@@ -158,14 +159,15 @@ struct GitHubInboxClient: GitHubInboxReading {
 
     private func readFailedRuns(gh: URL, repository: String, now: Date) -> Int? {
         do {
-            let output = try ProjectPulseCommand.run(
+            let output = try GitHubCLIRequestBroker.shared.run(
                 executableURL: gh,
                 arguments: [
                     "run", "list", "--repo", repository, "--limit", "100",
                     "--status", "failure", "--json", "conclusion,createdAt",
                 ],
                 currentDirectoryURL: FileManager.default.homeDirectoryForCurrentUser,
-                environment: Self.environment)
+                environment: Self.environment,
+                cacheKey: "failed-runs:\(repository)", cacheDuration: 30)
             return try GitHubInboxParser.parseFailedRuns(
                 output, since: now.addingTimeInterval(-7 * 24 * 60 * 60))
         } catch {

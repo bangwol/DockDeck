@@ -111,6 +111,27 @@ final class ProjectPulseTests: XCTestCase {
         XCTAssertNil(try GitHubRunParser.parse(Data("[]".utf8)))
     }
 
+    func testGitHubRequestBrokerSharesShortLivedSuccessfulResponses() throws {
+        let cacheKey = "test-\(UUID().uuidString)"
+        let directory = FileManager.default.temporaryDirectory
+        let first = try GitHubCLIRequestBroker.shared.run(
+            executableURL: URL(fileURLWithPath: "/usr/bin/printf"),
+            arguments: ["first"], currentDirectoryURL: directory,
+            environment: [:], cacheKey: cacheKey, cacheDuration: 60)
+        let cached = try GitHubCLIRequestBroker.shared.run(
+            executableURL: URL(fileURLWithPath: "/usr/bin/printf"),
+            arguments: ["second"], currentDirectoryURL: directory,
+            environment: [:], cacheKey: cacheKey, cacheDuration: 60)
+        let uncached = try GitHubCLIRequestBroker.shared.run(
+            executableURL: URL(fileURLWithPath: "/usr/bin/printf"),
+            arguments: ["second"], currentDirectoryURL: directory,
+            environment: [:])
+
+        XCTAssertEqual(String(data: first, encoding: .utf8), "first")
+        XCTAssertEqual(cached, first)
+        XCTAssertEqual(String(data: uncached, encoding: .utf8), "second")
+    }
+
     func testGitHubProjectParserReadsCompactActivity() throws {
         let data = Data(
             #"{"data":{"repository":{"nameWithOwner":"bangwol/DockDeck","isPrivate":false,"pushedAt":"2026-09-02T08:36:22Z","defaultBranchRef":{"name":"main","target":{"abbreviatedOid":"6084895","history":{"totalCount":69}}},"pullRequests":{"totalCount":2},"issues":{"totalCount":4},"stargazerCount":8,"forkCount":3}}}"#

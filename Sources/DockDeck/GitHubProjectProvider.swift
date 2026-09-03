@@ -1,6 +1,47 @@
 import Combine
 import Foundation
 
+final class GitHubCLIRequestBroker {
+    static let shared = GitHubCLIRequestBroker()
+
+    private struct CacheEntry {
+        let data: Data
+        let expiresAt: Date
+    }
+
+    private let lock = NSLock()
+    private var cache: [String: CacheEntry] = [:]
+
+    private init() {}
+
+    func run(
+        executableURL: URL,
+        arguments: [String],
+        currentDirectoryURL: URL,
+        environment: [String: String],
+        cacheKey: String? = nil,
+        cacheDuration: TimeInterval = 0
+    ) throws -> Data {
+        lock.lock()
+        defer { lock.unlock() }
+
+        let now = Date()
+        cache = cache.filter { $0.value.expiresAt > now }
+        if let cacheKey, let cached = cache[cacheKey] { return cached.data }
+
+        let data = try ProjectPulseCommand.run(
+            executableURL: executableURL,
+            arguments: arguments,
+            currentDirectoryURL: currentDirectoryURL,
+            environment: environment)
+        if let cacheKey, cacheDuration > 0 {
+            cache[cacheKey] = CacheEntry(
+                data: data, expiresAt: now.addingTimeInterval(cacheDuration))
+        }
+        return data
+    }
+}
+
 struct ProjectGitHubSnapshot: Equatable {
     let nameWithOwner: String
     let defaultBranch: String
@@ -128,7 +169,7 @@ struct GitHubProjectClient: GitHubProjectReading, GitHubRepositoryListing {
 
         let output: Data
         do {
-            output = try ProjectPulseCommand.run(
+            output = try GitHubCLIRequestBroker.shared.run(
                 executableURL: gh,
                 arguments: [
                     "api", "graphql",
@@ -138,7 +179,8 @@ struct GitHubProjectClient: GitHubProjectReading, GitHubRepositoryListing {
                     "-F", "since=\(since)",
                 ],
                 currentDirectoryURL: FileManager.default.homeDirectoryForCurrentUser,
-                environment: Self.environment)
+                environment: Self.environment,
+                cacheKey: "repository:\(repository)", cacheDuration: 60)
         } catch let error as ProjectPulseError
             where error == .commandTimedOut || error == .outputTooLarge
         {
@@ -165,7 +207,7 @@ struct GitHubProjectClient: GitHubProjectReading, GitHubRepositoryListing {
         let to = formatter.string(from: now)
         let output: Data
         do {
-            output = try ProjectPulseCommand.run(
+            output = try GitHubCLIRequestBroker.shared.run(
                 executableURL: gh,
                 arguments: [
                     "api", "graphql",
@@ -174,7 +216,8 @@ struct GitHubProjectClient: GitHubProjectReading, GitHubRepositoryListing {
                     "-F", "to=\(to)",
                 ],
                 currentDirectoryURL: FileManager.default.homeDirectoryForCurrentUser,
-                environment: Self.environment)
+                environment: Self.environment,
+                cacheKey: "activity", cacheDuration: 60)
         } catch let error as ProjectPulseError
             where error == .commandTimedOut || error == .outputTooLarge
         {
@@ -198,11 +241,13 @@ struct GitHubProjectClient: GitHubProjectReading, GitHubRepositoryListing {
             "--limit", "1", "--json", "status,conclusion,name,displayTitle",
         ]
         do {
-            let output = try ProjectPulseCommand.run(
+            let output = try GitHubCLIRequestBroker.shared.run(
                 executableURL: gh,
                 arguments: arguments,
                 currentDirectoryURL: currentDirectoryURL,
-                environment: Self.environment)
+                environment: Self.environment,
+                cacheKey: "workflow:\(repository ?? currentDirectoryURL.path)",
+                cacheDuration: 30)
             return try GitHubRunParser.parse(output)
                 ?? ProjectWorkflowSnapshot(state: .neutral, title: "No workflow runs")
         } catch {
@@ -216,7 +261,7 @@ struct GitHubProjectClient: GitHubProjectReading, GitHubRepositoryListing {
         }
         let output: Data
         do {
-            output = try ProjectPulseCommand.run(
+            output = try GitHubCLIRequestBroker.shared.run(
                 executableURL: gh,
                 arguments: [
                     "api", "-X", "GET", "user/repos",
@@ -226,7 +271,8 @@ struct GitHubProjectClient: GitHubProjectReading, GitHubRepositoryListing {
                     "-F", "per_page=100",
                 ],
                 currentDirectoryURL: FileManager.default.homeDirectoryForCurrentUser,
-                environment: Self.environment)
+                environment: Self.environment,
+                cacheKey: "repositories", cacheDuration: 5 * 60)
         } catch let error as ProjectPulseError
             where error == .commandTimedOut || error == .outputTooLarge
         {
