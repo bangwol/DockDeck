@@ -89,6 +89,9 @@ extension AppDelegate {
         if enabled.contains(.battery) { batteryStore.refresh() }
         if enabled.contains(.network) { networkStore.refresh() }
         if enabled.contains(.projectPulse) { projectPulseStore.refresh() }
+        if enabled.contains(.githubInbox) { githubInboxStore.refresh() }
+        if enabled.contains(.docker) { dockerStore.refresh() }
+        if enabled.contains(.customTile) { customTileStore.refresh() }
         if enabled.contains(.focusTimer) { focusTimerStore.refresh() }
         refreshCoarseCaches()
         startTrackingTimer()
