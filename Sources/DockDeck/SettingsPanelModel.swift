@@ -862,8 +862,12 @@ final class SettingsPanelModel: ObservableObject {
             PanelModuleRegistry.definition(for: $0)
         }
         let enabled = Set(configuration.enabled)
-        return definitions.filter { enabled.contains($0.id) }
-            + definitions.filter { !enabled.contains($0.id) }
+        return definitions.sorted { lhs, rhs in
+            let lhsEnabled = enabled.contains(lhs.id)
+            let rhsEnabled = enabled.contains(rhs.id)
+            if lhsEnabled != rhsEnabled { return lhsEnabled }
+            return lhs.title.localizedStandardCompare(rhs.title) == .orderedAscending
+        }
     }
 
     private func updateValues(_ update: (inout SettingsPanelValues) -> Void) {

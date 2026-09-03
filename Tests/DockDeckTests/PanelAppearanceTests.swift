@@ -160,6 +160,25 @@ final class PanelAppearanceTests: XCTestCase {
         XCTAssertTrue(model.moduleDefinitions.dropFirst(2).allSatisfy { !model.isEnabled($0.id) })
     }
 
+    func testSettingsSidebarSortsEnabledModulesThenTitlesWithoutChangingDeckOrder() {
+        let model = makeSettingsModel(
+            configuration: PanelDeckConfiguration(
+                left: [.weather, .terminal, .battery],
+                right: [.usage, .docker, .clock],
+                enabled: [.usage, .battery, .terminal]))
+
+        XCTAssertEqual(
+            model.moduleDefinitions.map(\.id),
+            [
+                .battery, .terminal, .usage,
+                .customTile, .docker, .focusTimer, .githubInbox, .network,
+                .projectPulse, .schedule, .serviceMonitor, .systemStats, .weather, .clock,
+            ])
+        XCTAssertEqual(
+            model.moduleDefinitions(on: .left).map(\.id),
+            [.terminal, .battery, .weather])
+    }
+
     func testSettingsModelDoesNotRepublishNoOpDeckMove() {
         let model = makeSettingsModel(
             configuration: PanelDeckConfiguration(
@@ -223,9 +242,10 @@ final class PanelAppearanceTests: XCTestCase {
         XCTAssertEqual(
             model.availablePanes,
             [
-                .decks, .notifications, .diagnostics, .terminal, .usage, .systemStats,
-                .serviceMonitor, .weather, .schedule, .clock, .battery, .network,
-                .projectPulse, .githubInbox, .docker, .customTile, .focusTimer, .appearance,
+                .decks, .notifications, .diagnostics, .terminal, .usage, .battery,
+                .customTile, .docker, .focusTimer, .githubInbox, .network,
+                .projectPulse, .schedule, .serviceMonitor, .systemStats, .weather,
+                .clock, .appearance,
             ])
         XCTAssertEqual(model.moduleDefinition(for: .usage)?.id, .usage)
         XCTAssertEqual(model.moduleDefinition(for: .systemStats)?.id, .systemStats)
