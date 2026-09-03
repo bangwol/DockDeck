@@ -6,6 +6,11 @@ private final class ReadOnlyPanel: NSPanel {
     override var canBecomeMain: Bool { false }
 }
 
+enum ReadOnlyModuleDetailLayout {
+    static let initialSize = NSSize(width: 520, height: 240)
+    static let minimumSize = NSSize(width: 420, height: 190)
+}
+
 enum DeckScrollDirection: Equatable {
     case previous
     case next
@@ -27,6 +32,7 @@ final class ReadOnlyDeckPanelController: NSObject, NSMenuDelegate {
     private let onSelectionChange: (PanelSide) -> Void
     private var lastScrollSelectionTime: TimeInterval = 0
     private var appliedModule: PanelModuleID?
+    private var detailPanel: NSPanel?
 
     init(
         initialFrame: NSRect,
@@ -81,6 +87,10 @@ final class ReadOnlyDeckPanelController: NSObject, NSMenuDelegate {
         surfaceView.onScrollWheel = { [weak self] event in
             self?.handleScrollWheel(event) ?? false
         }
+        let doubleClick = NSClickGestureRecognizer(
+            target: self, action: #selector(showDetailFromGesture(_:)))
+        doubleClick.numberOfClicksRequired = 2
+        hostingView.addGestureRecognizer(doubleClick)
         menu.delegate = self
         applySettings()
     }
@@ -119,6 +129,7 @@ final class ReadOnlyDeckPanelController: NSObject, NSMenuDelegate {
             ?? "Modules"
         panel.title = "DockDeck \(title)"
         panel.setAccessibilityLabel("DockDeck \(title)")
+        detailPanel?.title = "DockDeck — \(title)"
         presentation.select(
             activeModule,
             direction: direction,
@@ -166,6 +177,12 @@ final class ReadOnlyDeckPanelController: NSObject, NSMenuDelegate {
             title: "Settings…",
             action: #selector(AppDelegate.openReadOnlyModuleSettings(_:)),
             representedObject: side.rawValue)
+        let detailItem = NSMenuItem(
+            title: "Open Detail…", action: #selector(showDetailFromMenu(_:)),
+            keyEquivalent: "")
+        detailItem.target = self
+        detailItem.isEnabled = activeModule != nil
+        menu.addItem(detailItem)
 
         let enabledModules = PanelSettings.enabledModules(on: side)
         if enabledModules.count > 1 {
@@ -234,6 +251,48 @@ final class ReadOnlyDeckPanelController: NSObject, NSMenuDelegate {
     @objc private func selectNextFromMenu(_ sender: Any?) {
         selectNext()
     }
+
+    @objc private func showDetailFromMenu(_ sender: Any?) {
+        showDetail()
+    }
+
+    @objc private func showDetailFromGesture(_ sender: NSClickGestureRecognizer) {
+        guard sender.state == .ended else { return }
+        showDetail()
+    }
+
+    func showDetail() {
+        guard let activeModule,
+            let definition = PanelModuleRegistry.definition(for: activeModule)
+        else { return }
+        if let detailPanel {
+            detailPanel.title = "DockDeck — \(definition.title)"
+            NSApp.activate(ignoringOtherApps: true)
+            detailPanel.makeKeyAndOrderFront(nil)
+            return
+        }
+
+        let window = NSPanel(
+            contentRect: NSRect(origin: .zero, size: ReadOnlyModuleDetailLayout.initialSize),
+            styleMask: [.titled, .closable, .resizable],
+            backing: .buffered,
+            defer: false)
+        window.title = "DockDeck — \(definition.title)"
+        window.isReleasedWhenClosed = false
+        window.contentMinSize = ReadOnlyModuleDetailLayout.minimumSize
+        let frameName = "DockDeck.ModuleDetail.\(side.rawValue)"
+        let restoredFrame = window.setFrameUsingName(frameName)
+        window.setFrameAutosaveName(frameName)
+        window.contentView = NSHostingView(
+            rootView: ReadOnlyModuleDetailView(
+                services: services, presentation: presentation))
+        if !restoredFrame { window.center() }
+        detailPanel = window
+        NSApp.activate(ignoringOtherApps: true)
+        window.makeKeyAndOrderFront(nil)
+    }
+
+    var detailWindowForTesting: NSPanel? { detailPanel }
 
     @objc private func selectModuleFromMenu(_ sender: Any?) {
         guard let item = sender as? NSMenuItem,

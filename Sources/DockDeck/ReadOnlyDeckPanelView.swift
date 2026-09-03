@@ -210,3 +210,44 @@ struct ReadOnlyDeckPanelView: View {
         }
     }
 }
+
+struct ReadOnlyModuleDetailView: View {
+    let services: PanelModuleServices
+    @ObservedObject var presentation: ReadOnlyDeckPresentation
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 10) {
+                Image(systemName: definition?.symbolName ?? "rectangle.stack")
+                    .font(.system(size: 19, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 26)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(definition?.title ?? "Module")
+                        .font(.headline)
+                    Text(definition?.subtitle ?? "DockDeck module detail")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+            }
+            .padding(.horizontal, 18)
+            .frame(height: 58)
+
+            Divider()
+
+            ReadOnlyDeckPanelView(services: services, presentation: presentation)
+                .padding(14)
+                .background(
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .fill(Color.black.opacity(0.12)))
+                .padding(16)
+        }
+        .frame(minWidth: 420, minHeight: 190)
+        .background(Color(nsColor: .windowBackgroundColor))
+    }
+
+    private var definition: PanelModuleDefinition? {
+        presentation.activeModule.flatMap { PanelModuleRegistry.definition(for: $0) }
+    }
+}

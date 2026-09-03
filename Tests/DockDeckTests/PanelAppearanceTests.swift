@@ -731,7 +731,7 @@ final class PanelAppearanceTests: XCTestCase {
         XCTAssertEqual(
             menu.items.filter { !$0.isSeparatorItem }.map(\.title),
             [
-                "Settings…", "Show Used Values", "Move Terminal to Right",
+                "Settings…", "Open Detail…", "Show Used Values", "Move Terminal to Right",
                 "Refresh Modules & Layout",
             ])
     }
@@ -773,6 +773,29 @@ final class PanelAppearanceTests: XCTestCase {
         XCTAssertTrue(controller.synchronizeActiveModule())
         XCTAssertEqual(controller.activeModule, .systemStats)
         XCTAssertFalse(controller.synchronizeActiveModule())
+    }
+
+    func testReadOnlyModuleDetailOpensAndTracksSelection() throws {
+        let previousConfiguration = PanelSettings.deckConfiguration
+        let previousRight = PanelSettings.activeModule(on: .right)
+        defer {
+            PanelSettings.deckConfiguration = previousConfiguration
+            PanelSettings.setActiveModule(previousRight, on: .right)
+        }
+        PanelSettings.deckConfiguration = PanelDeckConfiguration(
+            left: [.terminal], right: [.usage, .weather],
+            enabled: [.terminal, .usage, .weather])
+        PanelSettings.setActiveModule(.usage, on: .right)
+        let controller = makeReadOnlyDeckController(side: .right)
+
+        controller.showDetail()
+        let detail = try XCTUnwrap(controller.detailWindowForTesting)
+
+        XCTAssertEqual(detail.contentMinSize, ReadOnlyModuleDetailLayout.minimumSize)
+        XCTAssertEqual(detail.title, "DockDeck — Usage")
+        controller.select(.weather)
+        XCTAssertEqual(detail.title, "DockDeck — Weather")
+        detail.close()
     }
 
     private func makeReadOnlyDeckController(side: PanelSide) -> ReadOnlyDeckPanelController {
