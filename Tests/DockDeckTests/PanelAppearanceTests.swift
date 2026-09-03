@@ -387,6 +387,12 @@ final class PanelAppearanceTests: XCTestCase {
         XCTAssertEqual(usageStops, 1)
         XCTAssertEqual(coordinator.state(for: .terminal), .visible)
         XCTAssertEqual(coordinator.state(for: .usage), .suspended)
+        XCTAssertEqual(
+            coordinator.diagnostics(),
+            ModuleRuntimeDiagnostics(
+                states: [.terminal: .visible, .usage: .suspended],
+                systemActive: false,
+                constrained: false))
 
         coordinator.synchronize(
             enabledModules: [.terminal, .usage], visibleModules: [.usage])
@@ -394,6 +400,7 @@ final class PanelAppearanceTests: XCTestCase {
         XCTAssertEqual(starts, [.terminal, .usage, .usage])
         XCTAssertEqual(coordinator.state(for: .terminal), .background)
         XCTAssertEqual(coordinator.state(for: .usage), .visible)
+        XCTAssertTrue(coordinator.diagnostics().systemActive)
     }
 
     func testModuleRuntimePolicyCombinesPowerAndThermalPressure() {

@@ -51,6 +51,10 @@ struct DiagnosticsSettingsView: View {
                         .font(.headline)
                 }
 
+                if !store.moduleRuntime.states.isEmpty {
+                    ModuleRuntimeDiagnosticsView(snapshot: store.moduleRuntime)
+                }
+
                 Text(
                     "Checks run only when this page opens or Refresh is pressed. "
                         + "Command output and account identifiers are discarded.")
@@ -60,6 +64,83 @@ struct DiagnosticsSettingsView: View {
             .padding(24)
         }
         .onAppear(perform: store.refresh)
+    }
+}
+
+private struct ModuleRuntimeDiagnosticsView: View {
+    let snapshot: ModuleRuntimeDiagnostics
+
+    var body: some View {
+        GroupBox {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(spacing: 8) {
+                    runtimeBadge(
+                        snapshot.systemActive ? "SYSTEM ACTIVE" : "SYSTEM PAUSED",
+                        color: snapshot.systemActive ? .green : .blue)
+                    if snapshot.constrained {
+                        runtimeBadge("REDUCED CADENCE", color: .orange)
+                    }
+                    Spacer()
+                }
+                LazyVGrid(
+                    columns: [GridItem(.flexible()), GridItem(.flexible())],
+                    spacing: 6
+                ) {
+                    ForEach(PanelModuleRegistry.all) { definition in
+                        if let state = snapshot.states[definition.id] {
+                            HStack(spacing: 6) {
+                                Image(systemName: definition.symbolName)
+                                    .foregroundStyle(.secondary)
+                                    .frame(width: 15)
+                                Text(definition.title)
+                                    .lineLimit(1)
+                                Spacer(minLength: 4)
+                                Text(title(state))
+                                    .font(.caption2.weight(.bold))
+                                    .foregroundStyle(color(state))
+                            }
+                            .font(.caption)
+                            .padding(.horizontal, 7)
+                            .frame(height: 26)
+                            .background(
+                                .secondary.opacity(0.07),
+                                in: RoundedRectangle(cornerRadius: 6))
+                        }
+                    }
+                }
+            }
+            .padding(.top, 4)
+        } label: {
+            Label("Module Runtime", systemImage: "waveform.path.ecg")
+                .font(.headline)
+        }
+    }
+
+    private func runtimeBadge(_ title: String, color: Color) -> some View {
+        Text(title)
+            .font(.caption2.weight(.bold))
+            .foregroundStyle(color)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 3)
+            .background(color.opacity(0.12), in: Capsule())
+    }
+
+    private func title(_ state: ModuleRuntimeCoordinator.State) -> String {
+        switch state {
+        case .stopped: "DISABLED"
+        case .suspended: "PAUSED"
+        case .background: "BACKGROUND"
+        case .visible: "VISIBLE"
+        }
+    }
+
+    private func color(_ state: ModuleRuntimeCoordinator.State) -> Color {
+        switch state {
+        case .stopped: .secondary
+        case .suspended: .blue
+        case .background: .secondary
+        case .visible: .green
+        }
     }
 }
 

@@ -91,6 +91,15 @@ extension DockerStore: PanelModuleRuntime {}
 extension CustomTileStore: PanelModuleRuntime {}
 extension FocusTimerStore: PanelModuleRuntime {}
 
+struct ModuleRuntimeDiagnostics: Equatable {
+    let states: [PanelModuleID: ModuleRuntimeCoordinator.State]
+    let systemActive: Bool
+    let constrained: Bool
+
+    static let empty = ModuleRuntimeDiagnostics(
+        states: [:], systemActive: true, constrained: false)
+}
+
 final class ModuleRuntimeCoordinator {
     enum State: Equatable {
         case stopped
@@ -119,6 +128,7 @@ final class ModuleRuntimeCoordinator {
     private var runtimes: [PanelModuleID: Runtime] = [:]
     private var states: [PanelModuleID: State] = [:]
     private var lowPowerMode = false
+    private var systemActive = true
 
     func register(
         _ module: PanelModuleID,
@@ -186,6 +196,7 @@ final class ModuleRuntimeCoordinator {
             if !previous.isRunning { runtime.start() }
         }
         self.lowPowerMode = lowPowerMode
+        self.systemActive = systemActive
     }
 
     func stopAll() {
@@ -200,5 +211,10 @@ final class ModuleRuntimeCoordinator {
 
     func state(for module: PanelModuleID) -> State {
         states[module] ?? .stopped
+    }
+
+    func diagnostics() -> ModuleRuntimeDiagnostics {
+        ModuleRuntimeDiagnostics(
+            states: states, systemActive: systemActive, constrained: lowPowerMode)
     }
 }

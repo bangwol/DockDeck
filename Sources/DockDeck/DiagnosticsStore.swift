@@ -166,17 +166,22 @@ enum DiagnosticsChecker {
 
 final class DiagnosticsStore: ObservableObject {
     @Published private(set) var items: [DiagnosticCheckItem]
+    @Published private(set) var moduleRuntime: ModuleRuntimeDiagnostics
     @Published private(set) var isRefreshing = false
 
     private let checker: () -> [DiagnosticCheckItem]
+    private let runtimeProvider: () -> ModuleRuntimeDiagnostics
     private let queue: DispatchQueue
 
     init(
         checker: @escaping () -> [DiagnosticCheckItem] = { DiagnosticsChecker.run() },
+        runtimeProvider: @escaping () -> ModuleRuntimeDiagnostics = { .empty },
         queue: DispatchQueue = DispatchQueue(label: "DockDeck.Diagnostics", qos: .utility)
     ) {
         self.checker = checker
+        self.runtimeProvider = runtimeProvider
         self.queue = queue
+        moduleRuntime = runtimeProvider()
         items = DiagnosticCheckID.allCases.map {
             DiagnosticCheckItem(
                 id: $0, title: Self.title(for: $0), symbolName: Self.symbol(for: $0),
@@ -194,6 +199,7 @@ final class DiagnosticsStore: ObservableObject {
             let results = self.checker()
             DispatchQueue.main.async {
                 self.items = Self.merging(results, previous: previous)
+                self.moduleRuntime = self.runtimeProvider()
                 self.isRefreshing = false
             }
         }

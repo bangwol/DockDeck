@@ -42,7 +42,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     lazy var githubInboxStore = GitHubInboxStore()
     lazy var dockerStore = DockerStore()
     lazy var customTileStore = CustomTileStore()
-    lazy var diagnosticsStore = DiagnosticsStore()
+    lazy var diagnosticsStore = DiagnosticsStore(runtimeProvider: { [weak self] in
+        self?.moduleRuntimeCoordinator.diagnostics() ?? .empty
+    })
     lazy var focusTimerStore = FocusTimerStore(
         settings: PanelSettings.focusTimerSettings,
         session: PanelSettings.focusTimerSession,
