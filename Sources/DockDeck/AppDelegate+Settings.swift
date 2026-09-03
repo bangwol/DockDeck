@@ -96,27 +96,77 @@ extension AppDelegate {
 
     func deckSelectionDidChange(on side: PanelSide) {
         debugLog("deck-selection", side.rawValue)
-        if terminalPanelMode != .docked {
+        finishDeckSelectionChange(reapplyPresentations: true, returnsTerminalToDock: true)
+    }
+
+    private func deckSelectionsDidAutoSlide(_ sides: [PanelSide]) {
+        debugLog("deck-auto-slide", sides.map(\.rawValue).joined(separator: ","))
+        finishDeckSelectionChange(reapplyPresentations: false, returnsTerminalToDock: false)
+    }
+
+    private func finishDeckSelectionChange(
+        reapplyPresentations: Bool, returnsTerminalToDock: Bool
+    ) {
+        if returnsTerminalToDock, terminalPanelMode != .docked {
             terminalPanelMode = .docked
             expansionScreenID = nil
             terminalPanelController.setResizable(false)
             applyTerminalAppearance()
         }
-        for controller in readOnlyDeckPanelControllers { controller.applySettings() }
+        if reapplyPresentations {
+            for controller in readOnlyDeckPanelControllers { controller.applySettings() }
+        }
         synchronizeModuleRuntimes()
         isFrozen = false
         refreshCoarseCaches()
         runEvaluation()
     }
 
-    func canAutoSlideDeck(on side: PanelSide) -> Bool {
+    func synchronizeDeckAutoSlideTimer() {
+        deckAutoSlideTimer?.invalidate()
+        deckAutoSlideTimer = nil
         guard usageDisplayAwake, usageSessionActive,
             settingsPanel?.isVisible != true,
-            let activeModule = PanelSettings.activeModule(on: side),
-            activeModule != .terminal
+            !deckAutoSlideSteps().isEmpty
+        else { return }
+
+        let interval = PanelSettings.deckAutoSlideSettings.interval
+        let timer = Timer(timeInterval: interval, repeats: false) { [weak self] _ in
+            guard let self else { return }
+            self.deckAutoSlideTimer = nil
+            if !self.advanceDeckAutoSlideIfPossible() {
+                self.synchronizeDeckAutoSlideTimer()
+            }
+        }
+        timer.tolerance = min(interval * 0.1, 1)
+        RunLoop.main.add(timer, forMode: .common)
+        deckAutoSlideTimer = timer
+    }
+
+    @discardableResult
+    func advanceDeckAutoSlideIfPossible() -> Bool {
+        guard usageDisplayAwake, usageSessionActive,
+            settingsPanel?.isVisible != true
         else { return false }
-        let deckPanel = readOnlyDeckPanelController(on: side).panel
-        return deckPanel.isVisible && !deckPanel.frame.contains(NSEvent.mouseLocation)
+        let steps = deckAutoSlideSteps()
+        guard !steps.isEmpty,
+            steps.allSatisfy({
+                !readOnlyDeckPanelController(on: $0.side).blocksAutoSlideInteraction
+            })
+        else { return false }
+
+        for step in steps {
+            readOnlyDeckPanelController(on: step.side).selectForAutoSlide(step.module)
+        }
+        deckSelectionsDidAutoSlide(steps.map(\.side))
+        return true
+    }
+
+    private func deckAutoSlideSteps() -> [DeckAutoSlideStep] {
+        DeckAutoSlidePlanner.steps(
+            settings: PanelSettings.deckAutoSlideSettings,
+            configuration: PanelSettings.deckConfiguration,
+            activeModule: { PanelSettings.activeModule(on: $0) })
     }
 
     /// The accessory app may be inactive while its floating panel stays visible, in which
@@ -295,6 +345,7 @@ extension AppDelegate {
         case .deckAutoSlide(let settings):
             PanelSettings.deckAutoSlideSettings = settings
             for controller in readOnlyDeckPanelControllers { controller.applySettings() }
+            synchronizeDeckAutoSlideTimer()
         case .notifications(let settings):
             let wasEnabled = PanelSettings.notifications.enabled
             PanelSettings.notifications = settings

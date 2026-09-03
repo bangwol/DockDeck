@@ -235,8 +235,8 @@ private struct DeckAutoSlideControls: View {
             VStack(alignment: .leading, spacing: 10) {
                 Text("Check Auto on at least two enabled cards in the same Deck.")
                 Text(
-                    "The wheel still visits every enabled card. Selecting a manual-only "
-                        + "card pauses that Deck until an Auto card is selected.")
+                    "Participating Decks advance together. The wheel still visits every "
+                        + "enabled card; a manual-only selection pauses that Deck.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 Divider()

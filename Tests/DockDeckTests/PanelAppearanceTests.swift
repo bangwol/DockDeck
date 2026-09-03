@@ -581,51 +581,32 @@ final class PanelAppearanceTests: XCTestCase {
             .usage)
     }
 
-    func testAutoSlideCyclesSelectedModulesAndPausesOnManualSelection() {
-        let previousConfiguration = PanelSettings.deckConfiguration
-        let previousAutoSlide = PanelSettings.deckAutoSlideSettings
-        let previousRight = PanelSettings.activeModule(on: .right)
-        defer {
-            PanelSettings.deckConfiguration = previousConfiguration
-            PanelSettings.deckAutoSlideSettings = previousAutoSlide
-            PanelSettings.setActiveModule(previousRight, on: .right)
-        }
-        PanelSettings.deckConfiguration = PanelDeckConfiguration(
-            left: [.terminal], right: [.usage, .weather, .systemStats],
-            enabled: [.terminal, .usage, .weather, .systemStats])
-        PanelSettings.deckAutoSlideSettings = DeckAutoSlideSettings(
-            modules: [.usage, .systemStats], interval: 10)
-        PanelSettings.setActiveModule(.usage, on: .right)
-        var isEligible = true
-        let controller = ReadOnlyDeckPanelController(
-            initialFrame: NSRect(x: 0, y: 0, width: 214, height: 59),
-            theme: Theme.theme(id: ""), services: PanelModuleServices(),
-            menuTarget: NSObject(), side: .right,
-            canAutoSlide: { _ in isEligible })
-        defer { controller.stopAutoSlide() }
+    func testAutoSlidePlansBothDecksOnTheSameTick() {
+        let configuration = PanelDeckConfiguration(
+            left: [.usage, .weather, .battery],
+            right: [.systemStats, .clock, .terminal],
+            enabled: [.usage, .weather, .battery, .systemStats, .clock, .terminal])
+        let settings = DeckAutoSlideSettings(
+            modules: [.usage, .battery, .systemStats, .clock], interval: 10)
 
-        XCTAssertTrue(controller.advanceAutoSlideIfPossible())
-        XCTAssertEqual(controller.activeModule, .systemStats)
+        let synchronizedSteps = DeckAutoSlidePlanner.steps(
+            settings: settings,
+            configuration: configuration,
+            activeModule: { side in side == .left ? .usage : .systemStats })
+        XCTAssertEqual(
+            synchronizedSteps,
+            [
+                DeckAutoSlideStep(side: .left, module: .battery),
+                DeckAutoSlideStep(side: .right, module: .clock),
+            ])
 
-        controller.select(.weather)
-        XCTAssertFalse(controller.advanceAutoSlideIfPossible())
-        XCTAssertEqual(controller.activeModule, .weather)
-
-        controller.select(.usage)
-        isEligible = false
-        XCTAssertFalse(controller.advanceAutoSlideIfPossible())
-        XCTAssertEqual(controller.activeModule, .usage)
-
-        isEligible = true
-        PanelSettings.deckAutoSlideSettings = DeckAutoSlideSettings(modules: [.usage])
-        controller.applySettings()
-        XCTAssertFalse(controller.advanceAutoSlideIfPossible())
-
-        PanelSettings.deckAutoSlideSettings = DeckAutoSlideSettings(
-            modules: [.usage, .systemStats])
-        controller.applySettings()
-        controller.setAutoSlideSystemActive(false)
-        XCTAssertFalse(controller.advanceAutoSlideIfPossible())
+        let manualLeftSteps = DeckAutoSlidePlanner.steps(
+            settings: settings,
+            configuration: configuration,
+            activeModule: { side in side == .left ? .weather : .systemStats })
+        XCTAssertEqual(
+            manualLeftSteps,
+            [DeckAutoSlideStep(side: .right, module: .clock)])
     }
 
     func testDeckScrollDirectionUsesVerticalAxis() {

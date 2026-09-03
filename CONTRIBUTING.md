@@ -86,9 +86,10 @@ swift test
   the compact panel size before they are registered. Preserve enabled-first
   ordering and independent Deck selections, and test settings changes against
   the runtime. Automatic rotation must be opt-in, skip Terminal and unchecked
-  modules, pause on an unchecked selection or interaction, and suspend with an
-  inactive display or login session. Manual scrolling must continue to include
-  every enabled module.
+  modules, use one shared timer to advance participating Decks in one batch,
+  pause on an unchecked selection or interaction, and suspend with an inactive
+  display or login session. Manual scrolling must continue to include every
+  enabled module.
 
 ## PR guidelines
 

@@ -34,13 +34,11 @@ final class ReadOnlyDeckPanelController:
     private let presentation: ReadOnlyDeckPresentation
     private weak var menuTarget: AnyObject?
     private let onSelectionChange: (PanelSide) -> Void
-    private let canAutoSlide: (PanelSide) -> Bool
+    private let onAutoSlideStateChange: () -> Void
     private var lastScrollSelectionTime: TimeInterval = 0
     private var lastUsageRefreshClickTime: TimeInterval?
     private var appliedModule: PanelModuleID?
     private var detailPanel: NSPanel?
-    private var autoSlideTimer: Timer?
-    private var autoSlideSystemActive = true
     private var isMenuOpen = false
 
     init(
@@ -50,13 +48,13 @@ final class ReadOnlyDeckPanelController:
         menuTarget: AnyObject,
         side: PanelSide = .right,
         onSelectionChange: @escaping (PanelSide) -> Void = { _ in },
-        canAutoSlide: @escaping (PanelSide) -> Bool = { _ in true }
+        onAutoSlideStateChange: @escaping () -> Void = {}
     ) {
         self.services = services
         self.menuTarget = menuTarget
         self.side = side
         self.onSelectionChange = onSelectionChange
-        self.canAutoSlide = canAutoSlide
+        self.onAutoSlideStateChange = onAutoSlideStateChange
         let presentation = ReadOnlyDeckPresentation(
             activeModule: PanelSettings.activeModule(on: side), theme: theme)
         self.presentation = presentation
@@ -133,7 +131,6 @@ final class ReadOnlyDeckPanelController:
             activeModule: PanelSettings.activeModule(on: side),
             direction: .next,
             showsIndicator: false)
-        scheduleAutoSlide()
     }
 
     /// Dock-tracking ticks call this up to ten times per second; rebuild the module view
@@ -143,7 +140,6 @@ final class ReadOnlyDeckPanelController:
         let activeModule = PanelSettings.activeModule(on: side)
         guard activeModule != appliedModule else { return false }
         render(activeModule: activeModule, direction: .next, showsIndicator: false)
-        scheduleAutoSlide()
         return true
     }
 
@@ -168,11 +164,20 @@ final class ReadOnlyDeckPanelController:
     func select(
         _ module: PanelModuleID, direction: DeckTransitionDirection = .next
     ) {
+        select(module, direction: direction, notifiesSelection: true)
+    }
+
+    func selectForAutoSlide(_ module: PanelModuleID) {
+        select(module, direction: .next, notifiesSelection: false)
+    }
+
+    private func select(
+        _ module: PanelModuleID, direction: DeckTransitionDirection,
+        notifiesSelection: Bool
+    ) {
         guard PanelSettings.enabledModules(on: side).contains(module) else { return }
-        PanelSettings.setActiveModule(module, on: side)
         render(activeModule: module, direction: direction, showsIndicator: true)
-        onSelectionChange(side)
-        scheduleAutoSlide()
+        if notifiesSelection { onSelectionChange(side) }
     }
 
     func selectNext() {
@@ -199,7 +204,7 @@ final class ReadOnlyDeckPanelController:
 
     func menuWillOpen(_ menu: NSMenu) {
         isMenuOpen = true
-        stopAutoSlide()
+        onAutoSlideStateChange()
         menu.removeAllItems()
         if activeModule == .usage { services.usage.refreshClaudeUsageIfDue() }
 
@@ -281,7 +286,7 @@ final class ReadOnlyDeckPanelController:
 
     func menuDidClose(_ menu: NSMenu) {
         isMenuOpen = false
-        scheduleAutoSlide()
+        onAutoSlideStateChange()
     }
 
     @objc private func selectNextFromMenu(_ sender: Any?) {
@@ -326,7 +331,7 @@ final class ReadOnlyDeckPanelController:
             detailPanel.title = "DockDeck — \(definition.title)"
             NSApp.activate(ignoringOtherApps: true)
             detailPanel.makeKeyAndOrderFront(nil)
-            scheduleAutoSlide()
+            onAutoSlideStateChange()
             return
         }
 
@@ -349,14 +354,14 @@ final class ReadOnlyDeckPanelController:
         detailPanel = window
         NSApp.activate(ignoringOtherApps: true)
         window.makeKeyAndOrderFront(nil)
-        scheduleAutoSlide()
+        onAutoSlideStateChange()
     }
 
     func windowWillClose(_ notification: Notification) {
         guard let window = notification.object as? NSWindow,
             window === detailPanel
         else { return }
-        DispatchQueue.main.async { [weak self] in self?.scheduleAutoSlide() }
+        DispatchQueue.main.async { [weak self] in self?.onAutoSlideStateChange() }
     }
 
     var detailWindowForTesting: NSPanel? { detailPanel }
@@ -400,50 +405,9 @@ final class ReadOnlyDeckPanelController:
         return true
     }
 
-    func setAutoSlideSystemActive(_ active: Bool) {
-        guard autoSlideSystemActive != active else { return }
-        autoSlideSystemActive = active
-        active ? scheduleAutoSlide() : stopAutoSlide()
-    }
-
-    func stopAutoSlide() {
-        autoSlideTimer?.invalidate()
-        autoSlideTimer = nil
-    }
-
-    @discardableResult
-    func advanceAutoSlideIfPossible() -> Bool {
-        let settings = PanelSettings.deckAutoSlideSettings
-        let candidates = settings.modules(
-            on: side, configuration: PanelSettings.deckConfiguration)
-        guard autoSlideSystemActive, !isMenuOpen, detailPanel?.isVisible != true,
-            candidates.count > 1, let activeModule, candidates.contains(activeModule),
-            canAutoSlide(side),
-            let next = ReadOnlyDeckSelection.next(
-                after: activeModule, enabledModules: candidates),
-            next != activeModule
-        else { return false }
-        select(next, direction: .next)
-        return true
-    }
-
-    private func scheduleAutoSlide() {
-        stopAutoSlide()
-        let settings = PanelSettings.deckAutoSlideSettings
-        let candidates = settings.modules(
-            on: side, configuration: PanelSettings.deckConfiguration)
-        guard autoSlideSystemActive, !isMenuOpen, detailPanel?.isVisible != true,
-            candidates.count > 1, let activeModule, candidates.contains(activeModule)
-        else { return }
-
-        let timer = Timer(timeInterval: settings.interval, repeats: false) { [weak self] _ in
-            guard let self else { return }
-            self.autoSlideTimer = nil
-            if !self.advanceAutoSlideIfPossible() { self.scheduleAutoSlide() }
-        }
-        timer.tolerance = min(settings.interval * 0.1, 1)
-        RunLoop.main.add(timer, forMode: .common)
-        autoSlideTimer = timer
+    var blocksAutoSlideInteraction: Bool {
+        isMenuOpen || detailPanel?.isVisible == true || !panel.isVisible
+            || panel.frame.contains(NSEvent.mouseLocation)
     }
 
     private func addItem(

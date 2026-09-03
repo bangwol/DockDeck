@@ -372,6 +372,31 @@ struct DeckAutoSlideSettings: Codable, Equatable {
     }
 }
 
+struct DeckAutoSlideStep: Equatable {
+    let side: PanelSide
+    let module: PanelModuleID
+}
+
+enum DeckAutoSlidePlanner {
+    static func steps(
+        settings: DeckAutoSlideSettings,
+        configuration: PanelDeckConfiguration,
+        activeModule: (PanelSide) -> PanelModuleID?
+    ) -> [DeckAutoSlideStep] {
+        PanelSide.allCases.compactMap { side in
+            let candidates = settings.modules(on: side, configuration: configuration)
+            guard candidates.count > 1,
+                let active = activeModule(side),
+                candidates.contains(active),
+                let next = ReadOnlyDeckSelection.next(
+                    after: active, enabledModules: candidates),
+                next != active
+            else { return nil }
+            return DeckAutoSlideStep(side: side, module: next)
+        }
+    }
+}
+
 enum PanelSettings {
     static let minimumUsageFontSize: CGFloat = 8
     static let maximumUsageFontSize: CGFloat = 14
