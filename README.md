@@ -94,6 +94,7 @@ Scroll over a compact Deck to cycle every enabled module; a transient page indic
 - [Local notifications](docs/notifications.md)
 - [Diagnostics](docs/diagnostics.md)
 - [Claude Code monitoring modes, bridge setup, and troubleshooting](docs/integrations/claude-code.md)
+- [Releases, preview artifacts, and versioning](docs/releases.md)
 
 ## Requirements
 
@@ -161,6 +162,8 @@ DOCKDECK_SIGNING_IDENTITY="Developer ID Application: Example" ./scripts/package.
 ## Preview distribution
 
 DockDeck does not yet publish a Developer ID-signed and notarized stable binary. Until that is available, installing from source with `./scripts/install.sh` is the recommended preview path.
+
+Preview tags, version increments, artifact contents, and the stable-release gate are defined in the [release and versioning policy](docs/releases.md).
 
 Tagged GitHub preview releases may include an explicitly labeled `unsigned` ZIP for technical evaluation. Manually dispatched preview builds appear as GitHub Actions artifacts and expire after 14 days; they are not GitHub Releases. Both are ad-hoc signed, so macOS requires manual approval in **System Settings → Privacy & Security → Open Anyway**, and an update may require Accessibility approval again. Preview artifacts built by GitHub Actions include a SHA-256 file and build-provenance attestation:
 

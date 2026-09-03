@@ -20,6 +20,10 @@ front page harder to scan.
 - [Local notifications](notifications.md)
 - [Diagnostics](diagnostics.md)
 
+## Project maintenance
+
+- [Releases and versioning](releases.md)
+
 ## Integrations
 
 - [Claude Code monitoring and optional bridge](integrations/claude-code.md)
