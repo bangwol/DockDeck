@@ -211,9 +211,9 @@ final class PanelAppearanceTests: XCTestCase {
         XCTAssertEqual(
             model.availablePanes,
             [
-                .decks, .notifications, .terminal, .usage, .systemStats, .serviceMonitor,
-                .weather, .schedule, .clock, .battery, .network, .projectPulse, .focusTimer,
-                .appearance,
+                .decks, .notifications, .diagnostics, .terminal, .usage, .systemStats,
+                .serviceMonitor, .weather, .schedule, .clock, .battery, .network,
+                .projectPulse, .focusTimer, .appearance,
             ])
         XCTAssertEqual(model.moduleDefinition(for: .usage)?.id, .usage)
         XCTAssertEqual(model.moduleDefinition(for: .systemStats)?.id, .systemStats)
@@ -226,7 +226,7 @@ final class PanelAppearanceTests: XCTestCase {
         XCTAssertEqual(model.moduleDefinition(for: .projectPulse)?.id, .projectPulse)
         XCTAssertEqual(model.moduleDefinition(for: .focusTimer)?.id, .focusTimer)
         XCTAssertEqual(model.sidebarSections.map(\.id), [.general, .modules, .interface])
-        XCTAssertEqual(model.sidebarSections[0].panes, [.decks, .notifications])
+        XCTAssertEqual(model.sidebarSections[0].panes, [.decks, .notifications, .diagnostics])
         XCTAssertEqual(
             model.sidebarSections[1].panes,
             model.moduleDefinitions.compactMap(\.settingsPane))
@@ -239,6 +239,35 @@ final class PanelAppearanceTests: XCTestCase {
         for module in PanelModuleID.readOnlyBuiltIns {
             XCTAssertNotNil(services.runtime(for: module), module.rawValue)
         }
+    }
+
+    func testDiagnosticsPreserveLastSuccessAcrossFailure() {
+        let previousDate = Date(timeIntervalSince1970: 1_000)
+        let checkedDate = Date(timeIntervalSince1970: 2_000)
+        let previous = DiagnosticCheckItem(
+            id: .github, title: "GitHub CLI", symbolName: "point.3.connected.trianglepath.dotted",
+            state: .ready, detail: "Installed and signed in", checkedAt: previousDate,
+            lastSuccessfulAt: previousDate)
+        let failed = DiagnosticCheckItem(
+            id: .github, title: "GitHub CLI", symbolName: "point.3.connected.trianglepath.dotted",
+            state: .warning, detail: "Installed; sign-in required", checkedAt: checkedDate,
+            lastSuccessfulAt: nil)
+
+        let merged = DiagnosticsStore.merging([failed], previous: [previous])
+
+        XCTAssertEqual(merged.first?.checkedAt, checkedDate)
+        XCTAssertEqual(merged.first?.lastSuccessfulAt, previousDate)
+    }
+
+    func testDiagnosticCommandRunnerReportsExitStatus() {
+        XCTAssertEqual(
+            DiagnosticCommandRunner.exitsSuccessfully(
+                URL(fileURLWithPath: "/usr/bin/true"), arguments: []),
+            true)
+        XCTAssertEqual(
+            DiagnosticCommandRunner.exitsSuccessfully(
+                URL(fileURLWithPath: "/usr/bin/false"), arguments: []),
+            false)
     }
 
     func testModuleRuntimeCoordinatorStartsAndStopsOnlyChangedModules() {

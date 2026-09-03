@@ -4,6 +4,7 @@ import Combine
 enum SettingsPaneID: String, CaseIterable, Identifiable {
     case decks
     case notifications
+    case diagnostics
     case terminal
     case usage
     case systemStats
@@ -23,6 +24,7 @@ enum SettingsPaneID: String, CaseIterable, Identifiable {
         switch self {
         case .decks: "Decks"
         case .notifications: "Notifications"
+        case .diagnostics: "Diagnostics"
         case .terminal: "Terminal"
         case .usage: "Usage"
         case .systemStats: "System Stats"
@@ -42,6 +44,7 @@ enum SettingsPaneID: String, CaseIterable, Identifiable {
         switch self {
         case .decks: "Choose which modules appear beside the Dock."
         case .notifications: "Choose which local events can alert you."
+        case .diagnostics: "Check local tools, permissions, sensors, and connectivity."
         case .terminal: "Control terminal expansion and text."
         case .usage: "Choose how account limits are displayed."
         case .systemStats: "Choose compact local performance metrics."
@@ -61,6 +64,7 @@ enum SettingsPaneID: String, CaseIterable, Identifiable {
         switch self {
         case .decks: "rectangle.stack"
         case .notifications: "bell.badge"
+        case .diagnostics: "stethoscope"
         case .terminal: "terminal"
         case .usage: "chart.bar"
         case .systemStats: "gauge.with.dots.needle.67percent"
@@ -344,6 +348,7 @@ final class SettingsPanelModel: ObservableObject {
             .compactMap(\.settingsPane)
         self.selectedPane = modulePanes.contains(selectedPane)
             || selectedPane == .decks || selectedPane == .notifications
+            || selectedPane == .diagnostics
             || selectedPane == .appearance
             ? selectedPane : .decks
     }
@@ -360,7 +365,7 @@ final class SettingsPanelModel: ObservableObject {
         let modulePanes = moduleDefinitions.compactMap(\.settingsPane)
         return [
             SettingsSidebarSection(
-                id: .general, title: "General", panes: [.decks, .notifications]),
+                id: .general, title: "General", panes: [.decks, .notifications, .diagnostics]),
             SettingsSidebarSection(
                 id: .modules, title: "Modules", panes: modulePanes),
             SettingsSidebarSection(

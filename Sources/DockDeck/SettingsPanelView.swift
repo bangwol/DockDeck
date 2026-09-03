@@ -29,13 +29,17 @@ final class SettingsPanelView: NSView {
         selectedPane: SettingsPaneID,
         values: SettingsPanelValues,
         fontNames: [String],
-        scheduleStore: ScheduleStore = ScheduleStore()
+        scheduleStore: ScheduleStore = ScheduleStore(),
+        diagnosticsStore: DiagnosticsStore = DiagnosticsStore()
     ) {
         let model = SettingsPanelModel(
             selectedPane: selectedPane, values: values, fontNames: fontNames)
         self.model = model
         hostingView = NSHostingView(
-            rootView: SettingsRootView(model: model, scheduleStore: scheduleStore))
+            rootView: SettingsRootView(
+                model: model,
+                scheduleStore: scheduleStore,
+                diagnosticsStore: diagnosticsStore))
 
         super.init(frame: NSRect(origin: .zero, size: Self.preferredSize))
         hostingView.frame = bounds
@@ -64,6 +68,7 @@ final class SettingsPanelView: NSView {
 private struct SettingsRootView: View {
     @ObservedObject var model: SettingsPanelModel
     @ObservedObject var scheduleStore: ScheduleStore
+    @ObservedObject var diagnosticsStore: DiagnosticsStore
 
     var body: some View {
         HStack(spacing: 0) {
@@ -125,6 +130,8 @@ private struct SettingsRootView: View {
             DecksSettingsView(model: model)
         case .notifications:
             NotificationSettingsView(model: model)
+        case .diagnostics:
+            DiagnosticsSettingsView(store: diagnosticsStore)
         case .terminal:
             TerminalSettingsView(model: model)
         case .usage:

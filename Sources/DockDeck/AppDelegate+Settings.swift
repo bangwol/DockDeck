@@ -136,7 +136,8 @@ extension AppDelegate {
             selectedPane: pane,
             values: currentSettingsValues,
             fontNames: TerminalTheme.installedFontNames,
-            scheduleStore: scheduleStore)
+            scheduleStore: scheduleStore,
+            diagnosticsStore: diagnosticsStore)
 
         view.onPaneChange = { [weak self] pane in
             UserDefaults.standard.set(pane.rawValue, forKey: AppPreferences.settingsPaneKey)

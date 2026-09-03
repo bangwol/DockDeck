@@ -39,6 +39,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     lazy var batteryStore = BatteryStore()
     lazy var networkStore = NetworkStore()
     lazy var projectPulseStore = ProjectPulseStore()
+    lazy var diagnosticsStore = DiagnosticsStore()
     lazy var focusTimerStore = FocusTimerStore(
         settings: PanelSettings.focusTimerSettings,
         session: PanelSettings.focusTimerSession,

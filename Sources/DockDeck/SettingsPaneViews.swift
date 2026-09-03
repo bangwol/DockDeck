@@ -18,6 +18,105 @@ enum DeckModuleDragPayload {
     }
 }
 
+struct DiagnosticsSettingsView: View {
+    @ObservedObject var store: DiagnosticsStore
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                HStack {
+                    Text("Current local integration status")
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Button(action: store.refresh) {
+                        if store.isRefreshing {
+                            ProgressView().controlSize(.small)
+                        } else {
+                            Label("Refresh", systemImage: "arrow.clockwise")
+                        }
+                    }
+                    .disabled(store.isRefreshing)
+                }
+
+                GroupBox {
+                    VStack(spacing: 0) {
+                        ForEach(Array(store.items.enumerated()), id: \.element.id) {
+                            index, item in
+                            DiagnosticSettingsRow(item: item)
+                            if index < store.items.count - 1 { Divider() }
+                        }
+                    }
+                } label: {
+                    Label("Checks", systemImage: "stethoscope")
+                        .font(.headline)
+                }
+
+                Text(
+                    "Checks run only when this page opens or Refresh is pressed. "
+                        + "Command output and account identifiers are discarded.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            .padding(24)
+        }
+        .onAppear(perform: store.refresh)
+    }
+}
+
+private struct DiagnosticSettingsRow: View {
+    let item: DiagnosticCheckItem
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: item.symbolName)
+                .foregroundStyle(statusColor)
+                .frame(width: 22)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(item.title)
+                    .fontWeight(.medium)
+                Text(item.detail)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+            VStack(alignment: .trailing, spacing: 3) {
+                Text(statusTitle)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(statusColor)
+                Text(lastSuccessText)
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+                    .monospacedDigit()
+            }
+        }
+        .padding(.vertical, 9)
+        .accessibilityElement(children: .combine)
+    }
+
+    private var statusTitle: String {
+        switch item.state {
+        case .checking: "CHECKING"
+        case .ready: "READY"
+        case .warning: "CHECK"
+        case .unavailable: "MISSING"
+        }
+    }
+
+    private var statusColor: Color {
+        switch item.state {
+        case .checking: .secondary
+        case .ready: .green
+        case .warning: .orange
+        case .unavailable: .red
+        }
+    }
+
+    private var lastSuccessText: String {
+        guard let date = item.lastSuccessfulAt else { return "No successful check" }
+        return "Last OK " + date.formatted(date: .omitted, time: .shortened)
+    }
+}
+
 struct DecksSettingsView: View {
     @ObservedObject var model: SettingsPanelModel
 

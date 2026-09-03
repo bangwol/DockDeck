@@ -17,6 +17,27 @@ enum ClaudeUsageProbeSchedule {
     }
 }
 
+enum ClaudeBinaryLocator {
+    static func locate(
+        environment: [String: String] = ProcessInfo.processInfo.environment,
+        homeDirectory: URL = FileManager.default.homeDirectoryForCurrentUser
+    ) -> URL? {
+        let home = homeDirectory.path
+        var candidates = [
+            environment["DOCKDECK_CLAUDE_PATH"],
+            "/opt/homebrew/bin/claude", "/usr/local/bin/claude",
+            "\(home)/.local/bin/claude",
+        ].compactMap { $0 }
+        if let path = environment["PATH"] {
+            candidates.append(contentsOf: path.split(separator: ":").map { "\($0)/claude" })
+        }
+        var seen: Set<String> = []
+        return candidates.first {
+            seen.insert($0).inserted && FileManager.default.isExecutableFile(atPath: $0)
+        }.map(URL.init(fileURLWithPath:))
+    }
+}
+
 enum ClaudeUsageSnapshotMerger {
     static func merge(_ snapshots: [UsageProviderSnapshot]) -> UsageProviderSnapshot? {
         guard !snapshots.isEmpty else { return nil }
@@ -321,7 +342,9 @@ final class ClaudeUsageCommandProvider: ClaudeUsageCommandReading {
     }
 
     func read(now: Date = Date()) -> Result<UsageProviderSnapshot, UsageProviderError> {
-        guard let executable = locateExecutable() else {
+        guard let executable = ClaudeBinaryLocator.locate(
+            environment: environment, homeDirectory: homeDirectory)
+        else {
             return .failure(.claudeExecutableNotFound)
         }
         do {
@@ -528,22 +551,6 @@ final class ClaudeUsageCommandProvider: ClaudeUsageCommandReading {
             result["PATH"] = "\(executableDirectory):\(path)"
         }
         return result
-    }
-
-    private func locateExecutable() -> URL? {
-        let home = homeDirectory.path
-        var candidates = [
-            environment["DOCKDECK_CLAUDE_PATH"],
-            "/opt/homebrew/bin/claude", "/usr/local/bin/claude",
-            "\(home)/.local/bin/claude",
-        ].compactMap { $0 }
-        if let path = environment["PATH"] {
-            candidates.append(contentsOf: path.split(separator: ":").map { "\($0)/claude" })
-        }
-        var seen: Set<String> = []
-        return candidates.first {
-            seen.insert($0).inserted && fileManager.isExecutableFile(atPath: $0)
-        }.map(URL.init(fileURLWithPath:))
     }
 
     private func prepareProbeDirectory() throws {
