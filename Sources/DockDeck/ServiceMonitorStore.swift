@@ -423,8 +423,8 @@ final class ServiceMonitorStore: ObservableObject {
         guard error.domain == NSURLErrorDomain else { return "Network error" }
         switch error.code {
         case NSURLErrorTimedOut: return "Timed out"
-        case NSURLErrorNotConnectedToInternet, NSURLErrorNetworkConnectionLost:
-            return "Offline"
+        case NSURLErrorNotConnectedToInternet: return "Offline"
+        case NSURLErrorNetworkConnectionLost: return "Connection lost"
         case NSURLErrorSecureConnectionFailed, NSURLErrorServerCertificateUntrusted,
             NSURLErrorServerCertificateHasBadDate, NSURLErrorServerCertificateHasUnknownRoot,
             NSURLErrorServerCertificateNotYetValid:
@@ -439,8 +439,7 @@ final class ServiceMonitorStore: ObservableObject {
     private static func isOffline(_ error: Error) -> Bool {
         let error = error as NSError
         return error.domain == NSURLErrorDomain
-            && [NSURLErrorNotConnectedToInternet, NSURLErrorNetworkConnectionLost]
-                .contains(error.code)
+            && error.code == NSURLErrorNotConnectedToInternet
     }
 
     private static func limitedUniqueEndpoints(

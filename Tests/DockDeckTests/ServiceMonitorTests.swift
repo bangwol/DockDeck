@@ -191,6 +191,31 @@ final class ServiceMonitorTests: XCTestCase {
         ServiceMonitorURLProtocol.handler = nil
     }
 
+    func testConnectionLostCountsAsEndpointFailure() {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [ServiceMonitorURLProtocol.self]
+        let session = URLSession(configuration: configuration)
+        let endpoint = ServiceMonitorEndpoint(
+            name: "API", urlString: "https://status.example.com/health")
+        ServiceMonitorURLProtocol.handler = { _ in throw URLError(.networkConnectionLost) }
+        let store = ServiceMonitorStore(
+            endpoints: [endpoint], refreshInterval: 120, session: session)
+        let completed = expectation(description: "Connection loss recorded")
+        let cancellable = store.$items.sink { items in
+            guard case .degraded(let reason) = items.first?.state else { return }
+            XCTAssertEqual(reason, "Connection lost")
+            completed.fulfill()
+        }
+
+        store.start()
+        wait(for: [completed], timeout: 1)
+
+        cancellable.cancel()
+        store.stop()
+        session.invalidateAndCancel()
+        ServiceMonitorURLProtocol.handler = nil
+    }
+
     func testPanelRendersFourServicesAtCompactSize() throws {
         let endpoints = (1...4).map {
             ServiceMonitorEndpoint(

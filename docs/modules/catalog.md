@@ -27,8 +27,10 @@ recent p50 and p95 latency when enough history exists.
 
 The first failed check is shown as `WARN`; a second consecutive failure is
 required before the service becomes `DOWN`. This avoids alerting on one
-transient timeout. A system-wide offline route is shown separately as `OFF` and
-does not count as an endpoint outage or send a service-down notification.
+transient timeout. When macOS reports that the Mac has no internet connection,
+the check is shown separately as `OFF` and does not count as an endpoint outage
+or send a service-down notification. A connection dropped by one endpoint still
+follows the `WARN` → `DOWN` confirmation path.
 
 On macOS 15 or later, the first local-network check can show Apple's Local
 Network permission prompt. Public HTTPS checks do not require this permission.
