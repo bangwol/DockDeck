@@ -167,6 +167,7 @@ struct PanelModuleID: Hashable, Codable {
     static let network = PanelModuleID(rawValue: "network")
     static let projectPulse = PanelModuleID(rawValue: "project-pulse")
     static let githubInbox = PanelModuleID(rawValue: "github-inbox")
+    static let docker = PanelModuleID(rawValue: "docker")
     static let focusTimer = PanelModuleID(rawValue: "focus-timer")
 
     static let readOnlyBuiltIns: [PanelModuleID] = [
@@ -174,6 +175,7 @@ struct PanelModuleID: Hashable, Codable {
         .network,
         .projectPulse,
         .githubInbox,
+        .docker,
         .focusTimer,
     ]
     static let builtIns: [PanelModuleID] = [.terminal] + readOnlyBuiltIns
@@ -361,6 +363,7 @@ enum PanelSettings {
         "DockDeck.settings.projectPulseConfiguration.v1"
     private static let githubInboxConfigurationKey =
         "DockDeck.settings.githubInboxConfiguration.v1"
+    private static let dockerConfigurationKey = "DockDeck.settings.dockerConfiguration.v1"
     private static let focusTimerSettingsKey = "DockDeck.settings.focusTimer.v1"
     private static let focusTimerSessionKey = "DockDeck.settings.focusTimerSession.v1"
     private static let panelOrderKey = "DockDeck.settings.panelOrder"
@@ -800,6 +803,19 @@ enum PanelSettings {
         }
     }
 
+    static var dockerConfiguration: DockerConfiguration {
+        get {
+            guard let data = UserDefaults.standard.data(forKey: dockerConfigurationKey),
+                let configuration = try? JSONDecoder().decode(DockerConfiguration.self, from: data)
+            else { return DockerConfiguration() }
+            return configuration.normalized()
+        }
+        set {
+            guard let data = try? JSONEncoder().encode(newValue.normalized()) else { return }
+            UserDefaults.standard.set(data, forKey: dockerConfigurationKey)
+        }
+    }
+
     static var focusTimerSettings: FocusTimerSettings {
         get {
             guard let data = UserDefaults.standard.data(forKey: focusTimerSettingsKey),
@@ -941,6 +957,7 @@ enum PanelSettings {
         defaults.removeObject(forKey: notificationsKey)
         defaults.removeObject(forKey: projectPulseConfigurationKey)
         defaults.removeObject(forKey: githubInboxConfigurationKey)
+        defaults.removeObject(forKey: dockerConfigurationKey)
         defaults.removeObject(forKey: focusTimerSettingsKey)
         defaults.removeObject(forKey: focusTimerSessionKey)
         defaults.removeObject(forKey: panelOrderKey)

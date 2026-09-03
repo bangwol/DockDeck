@@ -174,6 +174,7 @@ extension AppDelegate {
                 PanelSettings.projectPulseConfiguration)
             self.githubInboxStore.updateConfiguration(
                 PanelSettings.githubInboxConfiguration)
+            self.dockerStore.updateConfiguration(PanelSettings.dockerConfiguration)
             self.focusTimerStore.updateSettings(PanelSettings.focusTimerSettings)
             self.focusTimerStore.replaceSession(PanelSettings.focusTimerSession)
             self.applyCornerRadius()
@@ -256,6 +257,7 @@ extension AppDelegate {
                 refreshInterval: PanelSettings.networkRefreshInterval),
             projectPulse: PanelSettings.projectPulseConfiguration,
             githubInbox: PanelSettings.githubInboxConfiguration,
+            docker: PanelSettings.dockerConfiguration,
             focusTimer: PanelSettings.focusTimerSettings,
             appearance: AppearanceSettingsState(
                 cornerRadius: PanelSettings.cornerRadius,
@@ -374,6 +376,9 @@ extension AppDelegate {
         case .githubInbox(.configuration(let configuration)):
             PanelSettings.githubInboxConfiguration = configuration
             githubInboxStore.updateConfiguration(configuration)
+        case .docker(.configuration(let configuration)):
+            PanelSettings.dockerConfiguration = configuration
+            dockerStore.updateConfiguration(configuration)
         case .focusTimer(.settings(let settings)):
             PanelSettings.focusTimerSettings = settings
             focusTimerStore.updateSettings(settings)

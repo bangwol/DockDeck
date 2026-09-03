@@ -16,6 +16,7 @@ enum SettingsPaneID: String, CaseIterable, Identifiable {
     case network
     case projectPulse
     case githubInbox
+    case docker
     case focusTimer
     case appearance
 
@@ -37,6 +38,7 @@ enum SettingsPaneID: String, CaseIterable, Identifiable {
         case .network: "Network"
         case .projectPulse: "Project Pulse"
         case .githubInbox: "GitHub Inbox"
+        case .docker: "Docker"
         case .focusTimer: "Focus Timer"
         case .appearance: "Appearance"
         }
@@ -58,6 +60,7 @@ enum SettingsPaneID: String, CaseIterable, Identifiable {
         case .network: "Show local download and upload throughput."
         case .projectPulse: "Show local Git or remote GitHub repository activity."
         case .githubInbox: "Summarize account notifications, reviews, and Actions failures."
+        case .docker: "Show local container health and resource use."
         case .focusTimer: "Run persistent focus and break countdowns."
         case .appearance: "Adjust the shared panel surface."
         }
@@ -79,6 +82,7 @@ enum SettingsPaneID: String, CaseIterable, Identifiable {
         case .network: "network"
         case .projectPulse: "point.3.connected.trianglepath.dotted"
         case .githubInbox: "bell.badge"
+        case .docker: "shippingbox"
         case .focusTimer: "timer"
         case .appearance: "paintbrush"
         }
@@ -142,6 +146,9 @@ enum PanelModuleRegistry {
         PanelModuleDefinition(
             id: .githubInbox, title: "GitHub Inbox", subtitle: "Notifications and reviews",
             symbolName: "bell.badge", settingsPane: .githubInbox),
+        PanelModuleDefinition(
+            id: .docker, title: "Docker", subtitle: "Containers and resources",
+            symbolName: "shippingbox", settingsPane: .docker),
         PanelModuleDefinition(
             id: .focusTimer, title: "Focus Timer", subtitle: "Focus and break countdowns",
             symbolName: "timer", settingsPane: .focusTimer),
@@ -228,6 +235,7 @@ struct SettingsPanelValues: Equatable {
     var network: NetworkSettingsState
     var projectPulse: ProjectPulseConfiguration
     var githubInbox: GitHubInboxConfiguration
+    var docker: DockerConfiguration
     var focusTimer: FocusTimerSettings
     var appearance: AppearanceSettingsState
 
@@ -237,6 +245,7 @@ struct SettingsPanelValues: Equatable {
         values.systemStats.metrics = SystemStatsMetric.normalized(systemStats.metrics)
         values.projectPulse = projectPulse.normalized()
         values.githubInbox = githubInbox.normalized()
+        values.docker = docker.normalized()
         values.focusTimer = focusTimer.normalized()
         return values
     }
@@ -302,6 +311,10 @@ enum GitHubInboxSettingsChange {
     case configuration(GitHubInboxConfiguration)
 }
 
+enum DockerSettingsChange {
+    case configuration(DockerConfiguration)
+}
+
 enum FocusTimerSettingsChange {
     case settings(FocusTimerSettings)
 }
@@ -325,6 +338,7 @@ enum SettingsPanelChange {
     case network(NetworkSettingsChange)
     case projectPulse(ProjectPulseSettingsChange)
     case githubInbox(GitHubInboxSettingsChange)
+    case docker(DockerSettingsChange)
     case focusTimer(FocusTimerSettingsChange)
     case appearance(AppearanceSettingsChange)
 }
@@ -783,6 +797,14 @@ final class SettingsPanelModel: ObservableObject {
 
     func setGitHubInboxRefreshInterval(_ value: TimeInterval) {
         updateGitHubInboxConfiguration { $0.refreshInterval = value }
+    }
+
+    func setDockerRefreshInterval(_ value: TimeInterval) {
+        var configuration = values.docker
+        configuration.refreshInterval = value
+        configuration = configuration.normalized()
+        updateValues { $0.docker = configuration }
+        onChange?(.docker(.configuration(configuration)))
     }
 
     func setFocusTimerFocusMinutes(_ value: Int) {
