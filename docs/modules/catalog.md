@@ -19,6 +19,8 @@ storage disabled. DockDeck stores service names and URLs in local preferences,
 rejects URL user-info and common secret query fields, and does not use response
 bodies. Do not place secrets in URL paths. Enable the module under
 **Settings → Decks**, then configure it under **Settings → Service Monitor**.
+Successful response times form a 15-minute in-memory trend line. The history is
+never written to disk and disappears when DockDeck exits.
 
 On macOS 15 or later, the first local-network check can show Apple's Local
 Network permission prompt. Public HTTPS checks do not require this permission.
@@ -73,7 +75,24 @@ traffic, IP addresses, hostnames, or packet contents.
 Select a 1-second, 2-second, or 5-second interval under
 **Settings → Network**. Sampling and counter retention stop while the module is
 disabled. The primary interface name remains available in panel help and
-accessibility text.
+accessibility text. Download and upload trend lines retain at most 15 minutes or
+900 samples in memory and are never written to disk.
+
+## Docker
+
+Docker uses the installed local Docker CLI to show running, stopped, and
+unhealthy container counts plus aggregate live CPU and memory for running
+containers. Select a 5-second, 10-second, or 30-second interval under
+**Settings → Docker**.
+
+DockDeck runs read-only `docker ps -a` and `docker stats --no-stream` commands.
+The Docker engine and CLI must already be installed and running; DockDeck does
+not start the engine, authenticate to a registry, read Docker credentials, or
+modify containers. Output is bounded, parsed in memory, and discarded. A CLI or
+engine failure leaves the last successful snapshot visible with an unavailable
+state. Polling stops while the module is disabled and slows while hidden or in
+macOS Low Power Mode. See Docker's official
+[`docker container stats` reference](https://docs.docker.com/reference/cli/docker/container/stats/).
 
 ## Focus Timer
 

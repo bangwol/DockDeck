@@ -71,6 +71,12 @@ environment. Claude Code still uses its own existing local sign-in and may
 contact Anthropic to render `/usage`; DockDeck never reads that credential or
 calls a private account endpoint itself.
 
+Direct capture, hidden-PTY capture, and the store watchdog are independently
+bounded. DockDeck also closes its pipe readers after the child exits rather than
+waiting indefinitely for inherited file descriptors. On a transient failure it
+keeps the last successful limits visible as stale data and includes the current
+error in the provider hover text.
+
 The hidden-PTY fallback is not unique to DockDeck. Community implementations
 such as [claude-code-usage-overlay](https://github.com/MattPears1/claude-code-usage-overlay)
 and [Agents Deck](https://github.com/vulonviing/agents-deck) use the same general

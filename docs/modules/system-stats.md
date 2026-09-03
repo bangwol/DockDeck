@@ -13,8 +13,15 @@ the module stops all sampling.
 | Network I/O | Download and upload rates on the current primary interface |
 | Temperature | Numeric sensor value when the validated optional reader is available, plus macOS thermal pressure |
 
-Percentage metrics use progress bars. Network I/O uses compact down/up rates.
-Temperature combines a numeric value with a color-coded thermal-pressure bar.
+Percentage metrics use progress bars until enough samples exist, then CPU and
+memory use compact trend lines. Network I/O uses compact down/up rates and a
+combined-transfer trend. Temperature combines a numeric value with a
+color-coded thermal-pressure bar.
+
+CPU, memory, and network histories cover only the latest 15 minutes and at most
+900 samples. They stay in memory, reset when DockDeck exits, and are discarded
+if the system clock moves backwards. The separate Network module keeps distinct
+download and upload histories under the same limits.
 
 ## Memory semantics on macOS
 

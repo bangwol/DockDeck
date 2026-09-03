@@ -11,11 +11,14 @@ front page harder to scan.
 - [System Stats](modules/system-stats.md)
 - [Schedule and Reminders](modules/schedule.md)
 - [Project Pulse](modules/project-pulse.md)
-- [Service Monitor, Weather, World Clock, Battery, Network, and Focus Timer](modules/catalog.md)
+- [GitHub Inbox](modules/github-inbox.md)
+- [Custom Tile](modules/custom-tile.md)
+- [Service Monitor, Weather, World Clock, Battery, Network, Docker, and Focus Timer](modules/catalog.md)
 
 ## App behavior
 
 - [Local notifications](notifications.md)
+- [Diagnostics](diagnostics.md)
 
 ## Integrations
 

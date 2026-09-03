@@ -64,6 +64,12 @@ locked. An in-flight probe is cancelled and one fresh probe runs after the
 system becomes active. DockDeck does not install a global keyboard or pointer
 idle monitor.
 
+Each command path has a fixed runtime limit, and the Usage store adds a 30-second
+watchdog. Pipe capture is closed explicitly after the Claude process exits, so a
+descendant process cannot leave refresh permanently waiting for end-of-file. If
+a transient probe fails, the last valid values remain visible as stale data and
+the hover detail reports the latest refresh error.
+
 The command can return 5-hour, weekly, and plan-specific Fable windows. DockDeck
 shows `FBL` only when Claude returns that value and never estimates it.
 [Fable availability is plan-specific](https://support.claude.com/en/articles/15424964-claude-fable-models-on-your-plan).
