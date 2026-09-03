@@ -254,11 +254,7 @@ struct ReadOnlyModuleDetailView: View {
 
             Divider()
 
-            ReadOnlyDeckPanelView(services: services, presentation: presentation)
-                .padding(14)
-                .background(
-                    RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .fill(Color.black.opacity(0.12)))
+            detailContent
                 .padding(16)
         }
         .frame(minWidth: 420, minHeight: 190)
@@ -267,5 +263,17 @@ struct ReadOnlyModuleDetailView: View {
 
     private var definition: PanelModuleDefinition? {
         presentation.activeModule.flatMap { PanelModuleRegistry.definition(for: $0) }
+    }
+
+    @ViewBuilder private var detailContent: some View {
+        if presentation.activeModule == .githubInbox {
+            GitHubInboxDetailView(store: services.githubInbox, theme: presentation.theme)
+        } else {
+            ReadOnlyDeckPanelView(services: services, presentation: presentation)
+                .padding(14)
+                .background(
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .fill(Color.black.opacity(0.12)))
+        }
     }
 }

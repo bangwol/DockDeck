@@ -32,6 +32,29 @@ struct GitHubInboxConfiguration: Codable, Equatable {
     }
 }
 
+struct GitHubInboxEntry: Identifiable, Equatable {
+    let id: String
+    let title: String
+    let repository: String
+    let reason: String
+    let updatedAt: Date?
+
+    var repositoryName: String {
+        repository.split(separator: "/", maxSplits: 1).last.map(String.init) ?? repository
+    }
+
+    var reasonLabel: String {
+        switch reason {
+        case "review_requested": "REVIEW"
+        case "mention", "team_mention": "MENTION"
+        case "ci_activity": "CI"
+        case "assign": "ASSIGNED"
+        case "author": "AUTHOR"
+        default: "UPDATE"
+        }
+    }
+}
+
 struct GitHubInboxSnapshot: Equatable {
     let unreadCount: Int
     let mentionCount: Int
@@ -39,7 +62,23 @@ struct GitHubInboxSnapshot: Equatable {
     let ciNotificationCount: Int
     let failedRunsLastSevenDays: Int?
     let actionsRepository: String?
+    let entries: [GitHubInboxEntry]
     let observedAt: Date
+
+    init(
+        unreadCount: Int, mentionCount: Int, reviewRequestCount: Int,
+        ciNotificationCount: Int, failedRunsLastSevenDays: Int?,
+        actionsRepository: String?, entries: [GitHubInboxEntry] = [], observedAt: Date
+    ) {
+        self.unreadCount = max(unreadCount, 0)
+        self.mentionCount = max(mentionCount, 0)
+        self.reviewRequestCount = max(reviewRequestCount, 0)
+        self.ciNotificationCount = max(ciNotificationCount, 0)
+        self.failedRunsLastSevenDays = failedRunsLastSevenDays.map { max($0, 0) }
+        self.actionsRepository = actionsRepository
+        self.entries = Array(entries.prefix(5))
+        self.observedAt = observedAt
+    }
 }
 
 enum GitHubInboxStatus: Equatable {
@@ -64,7 +103,28 @@ enum GitHubInboxError: LocalizedError {
 
 enum GitHubInboxParser {
     private struct Notification: Decodable {
+        struct Subject: Decodable { let title: String? }
+        struct Repository: Decodable {
+            let fullName: String?
+
+            private enum CodingKeys: String, CodingKey {
+                case fullName = "full_name"
+            }
+        }
+
+        let id: String?
         let reason: String
+        let updatedAt: String?
+        let subject: Subject?
+        let repository: Repository?
+
+        private enum CodingKeys: String, CodingKey {
+            case id
+            case reason
+            case updatedAt = "updated_at"
+            case subject
+            case repository
+        }
     }
 
     private struct Run: Decodable {
@@ -83,6 +143,27 @@ enum GitHubInboxParser {
         } else {
             throw GitHubInboxError.invalidOutput
         }
+        let formatter = ISO8601DateFormatter()
+        let entries: [GitHubInboxEntry] = notifications.enumerated().compactMap {
+            index, notification in
+            guard let title = notification.subject?.title else { return nil }
+            let rawTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !rawTitle.isEmpty else { return nil }
+            let rawRepository = notification.repository?.fullName ?? "GitHub"
+            let repository = ProjectPulseConfiguration.normalizedGitHubRepository(rawRepository)
+                ?? String(rawRepository.prefix(201))
+            return GitHubInboxEntry(
+                id: "\(String((notification.id ?? "item").prefix(128))):\(index)",
+                title: String(rawTitle.prefix(140)),
+                repository: repository,
+                reason: String(notification.reason.prefix(40)),
+                updatedAt: notification.updatedAt.flatMap { formatter.date(from: $0) })
+        }.sorted { left, right in
+            let leftPriority = priority(left.reason)
+            let rightPriority = priority(right.reason)
+            if leftPriority != rightPriority { return leftPriority < rightPriority }
+            return (left.updatedAt ?? .distantPast) > (right.updatedAt ?? .distantPast)
+        }
         return GitHubInboxSnapshot(
             unreadCount: notifications.count,
             mentionCount: notifications.filter {
@@ -92,7 +173,18 @@ enum GitHubInboxParser {
             ciNotificationCount: notifications.filter { $0.reason == "ci_activity" }.count,
             failedRunsLastSevenDays: failedRuns,
             actionsRepository: repository,
+            entries: entries,
             observedAt: observedAt)
+    }
+
+    private static func priority(_ reason: String) -> Int {
+        switch reason {
+        case "review_requested": 0
+        case "mention", "team_mention": 1
+        case "assign": 2
+        case "ci_activity": 3
+        default: 4
+        }
     }
 
     static func parseFailedRuns(_ data: Data, since: Date) throws -> Int {
