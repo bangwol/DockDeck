@@ -41,6 +41,14 @@ final class NotificationTests: XCTestCase {
             detector.serviceEvents(
                 items: [ServiceMonitorItem(endpoint: endpoint, state: .checking)],
                 failuresEnabled: true, recoveriesEnabled: true).isEmpty)
+        XCTAssertTrue(
+            detector.serviceEvents(
+                items: [ServiceMonitorItem(endpoint: endpoint, state: .degraded("Timed out"))],
+                failuresEnabled: true, recoveriesEnabled: true).isEmpty)
+        XCTAssertTrue(
+            detector.serviceEvents(
+                items: [ServiceMonitorItem(endpoint: endpoint, state: .offline("Offline"))],
+                failuresEnabled: true, recoveriesEnabled: true).isEmpty)
         XCTAssertEqual(
             detector.serviceEvents(
                 items: [ServiceMonitorItem(endpoint: endpoint, state: .down("Timed out"))],

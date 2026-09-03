@@ -5,6 +5,16 @@ import XCTest
 @testable import DockDeck
 
 final class SystemStatsTests: XCTestCase {
+    func testMetricHistoryCalculatesInterpolatedPercentiles() {
+        var history = MetricHistory()
+        for value in [10.0, 40.0, 20.0, 30.0] { history.append(value) }
+
+        XCTAssertEqual(history.percentile(0), 10)
+        XCTAssertEqual(history.percentile(0.5), 25)
+        XCTAssertEqual(history.percentile(0.95), 38.5)
+        XCTAssertEqual(history.percentile(1), 40)
+    }
+
     func testMetricHistoryPrunesOldSamplesAndBoundsMemory() {
         let now = Date(timeIntervalSinceReferenceDate: 10_000)
         var history = MetricHistory()

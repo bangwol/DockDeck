@@ -26,6 +26,17 @@ struct MetricHistory: Equatable {
             samples.removeFirst(samples.count - Self.maximumSampleCount)
         }
     }
+
+    func percentile(_ quantile: Double) -> Double? {
+        guard !samples.isEmpty, quantile.isFinite else { return nil }
+        let values = samples.map(\.value).sorted()
+        let position = min(max(quantile, 0), 1) * Double(values.count - 1)
+        let lowerIndex = Int(position.rounded(.down))
+        let upperIndex = Int(position.rounded(.up))
+        guard lowerIndex != upperIndex else { return values[lowerIndex] }
+        let fraction = position - Double(lowerIndex)
+        return values[lowerIndex] + (values[upperIndex] - values[lowerIndex]) * fraction
+    }
 }
 
 struct MetricSparkline: View {

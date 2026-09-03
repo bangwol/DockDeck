@@ -64,6 +64,8 @@ final class ServiceMonitorTests: XCTestCase {
             "83ms")
         XCTAssertEqual(ServiceMonitorState.down("HTTP 503").shortLabel, "DOWN")
         XCTAssertEqual(ServiceMonitorState.down("HTTP 503").detail, "HTTP 503")
+        XCTAssertEqual(ServiceMonitorState.degraded("Timed out").shortLabel, "WARN")
+        XCTAssertEqual(ServiceMonitorState.offline("Network offline").shortLabel, "OFF")
     }
 
     func testStoreRemovesDuplicateEndpointIDs() {
@@ -107,6 +109,81 @@ final class ServiceMonitorTests: XCTestCase {
         wait(for: [completed], timeout: 1)
 
         XCTAssertEqual(store.latencyHistory(for: endpoint.id).samples.count, 1)
+
+        cancellable.cancel()
+        store.stop()
+        session.invalidateAndCancel()
+        ServiceMonitorURLProtocol.handler = nil
+    }
+
+    func testStoreFallsBackToBoundedGetWhenHeadIsUnsupported() throws {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [ServiceMonitorURLProtocol.self]
+        let session = URLSession(configuration: configuration)
+        let endpoint = ServiceMonitorEndpoint(
+            name: "API", urlString: "https://status.example.com/health")
+        var methods: [String] = []
+        ServiceMonitorURLProtocol.handler = { request in
+            methods.append(request.httpMethod ?? "")
+            if request.httpMethod == "GET" {
+                XCTAssertEqual(request.value(forHTTPHeaderField: "Range"), "bytes=0-0")
+            }
+            return HTTPURLResponse(
+                url: try XCTUnwrap(request.url),
+                statusCode: request.httpMethod == "HEAD" ? 405 : 204,
+                httpVersion: "HTTP/1.1", headerFields: nil)!
+        }
+        let store = ServiceMonitorStore(
+            endpoints: [endpoint], refreshInterval: 120, session: session)
+        let completed = expectation(description: "Fallback probe completed")
+        let cancellable = store.$items.sink { items in
+            guard case .up(let code, _) = items.first?.state else { return }
+            XCTAssertEqual(code, 204)
+            completed.fulfill()
+        }
+
+        store.start()
+        wait(for: [completed], timeout: 1)
+
+        XCTAssertEqual(methods, ["HEAD", "GET"])
+        cancellable.cancel()
+        store.stop()
+        session.invalidateAndCancel()
+        ServiceMonitorURLProtocol.handler = nil
+    }
+
+    func testStoreRequiresTwoFailuresBeforePublishingDown() throws {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [ServiceMonitorURLProtocol.self]
+        let session = URLSession(configuration: configuration)
+        let endpoint = ServiceMonitorEndpoint(
+            name: "API", urlString: "https://status.example.com/health")
+        ServiceMonitorURLProtocol.handler = { request in
+            HTTPURLResponse(
+                url: try XCTUnwrap(request.url), statusCode: 503,
+                httpVersion: "HTTP/1.1", headerFields: nil)!
+        }
+        let store = ServiceMonitorStore(
+            endpoints: [endpoint], refreshInterval: 120, session: session)
+        let firstFailure = expectation(description: "Transient failure")
+        let confirmedFailure = expectation(description: "Confirmed failure")
+        var requestedSecondProbe = false
+        let cancellable = store.$items.sink { items in
+            switch items.first?.state {
+            case .degraded:
+                guard !requestedSecondProbe else { return }
+                requestedSecondProbe = true
+                firstFailure.fulfill()
+                DispatchQueue.main.async { store.refresh() }
+            case .down:
+                confirmedFailure.fulfill()
+            default:
+                break
+            }
+        }
+
+        store.start()
+        wait(for: [firstFailure, confirmedFailure], timeout: 1)
 
         cancellable.cancel()
         store.stop()

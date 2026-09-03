@@ -259,7 +259,7 @@ struct DockNotificationEventDetector {
 
         for item in items {
             switch item.state {
-            case .idle, .checking:
+            case .idle, .checking, .degraded, .offline:
                 continue
             case .up:
                 if serviceHealth[item.id] == .down, recoveriesEnabled {

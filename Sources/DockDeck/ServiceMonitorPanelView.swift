@@ -70,7 +70,7 @@ private struct ServiceMonitorCell: View {
                     .padding(.bottom, 1)
             }
         }
-        .help("\(item.endpoint.displayName): \(item.state.detail)")
+        .help(helpText)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(item.endpoint.displayName)
         .accessibilityValue(item.state.detail)
@@ -80,7 +80,17 @@ private struct ServiceMonitorCell: View {
         switch item.state {
         case .idle, .checking: return Color(nsColor: .secondaryLabelColor)
         case .up: return .green
+        case .degraded: return .orange
+        case .offline: return Color(nsColor: .secondaryLabelColor)
         case .down: return .red
         }
+    }
+
+    private var helpText: String {
+        var parts = ["\(item.endpoint.displayName): \(item.state.detail)"]
+        if let p50 = history.percentile(0.5), let p95 = history.percentile(0.95) {
+            parts.append("latency p50 \(Int(p50.rounded())) ms, p95 \(Int(p95.rounded())) ms")
+        }
+        return parts.joined(separator: " · ")
     }
 }

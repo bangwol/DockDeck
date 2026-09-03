@@ -127,6 +127,8 @@ enum ServiceMonitorState: Equatable {
     case idle
     case checking
     case up(statusCode: Int, latencyMilliseconds: Int)
+    case degraded(String)
+    case offline(String)
     case down(String)
 
     var shortLabel: String {
@@ -134,6 +136,8 @@ enum ServiceMonitorState: Equatable {
         case .idle: "WAIT"
         case .checking: "…"
         case .up(_, let latency): "\(latency)ms"
+        case .degraded: "WARN"
+        case .offline: "OFF"
         case .down: "DOWN"
         }
     }
@@ -144,7 +148,8 @@ enum ServiceMonitorState: Equatable {
         case .checking: "Checking"
         case .up(let statusCode, let latency):
             "HTTP \(statusCode) in \(latency) ms"
-        case .down(let reason): reason
+        case .degraded(let reason): "Transient failure: \(reason)"
+        case .offline(let reason), .down(let reason): reason
         }
     }
 }
@@ -184,6 +189,7 @@ final class ServiceMonitorStore: ObservableObject {
     private var refreshInterval: TimeInterval
     private var timer: Timer?
     private var tasks: [UUID: URLSessionDataTask] = [:]
+    private var consecutiveFailures: [UUID: Int] = [:]
     private var delayedRefresh: DispatchWorkItem?
     private var generation = 0
     private var isRunning = false
@@ -257,6 +263,12 @@ final class ServiceMonitorStore: ObservableObject {
             else { return nil }
             return (endpoint.id, history)
         })
+        consecutiveFailures = Dictionary(uniqueKeysWithValues: endpoints.compactMap { endpoint in
+            guard previousItems[endpoint.id]?.endpoint.urlString == endpoint.urlString,
+                let count = consecutiveFailures[endpoint.id]
+            else { return nil }
+            return (endpoint.id, count)
+        })
         guard isRunning else { return }
         generation += 1
         cancelTasks()
@@ -283,60 +295,90 @@ final class ServiceMonitorStore: ObservableObject {
 
         for endpoint in endpoints {
             guard let url = ServiceMonitorURLValidator.validatedURL(endpoint.urlString) else {
+                consecutiveFailures[endpoint.id] = 2
                 update(endpoint.id, state: .down(
                     ServiceMonitorURLValidator.validationMessage(endpoint.urlString)
                         ?? "Invalid URL"))
                 continue
             }
             update(endpoint.id, state: .checking)
-            var request = URLRequest(url: url)
-            request.httpMethod = "HEAD"
-            request.cachePolicy = .reloadIgnoringLocalCacheData
-            request.timeoutInterval = 8
-            let startedAt = ProcessInfo.processInfo.systemUptime
-            let task = session.dataTask(with: request) { [weak self] _, response, error in
-                let latency = max(
-                    Int(((ProcessInfo.processInfo.systemUptime - startedAt) * 1_000).rounded()), 0)
-                DispatchQueue.main.async {
-                    self?.complete(
-                        endpointID: endpoint.id,
-                        response: response,
-                        error: error,
-                        latencyMilliseconds: latency,
-                        generation: generation)
-                }
-            }
-            tasks[endpoint.id] = task
-            task.resume()
+            startRequest(
+                endpointID: endpoint.id, url: url, method: "HEAD",
+                startedAt: ProcessInfo.processInfo.systemUptime, generation: generation)
         }
+    }
+
+    private func startRequest(
+        endpointID: UUID, url: URL, method: String, startedAt: TimeInterval,
+        generation: Int
+    ) {
+        var request = URLRequest(url: url)
+        request.httpMethod = method
+        request.cachePolicy = .reloadIgnoringLocalCacheData
+        request.timeoutInterval = 8
+        if method == "GET" { request.setValue("bytes=0-0", forHTTPHeaderField: "Range") }
+        let task = session.dataTask(with: request) { [weak self] _, response, error in
+            let latency = max(
+                Int(((ProcessInfo.processInfo.systemUptime - startedAt) * 1_000).rounded()), 0)
+            DispatchQueue.main.async {
+                self?.complete(
+                    endpointID: endpointID, url: url, method: method,
+                    response: response, error: error,
+                    latencyMilliseconds: latency, startedAt: startedAt,
+                    generation: generation)
+            }
+        }
+        tasks[endpointID] = task
+        task.resume()
     }
 
     private func complete(
         endpointID: UUID,
+        url: URL,
+        method: String,
         response: URLResponse?,
         error: Error?,
         latencyMilliseconds: Int,
+        startedAt: TimeInterval,
         generation: Int
     ) {
         guard isRunning, generation == self.generation else { return }
         tasks.removeValue(forKey: endpointID)
         if let error {
-            update(endpointID, state: .down(Self.failureLabel(error)))
+            if Self.isOffline(error) {
+                consecutiveFailures[endpointID] = 0
+                update(endpointID, state: .offline("Network offline"))
+            } else {
+                recordFailure(endpointID, reason: Self.failureLabel(error))
+            }
             return
         }
         guard let response = response as? HTTPURLResponse else {
-            update(endpointID, state: .down("No HTTP response"))
+            recordFailure(endpointID, reason: "No HTTP response")
+            return
+        }
+        if method == "HEAD", response.statusCode == 405 || response.statusCode == 501 {
+            startRequest(
+                endpointID: endpointID, url: url, method: "GET", startedAt: startedAt,
+                generation: generation)
             return
         }
         if (200..<300).contains(response.statusCode) {
+            consecutiveFailures[endpointID] = 0
             update(
                 endpointID,
                 state: .up(
                     statusCode: response.statusCode,
                     latencyMilliseconds: latencyMilliseconds))
         } else {
-            update(endpointID, state: .down("HTTP \(response.statusCode)"))
+            recordFailure(endpointID, reason: "HTTP \(response.statusCode)")
         }
+    }
+
+    private func recordFailure(_ endpointID: UUID, reason: String) {
+        let count = (consecutiveFailures[endpointID] ?? 0) + 1
+        consecutiveFailures[endpointID] = count
+        update(endpointID, state: count >= 2 ? .down(reason) : .degraded(reason))
     }
 
     private func update(_ endpointID: UUID, state: ServiceMonitorState) {
@@ -392,6 +434,13 @@ final class ServiceMonitorStore: ObservableObject {
         case NSURLErrorCancelled: return "Cancelled"
         default: return "Network error"
         }
+    }
+
+    private static func isOffline(_ error: Error) -> Bool {
+        let error = error as NSError
+        return error.domain == NSURLErrorDomain
+            && [NSURLErrorNotConnectedToInternet, NSURLErrorNetworkConnectionLost]
+                .contains(error.code)
     }
 
     private static func limitedUniqueEndpoints(
