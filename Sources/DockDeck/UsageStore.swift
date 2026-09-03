@@ -174,7 +174,7 @@ final class UsageStore: ObservableObject {
         if enabledProviderIDs.contains(.codex) { startCodex() }
         if enabledProviderIDs.contains(.claude), systemRefreshActive {
             refreshClaudeBridge()
-            if claudeRefreshMode == .automatic { requestClaudeProbe(force: true) }
+            if claudeRefreshMode == .automatic { requestClaudeProbeWhenAvailable() }
         }
 
         scheduleRefreshTimer()
@@ -224,7 +224,7 @@ final class UsageStore: ObservableObject {
             systemRefreshActive
         {
             refreshClaudeBridge()
-            if claudeRefreshMode == .automatic { requestClaudeProbe(force: true) }
+            if claudeRefreshMode == .automatic { requestClaudeProbeWhenAvailable() }
         }
     }
 
@@ -245,7 +245,7 @@ final class UsageStore: ObservableObject {
             }
         } else if started, systemRefreshActive, enabledProviderIDs.contains(.claude) {
             refreshClaudeBridge()
-            requestClaudeProbe(force: true)
+            requestClaudeProbeWhenAvailable()
         }
     }
 
@@ -261,7 +261,7 @@ final class UsageStore: ObservableObject {
         if enabledProviderIDs.contains(.codex) { codexProvider.refresh() }
         if enabledProviderIDs.contains(.claude) {
             refreshClaudeBridge()
-            if claudeRefreshMode == .automatic { requestClaudeProbe(force: true) }
+            if claudeRefreshMode == .automatic { requestClaudeProbeWhenAvailable() }
         }
         scheduleRefreshTimer()
     }
@@ -312,6 +312,7 @@ final class UsageStore: ObservableObject {
             enabledProviderIDs.contains(.claude),
             !claudeProbeInFlight
         else { return }
+        if !force, postponeClaudeProbeIfExhausted() { return }
         let uptime = ProcessInfo.processInfo.systemUptime
         if !force, let lastClaudeProbeUptime,
             uptime - lastClaudeProbeUptime < Self.menuProbeMinimumAge
@@ -348,6 +349,25 @@ final class UsageStore: ObservableObject {
                 self.scheduleClaudeProbe()
             }
         }
+    }
+
+    private func requestClaudeProbeWhenAvailable() {
+        guard !postponeClaudeProbeIfExhausted() else { return }
+        requestClaudeProbe(force: true)
+    }
+
+    private func postponeClaudeProbeIfExhausted() -> Bool {
+        guard ClaudeUsageProbeSchedule.exhaustedDelay(
+            windows: currentClaudeWindows, now: Date()) != nil
+        else { return false }
+        if claudeProbeTimer == nil { scheduleClaudeProbe() }
+        return true
+    }
+
+    private var currentClaudeWindows: [UsageWindow] {
+        ClaudeUsageSnapshotMerger.merge(
+            [claudeBridgeSnapshot, claudeCommandSnapshot].compactMap { $0 }
+        )?.windows ?? []
     }
 
     private func publishClaudeSources(fallbackError: UsageProviderError? = nil) {
@@ -426,10 +446,8 @@ final class UsageStore: ObservableObject {
             return
         }
         let proposed = nextClaudeProbeDelay()
-        let interval = proposed.isFinite
-            ? min(max(proposed, ClaudeUsageProbeSchedule.delayRange.lowerBound),
-                ClaudeUsageProbeSchedule.delayRange.upperBound)
-            : ClaudeUsageProbeSchedule.delayRange.lowerBound
+        let interval = ClaudeUsageProbeSchedule.nextDelay(
+            proposed: proposed, windows: currentClaudeWindows, now: Date())
         let timer = Timer(timeInterval: interval, repeats: false) { [weak self] _ in
             self?.claudeProbeTimer = nil
             self?.requestClaudeProbe(force: true)

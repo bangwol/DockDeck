@@ -49,7 +49,7 @@ Choose a source under **Settings → Usage → Claude Refresh**:
 
 | Mode | Behavior |
 | --- | --- |
-| **Automatic `/usage`** (default) | Runs the installed official Claude Code CLI briefly at launch, after `⌘R`, when a Deck menu opens, after the display or login session wakes, and at a randomized 10–20 minute interval. |
+| **Automatic `/usage`** (default) | Runs the installed official Claude Code CLI briefly at launch, after a manual refresh, when a Deck menu opens, after the display or login session wakes, and at a randomized 10–20 minute interval. |
 | **Status line only** | Never starts Claude in the background. It reads only the optional bridge cache produced after normal responses in a local Claude Code session. |
 
 Automatic mode asks Claude Code's built-in
@@ -60,9 +60,15 @@ rendering. No Terminal window appears, no Claude process is kept alive, and
 tools are disabled for the probe. The process exits after capture.
 
 Automatic probes stop while the display sleeps or the macOS login session is
-locked. An in-flight probe is cancelled and one fresh probe runs after the
-system becomes active. DockDeck does not install a global keyboard or pointer
-idle monitor.
+locked. An in-flight probe is cancelled and one fresh probe normally runs after
+the system becomes active. If a returned 5-hour or weekly limit is exhausted,
+background probes instead wait until the latest blocking reset plus a short
+grace period. A missing reset time backs off to one probe per hour. An exhausted
+Fable allowance does not pause checks for the other models.
+
+Click the compact Usage panel to refresh both enabled providers immediately.
+This manual refresh and `⌘R` override the exhausted-limit delay. DockDeck does
+not install a global keyboard or pointer idle monitor.
 
 Each command path has a fixed runtime limit, and the Usage store adds a 30-second
 watchdog. Pipe capture is closed explicitly after the Claude process exits, so a

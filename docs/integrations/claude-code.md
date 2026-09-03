@@ -52,11 +52,20 @@ DockDeck briefly runs the installed official CLI:
 - after `⌘R`;
 - when a Deck menu opens, unless the previous probe began less than one minute
   ago;
-- once after the display or macOS login session wakes; and
+- once after the display or macOS login session wakes, unless a known exhausted
+  limit is still waiting to reset; and
 - every 10–20 minutes, with a new randomized delay after each completion.
 
 The probe pauses while the display sleeps or the login session is locked. It is
 cancelled immediately if Claude is disabled or **Status line only** is selected.
+If a returned 5-hour or weekly limit reaches 100%, automatic probes wait until
+the latest blocking reset plus 30 seconds. A missing reset time falls back to an
+hourly check. An exhausted Fable-only allowance does not pause checks for the
+other models.
+
+Click the compact Usage panel to refresh both enabled providers immediately.
+The click and `⌘R` are manual overrides, so they still query Claude while an
+exhausted limit is waiting to reset.
 
 DockDeck first passes `/usage` directly to Claude Code. If that version requires
 interactive rendering, it falls back to a hidden pseudo-terminal backed by the

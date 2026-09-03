@@ -9,11 +9,40 @@ protocol ClaudeUsageCommandReading: AnyObject {
 
 enum ClaudeUsageProbeSchedule {
     static let delayRange: ClosedRange<TimeInterval> = (10 * 60)...(20 * 60)
+    static let exhaustedFallbackDelay: TimeInterval = 60 * 60
+    static let resetGraceDelay: TimeInterval = 30
 
     static func delay(unitValue: Double) -> TimeInterval {
         let unitValue = min(max(unitValue, 0), 1)
         return delayRange.lowerBound
             + ((delayRange.upperBound - delayRange.lowerBound) * unitValue)
+    }
+
+    static func nextDelay(
+        proposed: TimeInterval,
+        windows: [UsageWindow],
+        now: Date
+    ) -> TimeInterval {
+        if let delay = exhaustedDelay(windows: windows, now: now) { return delay }
+        guard proposed.isFinite else { return delayRange.lowerBound }
+        return min(max(proposed, delayRange.lowerBound), delayRange.upperBound)
+    }
+
+    static func exhaustedDelay(windows: [UsageWindow], now: Date) -> TimeInterval? {
+        let blockingWindows = windows.filter {
+            $0.customLabel == nil && $0.remainingPercent <= 0
+        }
+        guard !blockingWindows.isEmpty else { return nil }
+
+        let futureResets = blockingWindows.compactMap(\.resetsAt).filter { $0 > now }
+        let hasUnknownReset = blockingWindows.contains { $0.resetsAt == nil }
+        guard !futureResets.isEmpty || hasUnknownReset else { return nil }
+
+        var delay = hasUnknownReset ? exhaustedFallbackDelay : 0
+        if let latestReset = futureResets.max() {
+            delay = max(delay, latestReset.timeIntervalSince(now) + resetGraceDelay)
+        }
+        return delay
     }
 }
 

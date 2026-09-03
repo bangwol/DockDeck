@@ -21,7 +21,7 @@ enum DeckScrollDirection: Equatable {
     }
 }
 
-final class ReadOnlyDeckPanelController: NSObject, NSMenuDelegate {
+final class ReadOnlyDeckPanelController: NSObject, NSMenuDelegate, NSGestureRecognizerDelegate {
     let panel: NSPanel
     let side: PanelSide
 
@@ -90,12 +90,27 @@ final class ReadOnlyDeckPanelController: NSObject, NSMenuDelegate {
         let doubleClick = NSClickGestureRecognizer(
             target: self, action: #selector(showDetailFromGesture(_:)))
         doubleClick.numberOfClicksRequired = 2
+        let singleClick = NSClickGestureRecognizer(
+            target: self, action: #selector(refreshUsageFromGesture(_:)))
+        singleClick.numberOfClicksRequired = 1
+        singleClick.delegate = self
         hostingView.addGestureRecognizer(doubleClick)
+        hostingView.addGestureRecognizer(singleClick)
         menu.delegate = self
         applySettings()
     }
 
     var activeModule: PanelModuleID? { PanelSettings.activeModule(on: side) }
+
+    func gestureRecognizer(
+        _ gestureRecognizer: NSGestureRecognizer,
+        shouldRequireFailureOf otherGestureRecognizer: NSGestureRecognizer
+    ) -> Bool {
+        guard let click = gestureRecognizer as? NSClickGestureRecognizer,
+            let otherClick = otherGestureRecognizer as? NSClickGestureRecognizer
+        else { return false }
+        return click.numberOfClicksRequired == 1 && otherClick.numberOfClicksRequired > 1
+    }
 
     func applyTheme(_ theme: Theme) {
         presentation.setTheme(theme)
@@ -259,6 +274,18 @@ final class ReadOnlyDeckPanelController: NSObject, NSMenuDelegate {
     @objc private func showDetailFromGesture(_ sender: NSClickGestureRecognizer) {
         guard sender.state == .ended else { return }
         showDetail()
+    }
+
+    @objc private func refreshUsageFromGesture(_ sender: NSClickGestureRecognizer) {
+        guard sender.state == .ended else { return }
+        refreshUsageIfActive()
+    }
+
+    @discardableResult
+    func refreshUsageIfActive() -> Bool {
+        guard activeModule == .usage else { return false }
+        services.usage.refresh()
+        return true
     }
 
     func showDetail() {

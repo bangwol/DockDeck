@@ -579,6 +579,52 @@ final class UsageProviderTests: XCTestCase {
         XCTAssertEqual(ClaudeUsageProbeSchedule.delay(unitValue: 2), 1_200)
     }
 
+    func testClaudeProbeScheduleWaitsForLatestBlockingReset() {
+        let now = Date(timeIntervalSince1970: 1_000)
+        let windows = [
+            UsageWindow(
+                durationMinutes: 300, usedPercent: 100,
+                resetsAt: now.addingTimeInterval(1_800)),
+            UsageWindow(
+                durationMinutes: 10_080, usedPercent: 100,
+                resetsAt: now.addingTimeInterval(7_200)),
+            UsageWindow(
+                durationMinutes: 0, usedPercent: 100,
+                resetsAt: now.addingTimeInterval(20_000), customLabel: "FBL"),
+        ]
+
+        XCTAssertEqual(
+            ClaudeUsageProbeSchedule.nextDelay(proposed: 900, windows: windows, now: now),
+            7_200 + ClaudeUsageProbeSchedule.resetGraceDelay)
+    }
+
+    func testClaudeProbeScheduleUsesHourlyFallbackWithoutReset() {
+        let now = Date(timeIntervalSince1970: 1_000)
+        let windows = [
+            UsageWindow(durationMinutes: 300, usedPercent: 100, resetsAt: nil)
+        ]
+
+        XCTAssertEqual(
+            ClaudeUsageProbeSchedule.nextDelay(proposed: 900, windows: windows, now: now),
+            ClaudeUsageProbeSchedule.exhaustedFallbackDelay)
+    }
+
+    func testClaudeProbeScheduleIgnoresFableAndExpiredResets() {
+        let now = Date(timeIntervalSince1970: 1_000)
+        let windows = [
+            UsageWindow(
+                durationMinutes: 300, usedPercent: 100,
+                resetsAt: now.addingTimeInterval(-1)),
+            UsageWindow(
+                durationMinutes: 0, usedPercent: 100,
+                resetsAt: now.addingTimeInterval(20_000), customLabel: "FBL"),
+        ]
+
+        XCTAssertEqual(
+            ClaudeUsageProbeSchedule.nextDelay(proposed: 900, windows: windows, now: now),
+            900)
+    }
+
     func testUsageStorePausesProbeUntilSystemBecomesActive() {
         let snapshot = UsageProviderSnapshot(
             windows: [UsageWindow(durationMinutes: 300, usedPercent: 15, resetsAt: nil)],
@@ -612,6 +658,67 @@ final class UsageProviderTests: XCTestCase {
         XCTAssertEqual(command.readCount, 1)
         store.stop()
         cancellable.cancel()
+    }
+
+    func testExhaustedClaudeProbeWaitsAfterWakeButPanelRefreshOverrides() {
+        let snapshot = UsageProviderSnapshot(
+            windows: [
+                UsageWindow(
+                    durationMinutes: 300, usedPercent: 100,
+                    resetsAt: Date().addingTimeInterval(3_600))
+            ],
+            freshness: .live,
+            detail: "command",
+            observedAt: Date())
+        let command = FakeClaudeUsageCommandProvider(result: .success(snapshot))
+        let cache = ClaudeStatuslineCacheProvider(cacheURL: missingCacheURL())
+        let queue = DispatchQueue(label: "DockDeckTests.ExhaustedClaudeProbe")
+        let store = UsageStore(
+            claudeProvider: cache,
+            claudeCommandProvider: command,
+            nextClaudeProbeDelay: { 600 },
+            claudeProbeQueue: queue)
+        store.setEnabledProviders([.claude])
+        let loaded = expectation(description: "Exhausted Claude usage loaded")
+        var fulfilled = false
+        let cancellable = store.$providers.sink { providers in
+            guard !fulfilled, providers.first?.windows.first?.remainingPercent == 0 else {
+                return
+            }
+            fulfilled = true
+            loaded.fulfill()
+        }
+        let previousConfiguration = PanelSettings.deckConfiguration
+        let previousRight = PanelSettings.activeModule(on: .right)
+        defer {
+            store.stop()
+            cancellable.cancel()
+            PanelSettings.deckConfiguration = previousConfiguration
+            PanelSettings.setActiveModule(previousRight, on: .right)
+        }
+
+        store.start()
+        wait(for: [loaded], timeout: 2)
+        XCTAssertEqual(command.readCount, 1)
+
+        store.setSystemRefreshActive(false)
+        store.setSystemRefreshActive(true)
+        queue.sync {}
+        XCTAssertEqual(command.readCount, 1)
+
+        PanelSettings.deckConfiguration = PanelDeckConfiguration(
+            left: [.terminal], right: [.usage], enabled: [.terminal, .usage])
+        PanelSettings.setActiveModule(.usage, on: .right)
+        let controller = ReadOnlyDeckPanelController(
+            initialFrame: NSRect(x: 0, y: 0, width: 214, height: 59),
+            theme: Theme.theme(id: ""),
+            services: PanelModuleServices(usage: store),
+            menuTarget: NSObject(),
+            side: .right)
+
+        XCTAssertTrue(controller.refreshUsageIfActive())
+        queue.sync {}
+        XCTAssertEqual(command.readCount, 2)
     }
 
     func testUsageStoreStatusLineModeDoesNotLaunchClaude() {
