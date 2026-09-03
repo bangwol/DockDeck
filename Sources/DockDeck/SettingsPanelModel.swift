@@ -495,7 +495,7 @@ final class SettingsPanelModel: ObservableObject {
     }
 
     func setAutoSlideEnabled(_ enabled: Bool, for module: PanelModuleID) {
-        guard module != .terminal, isEnabled(module) else { return }
+        guard isEnabled(module) else { return }
         var settings = values.deckAutoSlide
         settings.setEnabled(enabled, for: module)
         publishDeckAutoSlide(settings)

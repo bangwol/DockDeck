@@ -247,7 +247,8 @@ private struct DeckAutoSlideControls: View {
                 Text("Check Auto on at least two enabled cards in the same Deck.")
                 Text(
                     "Participating Decks advance together. The wheel still visits every "
-                        + "enabled card; a manual-only selection pauses that Deck.")
+                        + "enabled card; a manual-only selection pauses that Deck. Terminal "
+                        + "participates only while compact and idle.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 Divider()
@@ -1214,24 +1215,16 @@ private struct DeckModuleCard: View {
                     .lineLimit(2)
             }
             Spacer()
-            if isAutoSlideEligible {
-                Toggle(
-                    "Automatically slide \(definition.title)",
-                    isOn: Binding(
-                        get: { model.isAutoSliding(definition.id) },
-                        set: { model.setAutoSlideEnabled($0, for: definition.id) }))
-                    .labelsHidden()
-                    .toggleStyle(.checkbox)
-                    .frame(width: 36)
-                    .disabled(!isEnabled)
-                    .help("Include \(definition.title) in automatic slides")
-            } else {
-                Text("—")
-                    .foregroundStyle(.tertiary)
-                    .frame(width: 36)
-                    .accessibilityLabel("Automatic Slide unavailable for Terminal")
-                    .help("The interactive terminal stays manual")
-            }
+            Toggle(
+                "Automatically slide \(definition.title)",
+                isOn: Binding(
+                    get: { model.isAutoSliding(definition.id) },
+                    set: { model.setAutoSlideEnabled($0, for: definition.id) }))
+                .labelsHidden()
+                .toggleStyle(.checkbox)
+                .frame(width: 36)
+                .disabled(!isEnabled)
+                .help(autoSlideHelp)
             Toggle(
                 "Show \(definition.title)",
                 isOn: Binding(
@@ -1325,7 +1318,12 @@ private struct DeckModuleCard: View {
     }
 
     private var isEnabled: Bool { model.isEnabled(definition.id) }
-    private var isAutoSlideEligible: Bool { definition.id != .terminal }
+    private var autoSlideHelp: String {
+        if definition.id == .terminal {
+            return "Include Terminal while compact and idle; focusing it pauses automatic slides"
+        }
+        return "Include \(definition.title) in automatic slides"
+    }
     private var isRecentlyActivated: Bool {
         !reduceMotion && model.recentlyActivatedModule == definition.id
     }

@@ -115,7 +115,7 @@ final class PanelAppearanceTests: XCTestCase {
             DeckAutoSlideSettings.self,
             from: Data(#"{"modules":["weather"]}"#.utf8))
 
-        XCTAssertEqual(settings.modules, [.usage, futureModule])
+        XCTAssertEqual(settings.modules, [.terminal, .usage, futureModule])
         XCTAssertEqual(settings.interval, DeckAutoSlideSettings.minimumInterval)
         XCTAssertEqual(decoded.modules, [.weather])
         XCTAssertEqual(decoded.interval, DeckAutoSlideSettings.defaultInterval)
@@ -269,10 +269,10 @@ final class PanelAppearanceTests: XCTestCase {
         model.setAutoSlideInterval(7.4)
         model.setEnabled(false, for: .weather)
 
-        XCTAssertEqual(model.values.deckAutoSlide.modules, [.usage])
+        XCTAssertEqual(model.values.deckAutoSlide.modules, [.terminal, .usage])
         XCTAssertEqual(model.values.deckAutoSlide.interval, 7)
-        XCTAssertEqual(emittedSettings.count, 4)
-        XCTAssertEqual(emittedSettings.last?.modules, [.usage])
+        XCTAssertEqual(emittedSettings.count, 5)
+        XCTAssertEqual(emittedSettings.last?.modules, [.terminal, .usage])
     }
 
     func testSettingsModelCanEmptyADeck() {
@@ -654,6 +654,53 @@ final class PanelAppearanceTests: XCTestCase {
         XCTAssertEqual(
             manualLeftSteps,
             [DeckAutoSlideStep(side: .right, module: .clock)])
+    }
+
+    func testAutoSlideCanCycleIntoAndOutOfTerminal() {
+        let configuration = PanelDeckConfiguration(
+            left: [.terminal, .weather], right: [.usage],
+            enabled: [.terminal, .weather, .usage])
+        let settings = DeckAutoSlideSettings(modules: [.terminal, .weather])
+
+        XCTAssertEqual(
+            DeckAutoSlidePlanner.steps(
+                settings: settings,
+                configuration: configuration,
+                activeModule: { $0 == .left ? .weather : .usage }),
+            [DeckAutoSlideStep(side: .left, module: .terminal)])
+        XCTAssertEqual(
+            DeckAutoSlidePlanner.steps(
+                settings: settings,
+                configuration: configuration,
+                activeModule: { $0 == .left ? .terminal : .usage }),
+            [DeckAutoSlideStep(side: .left, module: .weather)])
+    }
+
+    func testTerminalAutoSlideRequiresCompactIdlePanel() {
+        XCTAssertFalse(
+            TerminalAutoSlidePolicy.blocksAdvance(
+                mode: .docked, panelIsVisible: true,
+                panelIsKey: false, pointerInside: false))
+        XCTAssertTrue(
+            TerminalAutoSlidePolicy.blocksAdvance(
+                mode: .focused, panelIsVisible: true,
+                panelIsKey: false, pointerInside: false))
+        XCTAssertTrue(
+            TerminalAutoSlidePolicy.blocksAdvance(
+                mode: .large, panelIsVisible: true,
+                panelIsKey: false, pointerInside: false))
+        XCTAssertTrue(
+            TerminalAutoSlidePolicy.blocksAdvance(
+                mode: .docked, panelIsVisible: false,
+                panelIsKey: false, pointerInside: false))
+        XCTAssertTrue(
+            TerminalAutoSlidePolicy.blocksAdvance(
+                mode: .docked, panelIsVisible: true,
+                panelIsKey: true, pointerInside: false))
+        XCTAssertTrue(
+            TerminalAutoSlidePolicy.blocksAdvance(
+                mode: .docked, panelIsVisible: true,
+                panelIsKey: false, pointerInside: true))
     }
 
     func testDeckScrollDirectionUsesVerticalAxis() {

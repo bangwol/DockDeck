@@ -61,6 +61,7 @@ extension AppDelegate {
         }
 
         terminalPanelMode = .large
+        synchronizeDeckAutoSlideTimer()
         let screen = expansionScreen(fallingBackTo: presence?.host)
         expansionScreenID = screen.flatMap(displayID(of:))
         if let screen {

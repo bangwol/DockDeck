@@ -125,6 +125,7 @@ extension AppDelegate {
     func synchronizeDeckAutoSlideTimer() {
         deckAutoSlideTimer?.invalidate()
         deckAutoSlideTimer = nil
+        guard case .docked = terminalPanelMode else { return }
         guard usageDisplayAwake, usageSessionActive,
             settingsPanel?.isVisible != true,
             !deckAutoSlideSteps().isEmpty
@@ -145,21 +146,37 @@ extension AppDelegate {
 
     @discardableResult
     func advanceDeckAutoSlideIfPossible() -> Bool {
+        guard case .docked = terminalPanelMode else { return false }
         guard usageDisplayAwake, usageSessionActive,
             settingsPanel?.isVisible != true
         else { return false }
         let steps = deckAutoSlideSteps()
         guard !steps.isEmpty,
-            steps.allSatisfy({
-                !readOnlyDeckPanelController(on: $0.side).blocksAutoSlideInteraction
-            })
+            steps.allSatisfy({ !blocksAutoSlideInteraction(on: $0.side) })
         else { return false }
 
         for step in steps {
-            readOnlyDeckPanelController(on: step.side).selectForAutoSlide(step.module)
+            if step.module == .terminal {
+                // The terminal owns a separate window. Updating the Deck selection lets the
+                // tracking pass reveal it without making that nonactivating panel key.
+                PanelSettings.setActiveModule(.terminal, on: step.side)
+            } else {
+                readOnlyDeckPanelController(on: step.side).selectForAutoSlide(step.module)
+            }
         }
         deckSelectionsDidAutoSlide(steps.map(\.side))
         return true
+    }
+
+    private func blocksAutoSlideInteraction(on side: PanelSide) -> Bool {
+        guard PanelSettings.activeModule(on: side) == .terminal else {
+            return readOnlyDeckPanelController(on: side).blocksAutoSlideInteraction
+        }
+        return TerminalAutoSlidePolicy.blocksAdvance(
+            mode: terminalPanelMode,
+            panelIsVisible: panel.isVisible,
+            panelIsKey: panel.isKeyWindow,
+            pointerInside: panel.frame.contains(NSEvent.mouseLocation))
     }
 
     private func deckAutoSlideSteps() -> [DeckAutoSlideStep] {

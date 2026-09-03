@@ -22,6 +22,18 @@ enum TerminalScrollRoute: Equatable {
     }
 }
 
+enum TerminalAutoSlidePolicy {
+    static func blocksAdvance(
+        mode: TerminalPanelMode,
+        panelIsVisible: Bool,
+        panelIsKey: Bool,
+        pointerInside: Bool
+    ) -> Bool {
+        guard case .docked = mode else { return true }
+        return !panelIsVisible || panelIsKey || pointerInside
+    }
+}
+
 final class AppDelegate: NSObject, NSApplicationDelegate {
     static let accessibilityWarmupDelay: TimeInterval = 3
 

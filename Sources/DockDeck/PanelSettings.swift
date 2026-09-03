@@ -336,7 +336,6 @@ struct DeckAutoSlideSettings: Codable, Equatable {
     }
 
     mutating func setEnabled(_ enabled: Bool, for module: PanelModuleID) {
-        guard module != .terminal else { return }
         modules.removeAll { $0 == module }
         if enabled { modules.append(module) }
         self = normalized()
@@ -345,7 +344,7 @@ struct DeckAutoSlideSettings: Codable, Equatable {
     func normalized() -> Self {
         var seen: Set<PanelModuleID> = []
         let modules = modules.filter {
-            $0 != .terminal && !$0.rawValue.isEmpty && seen.insert($0).inserted
+            !$0.rawValue.isEmpty && seen.insert($0).inserted
         }.prefix(100)
         let interval = interval.isFinite ? interval.rounded() : Self.defaultInterval
         return Self(

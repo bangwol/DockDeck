@@ -13,8 +13,11 @@ DockDeck remembers those proportions for the next expansion.
 While a Deck is compact, hover it and scroll up or down to cycle through its
 enabled modules, including Terminal. Focused and large Terminal modes reserve
 the wheel for normal terminal scrollback. Right-click a compact Deck to select a
-module directly. Optional Automatic Slide can rotate checked read-only modules,
-but Terminal is never selected or replaced automatically.
+module directly. Optional Automatic Slide can rotate checked modules, including
+Terminal. Terminal rotates only while it is compact, visible,
+unfocused, and not hovered. Clicking or enlarging it pauses automatic slides;
+returning it to the Dock starts a complete interval before rotation resumes.
+Automatic selection never takes keyboard focus.
 
 `⌘E` selects Terminal and toggles a separate, fixed 75% large-terminal mode.
 The menu action changes to **Return Terminal to Dock** while that mode is

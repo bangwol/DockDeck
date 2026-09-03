@@ -51,6 +51,7 @@ extension AppDelegate {
     func expandTerminalForFocus() {
         guard !isExpanded, !isFocusExpanded else { return }
         terminalPanelMode = .focused
+        synchronizeDeckAutoSlideTimer()
         applyTerminalAppearance()
         refreshCoarseCaches()
         let presence = resolveDockPresence()
@@ -105,6 +106,9 @@ extension AppDelegate {
             panel.orderOut(nil)
             hideReadOnlyDecks()
         }
+        // Restart from a full interval after terminal interaction instead of rotating
+        // immediately when the user returns it to the Dock.
+        synchronizeDeckAutoSlideTimer()
         debugLog("expand", "returned terminal to Dock")
         updateFallbackHintVisibility()
     }

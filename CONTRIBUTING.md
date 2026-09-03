@@ -88,10 +88,12 @@ swift test
   shorter active Deck with a left-side tie break; an explicit drop must activate
   the module in its target Deck. Preserve independent Deck selections and test
   settings changes against the runtime. Automatic rotation must be opt-in, skip
-  Terminal and unchecked modules, use one shared timer to advance participating
-  Decks in one batch, pause on an unchecked selection or interaction, and
-  suspend with an inactive display or login session. Manual scrolling must
-  continue to include every enabled module.
+  unchecked modules, use one shared timer to advance participating Decks in one
+  batch, pause on an unchecked selection or interaction, and suspend with an
+  inactive display or login session. Terminal may rotate only while compact,
+  visible, unfocused, and not hovered; returning from user interaction must wait
+  one complete interval. Automatic display must not take keyboard focus. Manual
+  scrolling must continue to include every enabled module.
 
 ## PR guidelines
 
