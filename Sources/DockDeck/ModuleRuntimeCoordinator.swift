@@ -73,6 +73,7 @@ extension ClockStore: PanelModuleRuntime {}
 extension BatteryStore: PanelModuleRuntime {}
 extension NetworkStore: PanelModuleRuntime {}
 extension ProjectPulseStore: PanelModuleRuntime {}
+extension GitHubInboxStore: PanelModuleRuntime {}
 extension FocusTimerStore: PanelModuleRuntime {}
 
 final class ModuleRuntimeCoordinator {

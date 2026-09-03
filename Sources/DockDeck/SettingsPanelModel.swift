@@ -15,6 +15,7 @@ enum SettingsPaneID: String, CaseIterable, Identifiable {
     case battery
     case network
     case projectPulse
+    case githubInbox
     case focusTimer
     case appearance
 
@@ -35,6 +36,7 @@ enum SettingsPaneID: String, CaseIterable, Identifiable {
         case .battery: "Battery"
         case .network: "Network"
         case .projectPulse: "Project Pulse"
+        case .githubInbox: "GitHub Inbox"
         case .focusTimer: "Focus Timer"
         case .appearance: "Appearance"
         }
@@ -55,6 +57,7 @@ enum SettingsPaneID: String, CaseIterable, Identifiable {
         case .battery: "Show charge, power state, and time left."
         case .network: "Show local download and upload throughput."
         case .projectPulse: "Show local Git or remote GitHub repository activity."
+        case .githubInbox: "Summarize account notifications, reviews, and Actions failures."
         case .focusTimer: "Run persistent focus and break countdowns."
         case .appearance: "Adjust the shared panel surface."
         }
@@ -75,6 +78,7 @@ enum SettingsPaneID: String, CaseIterable, Identifiable {
         case .battery: "battery.75percent"
         case .network: "network"
         case .projectPulse: "point.3.connected.trianglepath.dotted"
+        case .githubInbox: "bell.badge"
         case .focusTimer: "timer"
         case .appearance: "paintbrush"
         }
@@ -135,6 +139,9 @@ enum PanelModuleRegistry {
         PanelModuleDefinition(
             id: .projectPulse, title: "Project Pulse", subtitle: "Git and GitHub activity",
             symbolName: "point.3.connected.trianglepath.dotted", settingsPane: .projectPulse),
+        PanelModuleDefinition(
+            id: .githubInbox, title: "GitHub Inbox", subtitle: "Notifications and reviews",
+            symbolName: "bell.badge", settingsPane: .githubInbox),
         PanelModuleDefinition(
             id: .focusTimer, title: "Focus Timer", subtitle: "Focus and break countdowns",
             symbolName: "timer", settingsPane: .focusTimer),
@@ -220,6 +227,7 @@ struct SettingsPanelValues: Equatable {
     var battery: BatterySettingsState
     var network: NetworkSettingsState
     var projectPulse: ProjectPulseConfiguration
+    var githubInbox: GitHubInboxConfiguration
     var focusTimer: FocusTimerSettings
     var appearance: AppearanceSettingsState
 
@@ -228,6 +236,7 @@ struct SettingsPanelValues: Equatable {
         values.deckConfiguration = deckConfiguration.normalized()
         values.systemStats.metrics = SystemStatsMetric.normalized(systemStats.metrics)
         values.projectPulse = projectPulse.normalized()
+        values.githubInbox = githubInbox.normalized()
         values.focusTimer = focusTimer.normalized()
         return values
     }
@@ -289,6 +298,10 @@ enum ProjectPulseSettingsChange {
     case configuration(ProjectPulseConfiguration)
 }
 
+enum GitHubInboxSettingsChange {
+    case configuration(GitHubInboxConfiguration)
+}
+
 enum FocusTimerSettingsChange {
     case settings(FocusTimerSettings)
 }
@@ -311,6 +324,7 @@ enum SettingsPanelChange {
     case battery(BatterySettingsChange)
     case network(NetworkSettingsChange)
     case projectPulse(ProjectPulseSettingsChange)
+    case githubInbox(GitHubInboxSettingsChange)
     case focusTimer(FocusTimerSettingsChange)
     case appearance(AppearanceSettingsChange)
 }
@@ -763,6 +777,14 @@ final class SettingsPanelModel: ObservableObject {
         updateProjectPulseConfiguration { $0.refreshInterval = value }
     }
 
+    func setGitHubInboxActionsRepository(_ repository: String?) {
+        updateGitHubInboxConfiguration { $0.actionsRepository = repository }
+    }
+
+    func setGitHubInboxRefreshInterval(_ value: TimeInterval) {
+        updateGitHubInboxConfiguration { $0.refreshInterval = value }
+    }
+
     func setFocusTimerFocusMinutes(_ value: Int) {
         updateFocusTimerSettings { $0.focusMinutes = value }
     }
@@ -841,6 +863,16 @@ final class SettingsPanelModel: ObservableObject {
         configuration = configuration.normalized()
         updateValues { $0.projectPulse = configuration }
         onChange?(.projectPulse(.configuration(configuration)))
+    }
+
+    private func updateGitHubInboxConfiguration(
+        _ update: (inout GitHubInboxConfiguration) -> Void
+    ) {
+        var configuration = values.githubInbox
+        update(&configuration)
+        configuration = configuration.normalized()
+        updateValues { $0.githubInbox = configuration }
+        onChange?(.githubInbox(.configuration(configuration)))
     }
 
     private func updateFocusTimerSettings(

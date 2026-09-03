@@ -21,6 +21,7 @@ final class PanelAppearanceTests: XCTestCase {
                 .usage, .systemStats, .serviceMonitor, .weather, .schedule, .clock, .battery,
                 .network,
                 .projectPulse,
+                .githubInbox,
                 .focusTimer,
             ])
         XCTAssertEqual(configuration.right, [.terminal])
@@ -45,6 +46,7 @@ final class PanelAppearanceTests: XCTestCase {
                 .usage, .systemStats, .serviceMonitor, .weather, .schedule, .clock, .battery,
                 .network,
                 .projectPulse,
+                .githubInbox,
                 .focusTimer,
             ])
         XCTAssertEqual(decoded.enabled, [futureModule])
@@ -63,6 +65,7 @@ final class PanelAppearanceTests: XCTestCase {
             [
                 .usage, .serviceMonitor, .weather, .schedule, .clock, .battery, .network,
                 .projectPulse,
+                .githubInbox,
                 .focusTimer,
             ])
     }
@@ -119,6 +122,7 @@ final class PanelAppearanceTests: XCTestCase {
                 .usage, .systemStats, .serviceMonitor, .weather, .schedule, .clock, .battery,
                 .network,
                 .projectPulse,
+                .githubInbox,
                 .focusTimer,
             ])
         XCTAssertEqual(model.values.deckConfiguration.right, [.terminal, futureModule])
@@ -213,7 +217,7 @@ final class PanelAppearanceTests: XCTestCase {
             [
                 .decks, .notifications, .diagnostics, .terminal, .usage, .systemStats,
                 .serviceMonitor, .weather, .schedule, .clock, .battery, .network,
-                .projectPulse, .focusTimer, .appearance,
+                .projectPulse, .githubInbox, .focusTimer, .appearance,
             ])
         XCTAssertEqual(model.moduleDefinition(for: .usage)?.id, .usage)
         XCTAssertEqual(model.moduleDefinition(for: .systemStats)?.id, .systemStats)
@@ -224,6 +228,7 @@ final class PanelAppearanceTests: XCTestCase {
         XCTAssertEqual(model.moduleDefinition(for: .battery)?.id, .battery)
         XCTAssertEqual(model.moduleDefinition(for: .network)?.id, .network)
         XCTAssertEqual(model.moduleDefinition(for: .projectPulse)?.id, .projectPulse)
+        XCTAssertEqual(model.moduleDefinition(for: .githubInbox)?.id, .githubInbox)
         XCTAssertEqual(model.moduleDefinition(for: .focusTimer)?.id, .focusTimer)
         XCTAssertEqual(model.sidebarSections.map(\.id), [.general, .modules, .interface])
         XCTAssertEqual(model.sidebarSections[0].panes, [.decks, .notifications, .diagnostics])
@@ -873,6 +878,7 @@ final class PanelAppearanceTests: XCTestCase {
             battery: BatterySettingsState(refreshInterval: 60),
             network: NetworkSettingsState(refreshInterval: 2),
             projectPulse: ProjectPulseConfiguration(),
+            githubInbox: GitHubInboxConfiguration(),
             focusTimer: FocusTimerSettings(),
             appearance: AppearanceSettingsState(
                 cornerRadius: 10, tintOpacity: 0.6))

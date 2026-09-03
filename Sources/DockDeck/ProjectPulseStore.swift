@@ -511,6 +511,8 @@ enum ProjectPulseCommand {
             reads.wait()
             throw ProjectPulseError.commandFailed
         }
+        outputPipe.fileHandleForWriting.closeFile()
+        errorPipe.fileHandleForWriting.closeFile()
 
         if terminated.wait(timeout: .now() + timeout) == .timedOut {
             process.terminate()

@@ -39,6 +39,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     lazy var batteryStore = BatteryStore()
     lazy var networkStore = NetworkStore()
     lazy var projectPulseStore = ProjectPulseStore()
+    lazy var githubInboxStore = GitHubInboxStore()
     lazy var diagnosticsStore = DiagnosticsStore()
     lazy var focusTimerStore = FocusTimerStore(
         settings: PanelSettings.focusTimerSettings,
@@ -57,6 +58,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         battery: batteryStore,
         network: networkStore,
         projectPulse: projectPulseStore,
+        githubInbox: githubInboxStore,
         focusTimer: focusTimerStore)
     let notificationCoordinator = DockNotificationCoordinator(
         settings: PanelSettings.notifications)

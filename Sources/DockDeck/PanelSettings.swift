@@ -166,12 +166,14 @@ struct PanelModuleID: Hashable, Codable {
     static let battery = PanelModuleID(rawValue: "battery")
     static let network = PanelModuleID(rawValue: "network")
     static let projectPulse = PanelModuleID(rawValue: "project-pulse")
+    static let githubInbox = PanelModuleID(rawValue: "github-inbox")
     static let focusTimer = PanelModuleID(rawValue: "focus-timer")
 
     static let readOnlyBuiltIns: [PanelModuleID] = [
         .usage, .systemStats, .serviceMonitor, .weather, .schedule, .clock, .battery,
         .network,
         .projectPulse,
+        .githubInbox,
         .focusTimer,
     ]
     static let builtIns: [PanelModuleID] = [.terminal] + readOnlyBuiltIns
@@ -357,6 +359,8 @@ enum PanelSettings {
     private static let notificationsKey = "DockDeck.settings.notifications.v1"
     private static let projectPulseConfigurationKey =
         "DockDeck.settings.projectPulseConfiguration.v1"
+    private static let githubInboxConfigurationKey =
+        "DockDeck.settings.githubInboxConfiguration.v1"
     private static let focusTimerSettingsKey = "DockDeck.settings.focusTimer.v1"
     private static let focusTimerSessionKey = "DockDeck.settings.focusTimerSession.v1"
     private static let panelOrderKey = "DockDeck.settings.panelOrder"
@@ -782,6 +786,20 @@ enum PanelSettings {
         }
     }
 
+    static var githubInboxConfiguration: GitHubInboxConfiguration {
+        get {
+            guard let data = UserDefaults.standard.data(forKey: githubInboxConfigurationKey),
+                let configuration = try? JSONDecoder().decode(
+                    GitHubInboxConfiguration.self, from: data)
+            else { return GitHubInboxConfiguration() }
+            return configuration.normalized()
+        }
+        set {
+            guard let data = try? JSONEncoder().encode(newValue.normalized()) else { return }
+            UserDefaults.standard.set(data, forKey: githubInboxConfigurationKey)
+        }
+    }
+
     static var focusTimerSettings: FocusTimerSettings {
         get {
             guard let data = UserDefaults.standard.data(forKey: focusTimerSettingsKey),
@@ -922,6 +940,7 @@ enum PanelSettings {
         defaults.removeObject(forKey: networkRefreshIntervalKey)
         defaults.removeObject(forKey: notificationsKey)
         defaults.removeObject(forKey: projectPulseConfigurationKey)
+        defaults.removeObject(forKey: githubInboxConfigurationKey)
         defaults.removeObject(forKey: focusTimerSettingsKey)
         defaults.removeObject(forKey: focusTimerSessionKey)
         defaults.removeObject(forKey: panelOrderKey)

@@ -68,6 +68,7 @@ final class PanelModuleServices {
     let battery: BatteryStore
     let network: NetworkStore
     let projectPulse: ProjectPulseStore
+    let githubInbox: GitHubInboxStore
     let focusTimer: FocusTimerStore
 
     private let runtimes: [PanelModuleID: any PanelModuleRuntime]
@@ -82,6 +83,7 @@ final class PanelModuleServices {
         battery: BatteryStore = BatteryStore(),
         network: NetworkStore = NetworkStore(),
         projectPulse: ProjectPulseStore = ProjectPulseStore(),
+        githubInbox: GitHubInboxStore = GitHubInboxStore(),
         focusTimer: FocusTimerStore = FocusTimerStore()
     ) {
         self.usage = usage
@@ -93,6 +95,7 @@ final class PanelModuleServices {
         self.battery = battery
         self.network = network
         self.projectPulse = projectPulse
+        self.githubInbox = githubInbox
         self.focusTimer = focusTimer
         runtimes = [
             .usage: usage,
@@ -104,6 +107,7 @@ final class PanelModuleServices {
             .battery: battery,
             .network: network,
             .projectPulse: projectPulse,
+            .githubInbox: githubInbox,
             .focusTimer: focusTimer,
         ]
     }
@@ -203,6 +207,8 @@ struct ReadOnlyDeckPanelView: View {
             NetworkPanelView(store: services.network, theme: presentation.theme)
         case .projectPulse:
             ProjectPulsePanelView(store: services.projectPulse, theme: presentation.theme)
+        case .githubInbox:
+            GitHubInboxPanelView(store: services.githubInbox, theme: presentation.theme)
         case .focusTimer:
             FocusTimerPanelView(store: services.focusTimer, theme: presentation.theme)
         default:
