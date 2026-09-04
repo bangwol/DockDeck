@@ -266,9 +266,25 @@ struct ReadOnlyModuleDetailView: View {
     }
 
     @ViewBuilder private var detailContent: some View {
-        if presentation.activeModule == .githubInbox {
+        switch presentation.activeModule {
+        case .usage:
+            UsageModuleDetailView(store: services.usage, theme: presentation.theme)
+        case .systemStats:
+            SystemStatsModuleDetailView(
+                store: services.systemStats, theme: presentation.theme)
+        case .serviceMonitor:
+            ServiceMonitorModuleDetailView(
+                store: services.serviceMonitor, theme: presentation.theme)
+        case .schedule:
+            ScheduleModuleDetailView(store: services.schedule, theme: presentation.theme)
+        case .projectPulse:
+            ProjectPulseModuleDetailView(
+                store: services.projectPulse, theme: presentation.theme)
+        case .githubInbox:
             GitHubInboxDetailView(store: services.githubInbox, theme: presentation.theme)
-        } else {
+        case .docker:
+            DockerModuleDetailView(store: services.docker, theme: presentation.theme)
+        default:
             ReadOnlyDeckPanelView(services: services, presentation: presentation)
                 .padding(14)
                 .background(

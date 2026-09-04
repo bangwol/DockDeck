@@ -1153,6 +1153,28 @@ final class PanelAppearanceTests: XCTestCase {
         detail.close()
     }
 
+    func testMajorReadOnlyModuleDetailsRender() {
+        let services = PanelModuleServices()
+        let theme = Theme.theme(id: "")
+        let modules: [PanelModuleID] = [
+            .usage, .systemStats, .serviceMonitor, .schedule,
+            .projectPulse, .githubInbox, .docker,
+        ]
+
+        for module in modules {
+            let presentation = ReadOnlyDeckPresentation(
+                activeModule: module, theme: theme)
+            let view = NSHostingView(
+                rootView: ReadOnlyModuleDetailView(
+                    services: services, presentation: presentation))
+            view.frame = NSRect(origin: .zero, size: ReadOnlyModuleDetailLayout.initialSize)
+            view.layoutSubtreeIfNeeded()
+
+            XCTAssertGreaterThan(view.fittingSize.width, 0, module.rawValue)
+            XCTAssertGreaterThan(view.fittingSize.height, 0, module.rawValue)
+        }
+    }
+
     private func makeReadOnlyDeckController(side: PanelSide) -> ReadOnlyDeckPanelController {
         ReadOnlyDeckPanelController(
             initialFrame: NSRect(x: 0, y: 0, width: 214, height: 59),
