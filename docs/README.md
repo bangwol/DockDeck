@@ -27,7 +27,7 @@ front page harder to scan.
 
 ## Project maintenance
 
-- [Releases and versioning](releases.md)
+- [Branch, PR, release, and version workflow](releases.md)
 
 ## Integrations
 

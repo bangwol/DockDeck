@@ -6,19 +6,31 @@ the single source of truth for the app's three-part version.
 
 ## Version policy
 
-DockDeck uses patch-only preview increments for now:
+DockDeck uses patch-only preview increments for now. Feature work and release
+versioning are separate:
 
 | Change | Version action |
 | --- | --- |
-| Documentation, tests, or refactoring only | No version change |
-| Any user-visible preview change or fix | Increment the patch version (`0.1.0` → `0.1.1`) |
+| Documentation, tests, or internal refactoring only | No version change |
+| Feature or fix PR | No version change; merge it independently after review |
+| Release integration PR | Increment the patch version exactly once (`0.1.0` → `0.1.1`) for all selected changes already on `main` |
 | Another build of the same base version | Keep `VERSION`; increment only the preview sequence |
+
+Keep one logical change in each feature or fix PR. If combined testing is
+needed, use a temporary integration branch without replacing those focused
+reviews with one oversized PR. When the selected work is ready to distribute,
+create a release integration branch from the latest `main`; update `VERSION`
+and release-facing documentation there, then run the release and package
+checks. Do not reserve versions on unfinished feature branches.
 
 Preview sequence numbers belong to Git tags, not `VERSION`. For example,
 `VERSION` remains `0.1.1` for `v0.1.1-preview.1` and
 `v0.1.1-preview.2`. Increment the preview number for another build of the same
 base version. Do not move or reuse a published tag. Minor and major increments
 remain reserved until this policy is explicitly revised.
+
+Merging a PR does not automatically publish a binary. Create a preview tag only
+when the accumulated `main` state is ready for a tested preview release.
 
 `1.0.0` is reserved for a stable feature and settings contract plus a
 Developer ID-signed, notarized distribution path.
@@ -53,11 +65,15 @@ after Developer ID signing and notarization are available.
    ./scripts/package.sh
    ```
 
-4. Create and push an annotated tag. For version `0.1.1`, the first preview uses:
+4. Choose the next unused preview sequence, then create and push an annotated
+   tag:
 
    ```bash
-   git tag -a v0.1.1-preview.1 -m "DockDeck 0.1.1 Preview 1"
-   git push origin v0.1.1-preview.1
+   version="$(tr -d '[:space:]' < VERSION)"
+   preview=1
+   tag="v${version}-preview.${preview}"
+   git tag -a "$tag" -m "DockDeck ${version} Preview ${preview}"
+   git push origin "$tag"
    ```
 
 5. Wait for the Preview Release workflow. Confirm that the GitHub Release is
@@ -65,9 +81,10 @@ after Developer ID signing and notarization are available.
 6. Download the published assets and verify them:
 
    ```bash
-   shasum -a 256 -c DockDeck-0.1.1-macos-universal-unsigned.zip.sha256
-   gh attestation verify DockDeck-0.1.1-macos-universal-unsigned.zip \
-     -R bangwol/DockDeck
+   version="$(tr -d '[:space:]' < VERSION)"
+   artifact="DockDeck-${version}-macos-universal-unsigned.zip"
+   shasum -a 256 -c "${artifact}.sha256"
+   gh attestation verify "$artifact" -R bangwol/DockDeck
    ```
 
 If a published preview is defective, keep its tag immutable and publish the
