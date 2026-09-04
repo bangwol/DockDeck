@@ -80,8 +80,13 @@ enum DockerOutputParser {
             guard let cpuValue = percent(item.cpuPercent),
                 let memoryValue = bytes(String(item.memoryUsage.split(separator: "/").first ?? ""))
             else { throw DockerError.invalidOutput }
-            cpu += cpuValue
-            memory += memoryValue
+            let nextCPU = cpu + cpuValue
+            let nextMemory = memory + memoryValue
+            guard nextCPU.isFinite, nextMemory.isFinite,
+                nextMemory < Double(Int64.max)
+            else { throw DockerError.invalidOutput }
+            cpu = nextCPU
+            memory = nextMemory
         }
         return (cpu, memory)
     }
@@ -122,7 +127,9 @@ enum DockerOutputParser {
         case "tib": multiplier = 1_099_511_627_776
         default: return nil
         }
-        return amount * multiplier
+        let result = amount * multiplier
+        guard result.isFinite, result < Double(Int64.max) else { return nil }
+        return result
     }
 }
 

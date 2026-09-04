@@ -476,7 +476,9 @@ struct DockerModuleDetailView: View {
     }
 
     private func memory(_ value: Double?) -> String {
-        guard let value else { return "--" }
+        guard let value, value.isFinite, value >= 0,
+            value < Double(Int64.max)
+        else { return "--" }
         return ByteCountFormatter.string(
             fromByteCount: Int64(value.rounded()), countStyle: .memory)
     }

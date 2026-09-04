@@ -302,6 +302,30 @@ final class ProjectPulseTests: XCTestCase {
         }
     }
 
+    func testGitHubBrokerPreservesProcessFailureCategories() {
+        let directory = FileManager.default.temporaryDirectory
+        XCTAssertThrowsError(
+            try GitHubCLIRequestBroker.shared.run(
+                executableURL: URL(fileURLWithPath: "/bin/sleep"),
+                arguments: ["1"],
+                currentDirectoryURL: directory,
+                environment: [:],
+                timeout: 0.01)
+        ) { error in
+            XCTAssertEqual(error as? ProjectPulseError, .commandTimedOut)
+        }
+        XCTAssertThrowsError(
+            try GitHubCLIRequestBroker.shared.run(
+                executableURL: URL(fileURLWithPath: "/usr/bin/printf"),
+                arguments: ["oversized"],
+                currentDirectoryURL: directory,
+                environment: [:],
+                maximumOutputBytes: 4)
+        ) { error in
+            XCTAssertEqual(error as? ProjectPulseError, .outputTooLarge)
+        }
+    }
+
     func testReaderReadsTemporaryGitRepository() throws {
         let fileManager = FileManager.default
         let directory = fileManager.temporaryDirectory

@@ -43,6 +43,23 @@ final class DockerTests: XCTestCase {
         XCTAssertEqual(DockerOutputParser.bytes("7.91MB"), 7_910_000)
     }
 
+    func testStatsParserRejectsValuesThatCannotBeDisplayedSafely() {
+        XCTAssertNil(DockerOutputParser.bytes("9000000000GiB"))
+        XCTAssertThrowsError(
+            try DockerOutputParser.parseStats(Data(
+                """
+                {"CPUPerc":"0.25%","MemUsage":"9000000000GiB / 1GiB"}
+                """.utf8))
+        ) { error in
+            guard let error = error as? DockerError else {
+                return XCTFail("Expected DockerError.invalidOutput")
+            }
+            guard case .invalidOutput = error else {
+                return XCTFail("Expected DockerError.invalidOutput")
+            }
+        }
+    }
+
     func testStoreRefreshesAndCompactPanelRenders() throws {
         let snapshot = DockerSnapshot(
             runningCount: 3, stoppedCount: 1, unhealthyCount: 0,

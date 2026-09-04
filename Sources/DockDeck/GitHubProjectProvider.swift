@@ -20,7 +20,9 @@ final class GitHubCLIRequestBroker {
         currentDirectoryURL: URL,
         environment: [String: String],
         cacheKey: String? = nil,
-        cacheDuration: TimeInterval = 0
+        cacheDuration: TimeInterval = 0,
+        timeout: TimeInterval = 8,
+        maximumOutputBytes: Int = BoundedProcessRunner.defaultMaximumOutputBytes
     ) throws -> Data {
         lock.lock()
         defer { lock.unlock() }
@@ -29,11 +31,22 @@ final class GitHubCLIRequestBroker {
         cache = cache.filter { $0.value.expiresAt > now }
         if let cacheKey, let cached = cache[cacheKey] { return cached.data }
 
-        let data = try BoundedProcessRunner.run(
-            executableURL: executableURL,
-            arguments: arguments,
-            currentDirectoryURL: currentDirectoryURL,
-            environmentAdditions: environment)
+        let data: Data
+        do {
+            data = try BoundedProcessRunner.run(
+                executableURL: executableURL,
+                arguments: arguments,
+                currentDirectoryURL: currentDirectoryURL,
+                environmentAdditions: environment,
+                timeout: timeout,
+                maximumOutputBytes: maximumOutputBytes)
+        } catch BoundedProcessError.timedOut {
+            throw ProjectPulseError.commandTimedOut
+        } catch BoundedProcessError.outputTooLarge {
+            throw ProjectPulseError.outputTooLarge
+        } catch {
+            throw ProjectPulseError.commandFailed
+        }
         if let cacheKey, cacheDuration > 0 {
             cache[cacheKey] = CacheEntry(
                 data: data, expiresAt: now.addingTimeInterval(cacheDuration))
