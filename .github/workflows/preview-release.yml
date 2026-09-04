@@ -62,6 +62,9 @@ jobs:
           codesign --verify --deep --strict .build/release-dist/DockDeck.app
           codesign -dvvv .build/release-dist/DockDeck.app 2>&1 \
             | grep -q '^Signature=adhoc$'
+          codesign -d --entitlements :- .build/release-dist/DockDeck.app 2>/dev/null \
+            | plutil -p - \
+            | grep -Fq '"com.apple.security.automation.apple-events" => true'
 
       - name: Attest preview provenance
         uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2

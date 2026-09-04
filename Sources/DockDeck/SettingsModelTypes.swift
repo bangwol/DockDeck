@@ -12,6 +12,7 @@ enum SettingsPaneID: String, CaseIterable, Identifiable {
     case weather
     case schedule
     case clock
+    case music
     case battery
     case network
     case projectPulse
@@ -35,6 +36,7 @@ enum SettingsPaneID: String, CaseIterable, Identifiable {
         case .weather: "Weather"
         case .schedule: "Schedule"
         case .clock: "World Clock"
+        case .music: "Music"
         case .battery: "Battery"
         case .network: "Network"
         case .projectPulse: "Project Pulse"
@@ -58,6 +60,7 @@ enum SettingsPaneID: String, CaseIterable, Identifiable {
         case .weather: "Show current conditions for a selected city."
         case .schedule: "Show the current event or next calendar and reminder item."
         case .clock: "Show local time or another time zone."
+        case .music: "Control the macOS Music app."
         case .battery: "Show charge, power state, and time left."
         case .network: "Show local download and upload throughput."
         case .projectPulse: "Show local Git or remote GitHub repository activity."
@@ -81,6 +84,7 @@ enum SettingsPaneID: String, CaseIterable, Identifiable {
         case .weather: "cloud.sun"
         case .schedule: "calendar"
         case .clock: "clock"
+        case .music: "music.note"
         case .battery: "battery.75percent"
         case .network: "network"
         case .projectPulse: "point.3.connected.trianglepath.dotted"
@@ -137,6 +141,9 @@ enum PanelModuleRegistry {
         PanelModuleDefinition(
             id: .clock, title: "World Clock", subtitle: "Local or selected time zone",
             symbolName: "clock", settingsPane: .clock),
+        PanelModuleDefinition(
+            id: .music, title: "Music", subtitle: "macOS Music playback",
+            symbolName: "music.note", settingsPane: .music),
         PanelModuleDefinition(
             id: .battery, title: "Battery", subtitle: "Charge and power state",
             symbolName: "battery.75percent", settingsPane: .battery),

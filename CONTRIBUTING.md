@@ -99,6 +99,11 @@ preview tag or GitHub Release.
   separate network requests for alert evaluation.
 - Keep World Clock local and minute-aligned. Do not add network time services;
   stop its timer when the module is disabled.
+- Keep Music on the public macOS Music Apple Event scripting interface. Request
+  Automation access only from an explicit Connect action; enabling the module
+  must not prompt or launch Music. Do not use private MediaRemote APIs or add
+  MusicKit credentials. Bound track metadata, retain it only in memory, and
+  keep the usage description and automation entitlement synchronized.
 - Keep Battery on documented IOKit power-source fields only. Do not read or
   persist battery serial numbers, and stop sampling while disabled.
 - Keep Network on primary-interface byte counters only. Do not inspect packets,

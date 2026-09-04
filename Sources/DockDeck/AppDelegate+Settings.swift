@@ -214,6 +214,7 @@ extension AppDelegate {
             values: currentSettingsValues,
             fontNames: TerminalTheme.installedFontNames,
             scheduleStore: scheduleStore,
+            musicStore: musicStore,
             diagnosticsStore: diagnosticsStore)
 
         view.onPaneChange = { [weak self] pane in

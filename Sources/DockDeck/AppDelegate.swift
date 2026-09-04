@@ -48,6 +48,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     lazy var weatherStore = WeatherStore()
     lazy var scheduleStore = ScheduleStore()
     lazy var clockStore = ClockStore()
+    lazy var musicStore = MusicStore()
     lazy var batteryStore = BatteryStore()
     lazy var networkStore = NetworkStore()
     lazy var projectPulseStore = ProjectPulseStore()
@@ -71,6 +72,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         weather: weatherStore,
         schedule: scheduleStore,
         clock: clockStore,
+        music: musicStore,
         battery: batteryStore,
         network: networkStore,
         projectPulse: projectPulseStore,

@@ -87,6 +87,7 @@ extension AppDelegate {
         if enabled.contains(.serviceMonitor) { serviceMonitorStore.refresh() }
         if enabled.contains(.weather) { weatherStore.refresh() }
         if enabled.contains(.schedule) { scheduleStore.refreshAuthorization() }
+        if enabled.contains(.music) { musicStore.refresh() }
         if enabled.contains(.battery) { batteryStore.refresh() }
         if enabled.contains(.network) { networkStore.refresh() }
         if enabled.contains(.projectPulse) { projectPulseStore.refresh() }

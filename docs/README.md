@@ -15,6 +15,7 @@ front page harder to scan.
 - [Usage](modules/usage.md)
 - [System Stats](modules/system-stats.md)
 - [Schedule and Reminders](modules/schedule.md)
+- [Music](modules/music.md)
 - [Project Pulse](modules/project-pulse.md)
 - [GitHub Inbox](modules/github-inbox.md)
 - [Custom Tile](modules/custom-tile.md)

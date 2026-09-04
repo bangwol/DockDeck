@@ -161,6 +161,8 @@ cat > "$APP_PATH/Contents/Info.plist" <<EOF
     <string>DockDeck reads incomplete reminder titles and due dates for Schedule. It never changes reminders.</string>
     <key>NSRemindersUsageDescription</key>
     <string>DockDeck reads incomplete reminder titles and due dates for Schedule. It never changes reminders.</string>
+    <key>NSAppleEventsUsageDescription</key>
+    <string>DockDeck reads playback details and controls the macOS Music app after you connect the Music module.</string>
     <key>LSUIElement</key>
     <true/>
 </dict>
@@ -170,7 +172,7 @@ EOF
 plutil -lint "$APP_PATH/Contents/Info.plist" >/dev/null
 codesign --force --options runtime --sign "$SIGNING_IDENTITY" "$APP_BRIDGE_PATH"
 codesign --force --options runtime --sign "$SIGNING_IDENTITY" \
-    --identifier "$LABEL" "$APP_PATH"
+    --entitlements "$REPO_DIR/DockDeck.entitlements" --identifier "$LABEL" "$APP_PATH"
 
 launchctl unload "$PLIST_PATH" 2>/dev/null || true
 mkdir -p "$HOME/Applications"

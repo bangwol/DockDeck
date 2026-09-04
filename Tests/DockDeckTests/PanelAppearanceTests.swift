@@ -18,8 +18,8 @@ final class PanelAppearanceTests: XCTestCase {
         XCTAssertEqual(
             configuration.left,
             [
-                .usage, .systemStats, .serviceMonitor, .weather, .schedule, .clock, .battery,
-                .network,
+                .usage, .systemStats, .serviceMonitor, .weather, .schedule, .clock, .music,
+                .battery, .network,
                 .projectPulse,
                 .githubInbox,
                 .docker,
@@ -45,8 +45,8 @@ final class PanelAppearanceTests: XCTestCase {
         XCTAssertEqual(
             decoded.right,
             [
-                .usage, .systemStats, .serviceMonitor, .weather, .schedule, .clock, .battery,
-                .network,
+                .usage, .systemStats, .serviceMonitor, .weather, .schedule, .clock, .music,
+                .battery, .network,
                 .projectPulse,
                 .githubInbox,
                 .docker,
@@ -67,7 +67,8 @@ final class PanelAppearanceTests: XCTestCase {
         XCTAssertEqual(
             configuration.right,
             [
-                .usage, .serviceMonitor, .weather, .schedule, .clock, .battery, .network,
+                .usage, .serviceMonitor, .weather, .schedule, .clock, .music, .battery,
+                .network,
                 .projectPulse,
                 .githubInbox,
                 .docker,
@@ -139,8 +140,8 @@ final class PanelAppearanceTests: XCTestCase {
         XCTAssertEqual(
             model.values.deckConfiguration.left,
             [
-                .usage, .systemStats, .serviceMonitor, .weather, .schedule, .clock, .battery,
-                .network,
+                .usage, .systemStats, .serviceMonitor, .weather, .schedule, .clock, .music,
+                .battery, .network,
                 .projectPulse,
                 .githubInbox,
                 .docker,
@@ -232,7 +233,7 @@ final class PanelAppearanceTests: XCTestCase {
             model.moduleDefinitions.map(\.id),
             [
                 .battery, .terminal, .usage,
-                .customTile, .docker, .focusTimer, .githubInbox, .network,
+                .customTile, .docker, .focusTimer, .githubInbox, .music, .network,
                 .projectPulse, .schedule, .serviceMonitor, .systemStats, .weather, .clock,
             ])
         XCTAssertEqual(
@@ -326,7 +327,7 @@ final class PanelAppearanceTests: XCTestCase {
             model.availablePanes,
             [
                 .decks, .notifications, .diagnostics, .terminal, .usage, .battery,
-                .customTile, .docker, .focusTimer, .githubInbox, .network,
+                .customTile, .docker, .focusTimer, .githubInbox, .music, .network,
                 .projectPulse, .schedule, .serviceMonitor, .systemStats, .weather,
                 .clock, .appearance,
             ])
@@ -336,6 +337,7 @@ final class PanelAppearanceTests: XCTestCase {
         XCTAssertEqual(model.moduleDefinition(for: .weather)?.id, .weather)
         XCTAssertEqual(model.moduleDefinition(for: .schedule)?.id, .schedule)
         XCTAssertEqual(model.moduleDefinition(for: .clock)?.id, .clock)
+        XCTAssertEqual(model.moduleDefinition(for: .music)?.id, .music)
         XCTAssertEqual(model.moduleDefinition(for: .battery)?.id, .battery)
         XCTAssertEqual(model.moduleDefinition(for: .network)?.id, .network)
         XCTAssertEqual(model.moduleDefinition(for: .projectPulse)?.id, .projectPulse)
@@ -1172,7 +1174,7 @@ final class PanelAppearanceTests: XCTestCase {
         let theme = Theme.theme(id: "")
         let modules: [PanelModuleID] = [
             .usage, .systemStats, .serviceMonitor, .schedule,
-            .projectPulse, .githubInbox, .docker,
+            .music, .projectPulse, .githubInbox, .docker,
         ]
 
         for module in modules {
