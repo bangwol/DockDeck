@@ -18,7 +18,8 @@ enum BoundedProcessRunner {
         environment: [String: String]? = nil,
         environmentAdditions: [String: String] = [:],
         timeout: TimeInterval = 8,
-        maximumOutputBytes: Int = defaultMaximumOutputBytes
+        maximumOutputBytes: Int = defaultMaximumOutputBytes,
+        allowedExitStatuses: Set<Int32> = [0]
     ) throws -> Data {
         let process = Process()
         let outputPipe = Pipe()
@@ -61,7 +62,7 @@ enum BoundedProcessRunner {
         }
         collector.finish()
         guard !capture.exceededLimit else { throw BoundedProcessError.outputTooLarge }
-        guard process.terminationStatus == 0 else {
+        guard allowedExitStatuses.contains(process.terminationStatus) else {
             throw BoundedProcessError.nonZeroExit(process.terminationStatus)
         }
         return capture.output

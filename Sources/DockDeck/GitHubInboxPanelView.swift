@@ -188,6 +188,23 @@ struct GitHubInboxDetailView: View {
     }
 
     private func detailRow(_ entry: GitHubInboxEntry) -> some View {
+        Group {
+            if let webURL = entry.webURL {
+                Link(destination: webURL) {
+                    detailRowContent(entry, showsDisclosure: true)
+                }
+                .buttonStyle(.plain)
+                .help("Open on GitHub")
+                .accessibilityHint("Opens in your default browser")
+            } else {
+                detailRowContent(entry, showsDisclosure: false)
+            }
+        }
+    }
+
+    private func detailRowContent(
+        _ entry: GitHubInboxEntry, showsDisclosure: Bool
+    ) -> some View {
         HStack(spacing: 9) {
             Text(entry.reasonLabel)
                 .font(.system(size: 8, weight: .bold, design: .rounded))
@@ -210,6 +227,11 @@ struct GitHubInboxDetailView: View {
                 .lineLimit(1)
             }
             Spacer(minLength: 0)
+            if showsDisclosure {
+                Image(systemName: "arrow.up.right")
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(baseColor.opacity(0.45))
+            }
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 5)

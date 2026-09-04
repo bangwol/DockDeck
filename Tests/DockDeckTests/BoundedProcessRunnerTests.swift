@@ -3,6 +3,15 @@ import XCTest
 @testable import DockDeck
 
 final class BoundedProcessRunnerTests: XCTestCase {
+    func testRunnerCanReturnAllowedNonzeroExitOutput() throws {
+        let output = try BoundedProcessRunner.run(
+            executableURL: URL(fileURLWithPath: "/bin/sh"),
+            arguments: ["-c", "printf accepted; exit 7"],
+            allowedExitStatuses: [0, 7])
+
+        XCTAssertEqual(String(data: output, encoding: .utf8), "accepted")
+    }
+
     func testReturnsBoundedStandardOutput() throws {
         let output = try BoundedProcessRunner.run(
             executableURL: URL(fileURLWithPath: "/usr/bin/printf"),

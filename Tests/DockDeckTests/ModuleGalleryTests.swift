@@ -135,11 +135,13 @@ final class ModuleGalleryTests: XCTestCase {
                 GitHubInboxEntry(
                     id: "1", title: "Improve compact layout",
                     repository: "example/DockDeck", reason: "review_requested",
-                    updatedAt: now),
+                    updatedAt: now,
+                    webURL: URL(string: "https://github.com/example/DockDeck/pull/12")),
                 GitHubInboxEntry(
                     id: "2", title: "Fix refresh scheduling",
                     repository: "example/DockDeck", reason: "mention",
-                    updatedAt: now.addingTimeInterval(-900)),
+                    updatedAt: now.addingTimeInterval(-900),
+                    webURL: URL(string: "https://github.com/example/DockDeck/issues/18")),
             ],
             observedAt: now)
         return PanelModuleServices(

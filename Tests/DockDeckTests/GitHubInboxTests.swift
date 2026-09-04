@@ -6,6 +6,21 @@ import XCTest
 @testable import DockDeck
 
 final class GitHubInboxTests: XCTestCase {
+    func testLiveClientUsesAuthenticatedGitHubSessionWhenRequested() throws {
+        guard ProcessInfo.processInfo.environment["DOCKDECK_LIVE_GITHUB_TEST"] == "1"
+        else { throw XCTSkip("Set DOCKDECK_LIVE_GITHUB_TEST=1 to query GitHub") }
+        let client = GitHubInboxClient()
+
+        let first = try client.read(
+            configuration: GitHubInboxConfiguration(), now: Date())
+        let second = try client.read(
+            configuration: GitHubInboxConfiguration(), now: Date())
+
+        XCTAssertGreaterThanOrEqual(first.unreadCount, 0)
+        XCTAssertGreaterThanOrEqual(second.observedAt, first.observedAt)
+        XCTAssertGreaterThanOrEqual(client.minimumPollInterval, 0)
+    }
+
     func testConfigurationNormalizesRepositoryAndRefreshInterval() {
         let configuration = GitHubInboxConfiguration(
             actionsRepository: "  bangwol/DockDeck  ", refreshInterval: 601)
@@ -21,7 +36,7 @@ final class GitHubInboxTests: XCTestCase {
         let data = Data(
             """
             [
-              [{"id":"1","reason":"mention","updated_at":"2026-09-03T10:00:00Z","subject":{"title":"Ping"},"repository":{"full_name":"bangwol/DockDeck"}},{"id":"2","reason":"review_requested","updated_at":"2026-09-02T10:00:00Z","subject":{"title":"Review DockDeck"},"repository":{"full_name":"bangwol/DockDeck"}}],
+              [{"id":"1","reason":"mention","updated_at":"2026-09-03T10:00:00Z","subject":{"title":"Ping","url":"https://api.github.com/repos/bangwol/DockDeck/issues/12"},"repository":{"full_name":"bangwol/DockDeck"}},{"id":"2","reason":"review_requested","updated_at":"2026-09-02T10:00:00Z","subject":{"title":"Review DockDeck","url":"https://api.github.com/repos/bangwol/DockDeck/pulls/34"},"repository":{"full_name":"bangwol/DockDeck"}}],
               [{"id":"3","reason":"team_mention","updated_at":"2026-09-01T10:00:00Z","subject":{"title":"Team ping"},"repository":{"full_name":"openai/example"}},{"id":"4","reason":"ci_activity","updated_at":"2026-09-04T10:00:00Z","subject":{"title":"CI failed"},"repository":{"full_name":"bangwol/DockDeck"}},{"reason":"subscribed"}]
             ]
             """.utf8)
@@ -40,6 +55,52 @@ final class GitHubInboxTests: XCTestCase {
             ["Review DockDeck", "Ping", "Team ping", "CI failed"])
         XCTAssertEqual(snapshot.entries.first?.reasonLabel, "REVIEW")
         XCTAssertEqual(snapshot.entries.first?.repositoryName, "DockDeck")
+        XCTAssertEqual(
+            snapshot.entries.first?.webURL?.absoluteString,
+            "https://github.com/bangwol/DockDeck/pull/34")
+    }
+
+    func testNotificationURLResolverRejectsLookalikesAndCredentials() {
+        XCTAssertEqual(
+            GitHubNotificationURLResolver.resolve(
+                apiURL: "https://api.github.com/repos/bangwol/DockDeck/commits/abc123",
+                repository: "bangwol/DockDeck")?.absoluteString,
+            "https://github.com/bangwol/DockDeck/commit/abc123")
+        XCTAssertEqual(
+            GitHubNotificationURLResolver.resolve(
+                apiURL: "https://api.github.com.evil.test/repos/bangwol/DockDeck/issues/1",
+                repository: "bangwol/DockDeck")?.absoluteString,
+            "https://github.com/bangwol/DockDeck")
+        XCTAssertEqual(
+            GitHubNotificationURLResolver.resolve(
+                apiURL: "https://user:secret@api.github.com/repos/bangwol/DockDeck/issues/1",
+                repository: "bangwol/DockDeck")?.absoluteString,
+            "https://github.com/bangwol/DockDeck")
+    }
+
+    func testIncludedResponseParserReadsHeadersAndBody() throws {
+        let response = try GitHubIncludedResponseParser.parse(Data(
+            """
+            HTTP/2.0 200 OK\r
+            Etag: "abc"\r
+            X-Poll-Interval: 90\r
+            \r
+            [{"id":"1"}]
+            """.utf8))
+
+        XCTAssertEqual(response.statusCode, 200)
+        XCTAssertEqual(response.headers["etag"], "\"abc\"")
+        XCTAssertEqual(response.headers["x-poll-interval"], "90")
+        XCTAssertEqual(String(data: response.body, encoding: .utf8), "[{\"id\":\"1\"}]")
+    }
+
+    func testIncludedResponseParserAcceptsNotModifiedWithoutBody() throws {
+        let response = try GitHubIncludedResponseParser.parse(Data(
+            "HTTP/2.0 304 Not Modified\r\nX-Poll-Interval: 120\r\n\r\n".utf8))
+
+        XCTAssertEqual(response.statusCode, 304)
+        XCTAssertEqual(response.headers["x-poll-interval"], "120")
+        XCTAssertTrue(response.body.isEmpty)
     }
 
     func testFailedRunParserKeepsOnlyRecentFailures() throws {

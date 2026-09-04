@@ -38,6 +38,19 @@ struct GitHubInboxEntry: Identifiable, Equatable {
     let repository: String
     let reason: String
     let updatedAt: Date?
+    let webURL: URL?
+
+    init(
+        id: String, title: String, repository: String, reason: String,
+        updatedAt: Date?, webURL: URL? = nil
+    ) {
+        self.id = id
+        self.title = title
+        self.repository = repository
+        self.reason = reason
+        self.updatedAt = updatedAt
+        self.webURL = webURL
+    }
 
     var repositoryName: String {
         repository.split(separator: "/", maxSplits: 1).last.map(String.init) ?? repository
@@ -103,7 +116,10 @@ enum GitHubInboxError: LocalizedError {
 
 enum GitHubInboxParser {
     private struct Notification: Decodable {
-        struct Subject: Decodable { let title: String? }
+        struct Subject: Decodable {
+            let title: String?
+            let url: String?
+        }
         struct Repository: Decodable {
             let fullName: String?
 
@@ -157,7 +173,9 @@ enum GitHubInboxParser {
                 title: String(rawTitle.prefix(140)),
                 repository: repository,
                 reason: String(notification.reason.prefix(40)),
-                updatedAt: notification.updatedAt.flatMap { formatter.date(from: $0) })
+                updatedAt: notification.updatedAt.flatMap { formatter.date(from: $0) },
+                webURL: GitHubNotificationURLResolver.resolve(
+                    apiURL: notification.subject?.url, repository: repository))
         }.sorted { left, right in
             let leftPriority = priority(left.reason)
             let rightPriority = priority(right.reason)
@@ -206,16 +224,29 @@ enum GitHubInboxParser {
 }
 
 protocol GitHubInboxReading {
+    var minimumPollInterval: TimeInterval { get }
     func read(configuration: GitHubInboxConfiguration, now: Date) throws
         -> GitHubInboxSnapshot
 }
 
-struct GitHubInboxClient: GitHubInboxReading {
+extension GitHubInboxReading {
+    var minimumPollInterval: TimeInterval { 0 }
+}
+
+final class GitHubInboxClient: GitHubInboxReading {
     private static let environment = [
         "GH_PROMPT_DISABLED": "1",
         "NO_COLOR": "1",
         "PAGER": "cat",
     ]
+    private let lock = NSLock()
+    private var validatorHeader: String?
+    private var cachedNotifications: Data?
+    private var storedMinimumPollInterval: TimeInterval = 0
+
+    var minimumPollInterval: TimeInterval {
+        lock.withLock { storedMinimumPollInterval }
+    }
 
     func read(
         configuration: GitHubInboxConfiguration, now: Date
@@ -223,18 +254,61 @@ struct GitHubInboxClient: GitHubInboxReading {
         guard let gh = ProjectPulseBinaryLocator.githubCLI() else {
             throw GitHubInboxError.cliUnavailable
         }
-        let notifications: Data
+        let probe: GitHubIncludedResponse
         do {
-            notifications = try GitHubCLIRequestBroker.shared.run(
+            var arguments = [
+                "api", "--include", "-X", "GET", "notifications",
+                "-f", "all=false", "-f", "participating=false", "-F", "per_page=50",
+            ]
+            if let validatorHeader = lock.withLock({ validatorHeader }) {
+                arguments.append(contentsOf: ["-H", validatorHeader])
+            }
+            let output = try BoundedProcessRunner.run(
                 executableURL: gh,
-                arguments: [
-                    "api", "--paginate", "--slurp", "-X", "GET", "notifications",
-                    "-f", "all=false", "-f", "participating=false", "-F", "per_page=100",
-                ],
+                arguments: arguments,
                 currentDirectoryURL: FileManager.default.homeDirectoryForCurrentUser,
-                environment: Self.environment,
-                cacheKey: "inbox", cacheDuration: 30)
+                environmentAdditions: Self.environment,
+                allowedExitStatuses: [0, 1])
+            probe = try GitHubIncludedResponseParser.parse(output)
         } catch {
+            throw GitHubInboxError.requestFailed
+        }
+        updateMinimumPollInterval(probe)
+        let nextValidatorHeader = conditionalHeader(from: probe)
+
+        let notifications: Data
+        let cachesNotifications: Bool
+        switch probe.statusCode {
+        case 200:
+            cachesNotifications = true
+            if probe.headers["link"]?.contains("rel=\"next\"") == true {
+                do {
+                    notifications = try GitHubCLIRequestBroker.shared.run(
+                        executableURL: gh,
+                        arguments: [
+                            "api", "--paginate", "--slurp", "-X", "GET", "notifications",
+                            "-f", "all=false", "-f", "participating=false",
+                            "-F", "per_page=50",
+                        ],
+                        currentDirectoryURL: FileManager.default.homeDirectoryForCurrentUser,
+                        environment: Self.environment,
+                        cacheKey: "inbox", cacheDuration: 30)
+                } catch {
+                    throw GitHubInboxError.requestFailed
+                }
+            } else {
+                notifications = probe.body
+            }
+        case 304:
+            cachesNotifications = false
+            guard let cached = lock.withLock({ cachedNotifications }) else {
+                throw GitHubInboxError.invalidOutput
+            }
+            notifications = cached
+            if let nextValidatorHeader {
+                lock.withLock { validatorHeader = nextValidatorHeader }
+            }
+        default:
             throw GitHubInboxError.requestFailed
         }
 
@@ -245,8 +319,42 @@ struct GitHubInboxClient: GitHubInboxReading {
         } else {
             failedRuns = nil
         }
-        return try GitHubInboxParser.parseNotifications(
+        let snapshot = try GitHubInboxParser.parseNotifications(
             notifications, failedRuns: failedRuns, repository: repository, observedAt: now)
+        if cachesNotifications {
+            lock.withLock {
+                cachedNotifications = notifications
+                validatorHeader = nextValidatorHeader
+            }
+        }
+        return snapshot
+    }
+
+    private func updateMinimumPollInterval(_ response: GitHubIncludedResponse) {
+        lock.withLock {
+            if let seconds = response.headers["x-poll-interval"].flatMap(Double.init),
+                seconds.isFinite
+            {
+                storedMinimumPollInterval = min(max(seconds, 0), 24 * 60 * 60)
+            }
+        }
+    }
+
+    private func conditionalHeader(from response: GitHubIncludedResponse) -> String? {
+        if let lastModified = safeHeaderValue(response.headers["last-modified"]) {
+            return "If-Modified-Since: \(lastModified)"
+        }
+        if let etag = safeHeaderValue(response.headers["etag"]) {
+            return "If-None-Match: \(etag)"
+        }
+        return nil
+    }
+
+    private func safeHeaderValue(_ value: String?) -> String? {
+        guard let value, !value.isEmpty, value.count <= 512,
+            !value.contains("\r"), !value.contains("\n")
+        else { return nil }
+        return value
     }
 
     private func readFailedRuns(gh: URL, repository: String, now: Date) -> Int? {
@@ -353,6 +461,7 @@ final class GitHubInboxStore: ObservableObject {
                 case .success(let snapshot):
                     self.snapshot = snapshot
                     self.status = .ready
+                    self.scheduleTimer()
                 case .failure(let error):
                     self.status = .unavailable(
                         (error as? LocalizedError)?.errorDescription
@@ -369,7 +478,8 @@ final class GitHubInboxStore: ObservableObject {
             return
         }
         let interval = refreshCadence.effectiveInterval(
-            configuredInterval: configuration.refreshInterval)
+            configuredInterval: max(
+                configuration.refreshInterval, reader.minimumPollInterval))
         timer = .moduleRefreshTimer(interval: interval) { [weak self] in self?.refresh() }
     }
 }
