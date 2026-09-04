@@ -65,6 +65,7 @@ final class PanelModuleServices {
     let weather: WeatherStore
     let schedule: ScheduleStore
     let clock: ClockStore
+    let music: MusicStore
     let battery: BatteryStore
     let network: NetworkStore
     let projectPulse: ProjectPulseStore
@@ -82,6 +83,7 @@ final class PanelModuleServices {
         weather: WeatherStore = WeatherStore(),
         schedule: ScheduleStore = ScheduleStore(),
         clock: ClockStore = ClockStore(),
+        music: MusicStore = MusicStore(),
         battery: BatteryStore = BatteryStore(),
         network: NetworkStore = NetworkStore(),
         projectPulse: ProjectPulseStore = ProjectPulseStore(),
@@ -96,6 +98,7 @@ final class PanelModuleServices {
         self.weather = weather
         self.schedule = schedule
         self.clock = clock
+        self.music = music
         self.battery = battery
         self.network = network
         self.projectPulse = projectPulse
@@ -110,6 +113,7 @@ final class PanelModuleServices {
             .weather: weather,
             .schedule: schedule,
             .clock: clock,
+            .music: music,
             .battery: battery,
             .network: network,
             .projectPulse: projectPulse,
@@ -209,6 +213,8 @@ struct ReadOnlyDeckPanelView: View {
                 theme: presentation.theme,
                 timeZoneIdentifier: PanelSettings.clockTimeZoneIdentifier,
                 hourFormat: PanelSettings.clockHourFormat)
+        case .music:
+            MusicPanelView(store: services.music, theme: presentation.theme)
         case .battery:
             BatteryPanelView(store: services.battery, theme: presentation.theme)
         case .network:
@@ -277,6 +283,8 @@ struct ReadOnlyModuleDetailView: View {
                 store: services.serviceMonitor, theme: presentation.theme)
         case .schedule:
             ScheduleModuleDetailView(store: services.schedule, theme: presentation.theme)
+        case .music:
+            MusicModuleDetailView(store: services.music, theme: presentation.theme)
         case .projectPulse:
             ProjectPulseModuleDetailView(
                 store: services.projectPulse, theme: presentation.theme)

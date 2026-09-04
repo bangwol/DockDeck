@@ -83,6 +83,7 @@ extension ServiceMonitorStore: PanelModuleRuntime {}
 extension WeatherStore: PanelModuleRuntime {}
 extension ScheduleStore: PanelModuleRuntime {}
 extension ClockStore: PanelModuleRuntime {}
+extension MusicStore: PanelModuleRuntime {}
 extension BatteryStore: PanelModuleRuntime {}
 extension NetworkStore: PanelModuleRuntime {}
 extension ProjectPulseStore: PanelModuleRuntime {}

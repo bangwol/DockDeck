@@ -100,6 +100,8 @@ cat > "$APP_PATH/Contents/Info.plist" <<EOF
     <string>DockDeck reads incomplete reminder titles and due dates for Schedule. It never changes reminders.</string>
     <key>NSRemindersUsageDescription</key>
     <string>DockDeck reads incomplete reminder titles and due dates for Schedule. It never changes reminders.</string>
+    <key>NSAppleEventsUsageDescription</key>
+    <string>DockDeck reads playback details and controls the macOS Music app after you connect the Music module.</string>
     <key>LSUIElement</key>
     <true/>
 </dict>
@@ -111,13 +113,15 @@ plutil -lint "$APP_PATH/Contents/Info.plist" >/dev/null
 if [ "$SIGNING_IDENTITY" = "-" ]; then
     echo "Ad-hoc signing $APP_PATH..."
     codesign --force --options runtime --sign - "$APP_BRIDGE_PATH"
-    codesign --force --options runtime --sign - --identifier "$LABEL" "$APP_PATH"
+    codesign --force --options runtime --sign - \
+        --entitlements "$REPO_DIR/DockDeck.entitlements" --identifier "$LABEL" "$APP_PATH"
 else
     echo "Signing $APP_PATH with the configured identity..."
     codesign --force --options runtime --timestamp --sign "$SIGNING_IDENTITY" \
         "$APP_BRIDGE_PATH"
     codesign --force --options runtime --timestamp \
-        --sign "$SIGNING_IDENTITY" --identifier "$LABEL" "$APP_PATH"
+        --sign "$SIGNING_IDENTITY" --entitlements "$REPO_DIR/DockDeck.entitlements" \
+        --identifier "$LABEL" "$APP_PATH"
 fi
 
 codesign --verify --deep --strict "$APP_PATH"

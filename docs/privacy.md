@@ -16,6 +16,7 @@ pointer coordinates, or clicked content.
 | Weather | Open-Meteo forecast and geocoding APIs | Sends searches and selected coordinates over HTTPS only while used, and stores the selected city locally. |
 | Schedule | Apple EventKit | Reads selected calendars, safe conference links, and optional due Reminders after separate explicit permissions. It never saves, edits, logs, or uploads items. |
 | World Clock | macOS time-zone database | Formats time locally and stops its timer while disabled. |
+| Music | macOS Music app Apple Events | After explicit Automation permission, reads bounded current-track metadata and playback state in memory and sends transport commands. It does not use MusicKit, read an Apple ID, or contact a network service. |
 | Battery | macOS IOKit | Reads the internal power source locally without battery identifiers or serial numbers. |
 | Network | macOS routing and Network frameworks | Reads primary-interface byte counters and connection properties without inspecting traffic, addresses, or destinations. |
 | Project Pulse | Local `git`; authenticated `gh` REST, GraphQL, and optional Actions calls | Stores a selected local path, GitHub view, or `owner/repository`. Parsed summaries stay in memory; command output and GitHub tokens are never stored. |
@@ -43,8 +44,8 @@ allowlist and omit paths, URLs, account identifiers, command output, and tokens.
 
 Network work is opt-in by module. Weather contacts Open-Meteo, Service Monitor
 contacts only configured endpoints, and GitHub modules invoke authenticated
-`gh` commands. Schedule, World Clock, Battery, Network counters, Focus Timer,
-and the default System Stats metrics do not contact an external service.
+`gh` commands. Schedule, World Clock, Music, Battery, Network counters, Focus
+Timer, and the default System Stats metrics do not contact an external service.
 
 See each [module guide](README.md#module-guides) for request cadence, retained
 state, permissions, and provider-specific limits.

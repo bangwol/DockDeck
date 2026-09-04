@@ -494,6 +494,128 @@ struct DockerModuleDetailView: View {
     private var baseColor: Color { Color(nsColor: theme.foregroundColor) }
 }
 
+struct MusicModuleDetailView: View {
+    @ObservedObject var store: MusicStore
+    let theme: Theme
+
+    var body: some View {
+        VStack(spacing: 14) {
+            if let track = store.snapshot?.track {
+                HStack(spacing: 12) {
+                    Image(systemName: "music.note")
+                        .font(.system(size: 24, weight: .semibold))
+                        .foregroundStyle(.pink)
+                        .frame(width: 42, height: 42)
+                        .background(baseColor.opacity(0.07), in: RoundedRectangle(cornerRadius: 9))
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(track.title)
+                            .font(.headline)
+                            .lineLimit(1)
+                        Text(track.artist + albumSuffix(track.album))
+                            .font(.caption)
+                            .foregroundStyle(baseColor.opacity(0.62))
+                            .lineLimit(1)
+                    }
+                    Spacer()
+                    Text(store.snapshot?.state.title ?? "Stopped")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.pink)
+                }
+                progress(track)
+            } else {
+                Label(placeholder, systemImage: placeholderSymbol)
+                    .foregroundStyle(baseColor.opacity(0.7))
+                    .frame(maxWidth: .infinity)
+            }
+
+            HStack(spacing: 12) {
+                Button(action: { store.send(.previous) }) {
+                    Label("Previous", systemImage: "backward.end.fill")
+                }
+                .disabled(!store.canControl)
+                Button(action: { store.send(.playPause) }) {
+                    Label(playPauseTitle, systemImage: playPauseSymbol)
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(!store.canControl)
+                Button(action: { store.send(.next) }) {
+                    Label("Next", systemImage: "forward.end.fill")
+                }
+                .disabled(!store.canControl)
+                Spacer()
+                if store.status == .permissionRequired || store.status == .notRunning {
+                    Button("Connect", action: store.requestAccess)
+                } else {
+                    Button("Open Music", action: store.openMusic)
+                }
+            }
+            .controlSize(.regular)
+        }
+        .moduleDetailSurface()
+    }
+
+    private func progress(_ track: MusicTrackSnapshot) -> some View {
+        VStack(spacing: 5) {
+            GeometryReader { proxy in
+                ZStack(alignment: .leading) {
+                    Capsule().fill(baseColor.opacity(0.12))
+                    Capsule()
+                        .fill(.pink)
+                        .frame(width: proxy.size.width * CGFloat(track.progress ?? 0))
+                }
+            }
+            .frame(height: 5)
+            HStack {
+                Text(time(track.position))
+                Spacer()
+                Text(time(track.duration))
+            }
+            .font(.caption.monospacedDigit())
+            .foregroundStyle(baseColor.opacity(0.58))
+        }
+    }
+
+    private func albumSuffix(_ album: String?) -> String {
+        album.map { " · \($0)" } ?? ""
+    }
+
+    private func time(_ interval: TimeInterval?) -> String {
+        guard let interval else { return "--:--" }
+        let seconds = max(Int(interval.rounded(.down)), 0)
+        return String(format: "%d:%02d", seconds / 60, seconds % 60)
+    }
+
+    private var placeholder: String {
+        switch store.status {
+        case .checking: "Checking Music"
+        case .notRunning: "Open and connect the macOS Music app"
+        case .permissionRequired: "Connect Music in Settings"
+        case .permissionDenied: "Allow DockDeck in macOS Automation settings"
+        case .ready: "Nothing playing"
+        case .unavailable: "Music automation unavailable"
+        }
+    }
+
+    private var placeholderSymbol: String {
+        switch store.status {
+        case .permissionDenied, .unavailable: "exclamationmark.triangle"
+        case .permissionRequired: "lock"
+        case .notRunning: "power"
+        default: "music.note"
+        }
+    }
+
+    private var playPauseTitle: String {
+        store.snapshot?.state == .playing ? "Pause" : "Play"
+    }
+
+    private var playPauseSymbol: String {
+        store.snapshot?.state == .playing ? "pause.fill" : "play.fill"
+    }
+
+    private var baseColor: Color { Color(nsColor: theme.foregroundColor) }
+}
+
 private struct DetailMetricValue {
     let title: String
     let value: String

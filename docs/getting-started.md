@@ -13,6 +13,7 @@ Developer ID-signed and notarized stable binary is not available yet.
 | [Claude Code](https://code.claude.com/docs/en/installation), signed in | Claude Usage values |
 | [GitHub CLI](https://cli.github.com/), signed in | Project Pulse and GitHub Inbox |
 | Docker CLI and a running local engine | Docker module |
+| Built-in macOS Music app | Music module |
 
 Only the build tools are required to launch DockDeck. Each optional integration
 can remain disabled until its dependency is ready.
@@ -50,8 +51,9 @@ the fallback layout.
 
 Schedule requests Calendar and Reminders separately and only when their buttons
 are pressed. Service Monitor can prompt for Local Network access when checking a
-private or local address. DockDeck does not require Full Disk Access, Screen
-Recording, or Location access.
+private or local address. Music requests Automation access only after you enable
+the module and press **Connect**. DockDeck does not require Full Disk Access,
+Screen Recording, or Location access.
 
 ## Deck basics
 
@@ -94,6 +96,7 @@ respected.
 | Click outside focused Terminal | Return it to the Dock |
 | Drag an expanded Terminal edge | Resize it; DockDeck remembers the result |
 | Double-click a read-only module | Open a resizable detail view |
+| Click Music transport buttons | Previous, play or pause, and next track |
 | Right-click a Deck | Navigate, refresh, or open Settings |
 | `⌘,` | Open Settings |
 | `⌘R` | Refresh eligible visible data |
@@ -115,6 +118,9 @@ Enable Dock geometry diagnostics when investigating placement:
 ```bash
 DOCKDECK_DEBUG=1 swift run DockDeck
 ```
+
+Music Automation requires the packaged usage description and entitlement, so
+test that module with `./scripts/install.sh`, not `swift run DockDeck`.
 
 ## Update or uninstall
 

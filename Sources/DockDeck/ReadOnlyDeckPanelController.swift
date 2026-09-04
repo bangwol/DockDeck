@@ -212,6 +212,7 @@ final class ReadOnlyDeckPanelController:
         onAutoSlideStateChange()
         menu.removeAllItems()
         if activeModule == .usage { services.usage.refreshClaudeUsageIfDue() }
+        if activeModule == .music { services.music.refresh() }
 
         addItem(
             to: menu,
@@ -275,6 +276,31 @@ final class ReadOnlyDeckPanelController:
                 action: #selector(skipFocusTimer(_:)), keyEquivalent: "")
             skip.target = self
             menu.addItem(skip)
+        }
+
+        if activeModule == .music {
+            menu.addItem(.separator())
+            addMusicItem(
+                to: menu, title: "Previous Track", action: #selector(previousMusicTrack(_:)),
+                enabled: services.music.canControl)
+            addMusicItem(
+                to: menu,
+                title: services.music.snapshot?.state == .playing ? "Pause" : "Play",
+                action: #selector(toggleMusicPlayback(_:)),
+                enabled: services.music.canControl)
+            addMusicItem(
+                to: menu, title: "Next Track", action: #selector(nextMusicTrack(_:)),
+                enabled: services.music.canControl)
+            if services.music.status == .permissionRequired
+                || services.music.status == .notRunning
+            {
+                addMusicItem(
+                    to: menu, title: "Connect Music…",
+                    action: #selector(connectMusic(_:)))
+            }
+            addMusicItem(
+                to: menu, title: "Open Music",
+                action: #selector(openMusic(_:)))
         }
 
         menu.addItem(.separator())
@@ -396,6 +422,26 @@ final class ReadOnlyDeckPanelController:
         services.focusTimer.skip()
     }
 
+    @objc private func previousMusicTrack(_ sender: Any?) {
+        services.music.send(.previous)
+    }
+
+    @objc private func toggleMusicPlayback(_ sender: Any?) {
+        services.music.send(.playPause)
+    }
+
+    @objc private func nextMusicTrack(_ sender: Any?) {
+        services.music.send(.next)
+    }
+
+    @objc private func connectMusic(_ sender: Any?) {
+        services.music.requestAccess()
+    }
+
+    @objc private func openMusic(_ sender: Any?) {
+        services.music.openMusic()
+    }
+
     private func handleScrollWheel(_ event: NSEvent) -> Bool {
         let enabledModules = PanelSettings.enabledModules(on: side)
         guard enabledModules.count > 1,
@@ -427,6 +473,15 @@ final class ReadOnlyDeckPanelController:
         let item = NSMenuItem(title: title, action: action, keyEquivalent: "")
         item.target = menuTarget
         item.representedObject = representedObject
+        menu.addItem(item)
+    }
+
+    private func addMusicItem(
+        to menu: NSMenu, title: String, action: Selector, enabled: Bool = true
+    ) {
+        let item = NSMenuItem(title: title, action: action, keyEquivalent: "")
+        item.target = self
+        item.isEnabled = enabled
         menu.addItem(item)
     }
 }

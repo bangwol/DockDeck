@@ -34,7 +34,7 @@ final class ModuleGalleryTests: XCTestCase {
             }
             for module in [
                 PanelModuleID.usage, .systemStats, .serviceMonitor, .schedule,
-                .projectPulse, .githubInbox, .docker,
+                .music, .projectPulse, .githubInbox, .docker,
             ] {
                 let presentation = ReadOnlyDeckPresentation(
                     activeModule: module, theme: theme)
@@ -151,6 +151,14 @@ final class ModuleGalleryTests: XCTestCase {
             weather: weather,
             schedule: schedule,
             clock: ClockStore(now: now),
+            music: MusicStore(
+                initialSnapshot: MusicPlaybackSnapshot(
+                    state: .playing,
+                    track: MusicTrackSnapshot(
+                        title: "Midnight Drive", artist: "DockDeck",
+                        album: "Preview", duration: 240, position: 90),
+                    observedAt: now),
+                initialStatus: .ready),
             battery: BatteryStore(
                 initialSnapshot: BatterySnapshot(
                     percent: 76, state: .discharging, minutesRemaining: 310)),

@@ -30,6 +30,7 @@ final class SettingsPanelView: NSView {
         values: SettingsPanelValues,
         fontNames: [String],
         scheduleStore: ScheduleStore = ScheduleStore(),
+        musicStore: MusicStore = MusicStore(),
         diagnosticsStore: DiagnosticsStore = DiagnosticsStore()
     ) {
         let model = SettingsPanelModel(
@@ -39,6 +40,7 @@ final class SettingsPanelView: NSView {
             rootView: SettingsRootView(
                 model: model,
                 scheduleStore: scheduleStore,
+                musicStore: musicStore,
                 diagnosticsStore: diagnosticsStore))
 
         super.init(frame: NSRect(origin: .zero, size: Self.preferredSize))
@@ -68,6 +70,7 @@ final class SettingsPanelView: NSView {
 private struct SettingsRootView: View {
     @ObservedObject var model: SettingsPanelModel
     @ObservedObject var scheduleStore: ScheduleStore
+    @ObservedObject var musicStore: MusicStore
     @ObservedObject var diagnosticsStore: DiagnosticsStore
 
     var body: some View {
@@ -146,6 +149,8 @@ private struct SettingsRootView: View {
             ScheduleSettingsView(model: model, store: scheduleStore)
         case .clock:
             ClockSettingsView(model: model)
+        case .music:
+            MusicSettingsView(store: musicStore)
         case .battery:
             BatterySettingsView(model: model)
         case .network:
