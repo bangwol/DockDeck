@@ -8,6 +8,25 @@ swift test
 .build/debug/DockDeck
 ```
 
+## Branch and PR workflow
+
+1. Synchronize `main`, then create a focused branch. Use a short name such as
+   `feat/<topic>`, `fix/<topic>`, or `docs/<topic>`.
+2. Keep related commits on that branch. Do not develop or push directly to
+   `main`.
+3. Before marking the PR ready, synchronize with the latest `main`, run the
+   release test, and update affected documentation.
+4. Open one PR for one logical change and wait for required checks and review.
+5. Prefer squash merge and delete the branch after merge. Write the PR title as
+   a concise Conventional Commit subject because it becomes the squash commit
+   title.
+
+Feature, fix, documentation, test, and refactor PRs leave `VERSION` unchanged.
+After the intended feature and fix PRs reach `main`, use one dedicated release
+integration PR to increment the patch version, update release-facing material,
+and run package checks. A merged feature PR does not automatically create a
+preview tag or GitHub Release.
+
 ## Project constraints
 
 - Keep one app process with a key-capable terminal panel and a read-only,
@@ -112,6 +131,9 @@ swift test
   unit — split it up, even if it was all written in one sitting.
 - **Keep PRs small.** Prefer the smallest diff that does the thing. Put Dock
   queries and frame calculations in `DockCoordinator`, not in a panel view.
+- Create a release integration branch from the latest `main`. Increment
+  `VERSION` once for all changes selected for that release; do not reserve a
+  version on unfinished feature branches.
 - Keep copied diagnostics allowlisted and redacted. Do not add paths, URLs,
   account identifiers, command output, token material, or free-form error detail.
 
