@@ -152,9 +152,10 @@ final class UsageStore: ObservableObject {
         claudeProbeQueue: DispatchQueue = DispatchQueue(
             label: "DockDeck.ClaudeUsageProbe", qos: .utility),
         uptime: @escaping () -> TimeInterval = { ProcessInfo.processInfo.systemUptime },
-        logger: @escaping (String) -> Void = { _ in }
+        logger: @escaping (String) -> Void = { _ in },
+        initialProviders: [ProviderUsage]? = nil
     ) {
-        let initialProviders = UsageProviderID.allCases.map {
+        let initialProviders = initialProviders ?? UsageProviderID.allCases.map {
             ProviderUsage(
                 id: $0, name: $0.title.uppercased(), windows: [],
                 freshness: .loading, detail: nil)

@@ -255,12 +255,15 @@ final class WeatherStore: ObservableObject {
         location: WeatherLocation? = PanelSettings.weatherLocation,
         unit: WeatherTemperatureUnit = PanelSettings.weatherTemperatureUnit,
         refreshInterval: TimeInterval = PanelSettings.weatherRefreshInterval,
-        session: URLSession? = nil
+        session: URLSession? = nil,
+        initialSnapshot: WeatherSnapshot? = nil
     ) {
         self.location = location?.normalizedForStorage()
         self.unit = unit
         self.refreshInterval = Self.resolvedRefreshInterval(refreshInterval)
         self.session = session ?? Self.makeSession()
+        snapshot = initialSnapshot
+        status = initialSnapshot == nil ? .idle : .ready
     }
 
     func start() {

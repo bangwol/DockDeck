@@ -1153,6 +1153,20 @@ final class PanelAppearanceTests: XCTestCase {
         detail.close()
     }
 
+    func testReadOnlyDeckAppearanceTracksTheme() {
+        let controller = makeReadOnlyDeckController(side: .right)
+
+        controller.applyTheme(Theme.theme(id: "github-light"))
+        XCTAssertEqual(
+            controller.panel.appearance?.bestMatch(from: [.aqua, .darkAqua]),
+            .aqua)
+
+        controller.applyTheme(Theme.theme(id: "dracula"))
+        XCTAssertEqual(
+            controller.panel.appearance?.bestMatch(from: [.aqua, .darkAqua]),
+            .darkAqua)
+    }
+
     func testMajorReadOnlyModuleDetailsRender() {
         let services = PanelModuleServices()
         let theme = Theme.theme(id: "")

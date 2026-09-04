@@ -7,8 +7,8 @@ private final class ReadOnlyPanel: NSPanel {
 }
 
 enum ReadOnlyModuleDetailLayout {
-    static let initialSize = NSSize(width: 520, height: 240)
-    static let minimumSize = NSSize(width: 420, height: 190)
+    static let initialSize = NSSize(width: 560, height: 340)
+    static let minimumSize = NSSize(width: 440, height: 260)
 }
 
 enum DeckScrollDirection: Equatable {
@@ -74,6 +74,7 @@ final class ReadOnlyDeckPanelController:
         ]
         panel.hidesOnDeactivate = false
         panel.ignoresMouseEvents = false
+        panel.appearance = Self.appearance(for: theme)
 
         let surfaceView = PanelSurfaceView(
             frame: NSRect(origin: .zero, size: initialFrame.size), theme: theme)
@@ -124,6 +125,8 @@ final class ReadOnlyDeckPanelController:
     func applyTheme(_ theme: Theme) {
         presentation.setTheme(theme)
         surfaceView.apply(theme: theme, presentation: .compact)
+        panel.appearance = Self.appearance(for: theme)
+        detailPanel?.appearance = Self.appearance(for: theme)
     }
 
     func applySettings() {
@@ -346,6 +349,7 @@ final class ReadOnlyDeckPanelController:
         window.isReleasedWhenClosed = false
         window.delegate = self
         window.contentMinSize = ReadOnlyModuleDetailLayout.minimumSize
+        window.appearance = Self.appearance(for: presentation.theme)
         let frameName = "DockDeck.ModuleDetail.\(side.rawValue)"
         let restoredFrame = window.setFrameUsingName(frameName)
         window.setFrameAutosaveName(frameName)
@@ -368,6 +372,10 @@ final class ReadOnlyDeckPanelController:
 
     var detailWindowForTesting: NSPanel? { detailPanel }
     var pageIndicatorForTesting: String? { presentation.pageIndicator }
+
+    private static func appearance(for theme: Theme) -> NSAppearance? {
+        NSAppearance(named: theme.isDark ? .darkAqua : .aqua)
+    }
 
     @objc private func selectModuleFromMenu(_ sender: Any?) {
         guard let item = sender as? NSMenuItem,
