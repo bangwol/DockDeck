@@ -388,7 +388,7 @@ final class PanelAppearanceTests: XCTestCase {
             constrained: true, stateChangedAt: [.githubInbox: date])
 
         let report = DiagnosticsReportBuilder.build(
-            items: [item], runtime: runtime, appVersion: "0.2.0-preview.1",
+            items: [item], runtime: runtime, appVersion: "0.1.1",
             operatingSystem: "macOS 15.6", architecture: "arm64")
 
         XCTAssertTrue(report.contains("GitHub CLI: check"))

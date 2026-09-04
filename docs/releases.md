@@ -6,20 +6,19 @@ the single source of truth for the app's three-part version.
 
 ## Version policy
 
-DockDeck follows semantic versioning with these pre-1.0 rules:
+DockDeck uses patch-only preview increments for now:
 
 | Change | Version action |
 | --- | --- |
-| Documentation, tests, refactoring, or unreleased fixes | No version change |
-| Fix for an already published base version | Increment the patch version |
-| User-visible feature set or material behavior change | Increment the minor version |
-| Stable compatibility break after 1.0 | Increment the major version |
+| Documentation, tests, or refactoring only | No version change |
+| Any user-visible preview change or fix | Increment the patch version (`0.1.0` → `0.1.1`) |
+| Another build of the same base version | Keep `VERSION`; increment only the preview sequence |
 
 Preview sequence numbers belong to Git tags, not `VERSION`. For example,
-`VERSION` remains `0.1.0` for `v0.1.0-preview.1` and
-`v0.1.0-preview.2`. Increment the preview number for another build of the same
-feature set. Do not move or reuse a published tag. Start the next minor version
-when the feature set changes materially.
+`VERSION` remains `0.1.1` for `v0.1.1-preview.1` and
+`v0.1.1-preview.2`. Increment the preview number for another build of the same
+base version. Do not move or reuse a published tag. Minor and major increments
+remain reserved until this policy is explicitly revised.
 
 `1.0.0` is reserved for a stable feature and settings contract plus a
 Developer ID-signed, notarized distribution path.
@@ -54,11 +53,11 @@ after Developer ID signing and notarization are available.
    ./scripts/package.sh
    ```
 
-4. Create and push an annotated tag. The first preview uses:
+4. Create and push an annotated tag. For version `0.1.1`, the first preview uses:
 
    ```bash
-   git tag -a v0.1.0-preview.1 -m "DockDeck 0.1.0 Preview 1"
-   git push origin v0.1.0-preview.1
+   git tag -a v0.1.1-preview.1 -m "DockDeck 0.1.1 Preview 1"
+   git push origin v0.1.1-preview.1
    ```
 
 5. Wait for the Preview Release workflow. Confirm that the GitHub Release is
@@ -66,8 +65,8 @@ after Developer ID signing and notarization are available.
 6. Download the published assets and verify them:
 
    ```bash
-   shasum -a 256 -c DockDeck-0.1.0-macos-universal-unsigned.zip.sha256
-   gh attestation verify DockDeck-0.1.0-macos-universal-unsigned.zip \
+   shasum -a 256 -c DockDeck-0.1.1-macos-universal-unsigned.zip.sha256
+   gh attestation verify DockDeck-0.1.1-macos-universal-unsigned.zip \
      -R bangwol/DockDeck
    ```
 
