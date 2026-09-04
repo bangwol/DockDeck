@@ -5,13 +5,26 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  schedule:
+    - cron: "31 0 * * 3" # Wednesday 09:31 Asia/Seoul
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
   build:
-    runs-on: macos-14
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Test release build with warnings as errors
+        run: swift test -c release -Xswiftc -warnings-as-errors
+
+  latest-macos:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: macos-26
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
