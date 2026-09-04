@@ -24,6 +24,13 @@ Diagnostics reports dependency readiness, not service uptime or entitlement
 details. Use the module's panel help and guide when a dependency is ready but a
 specific refresh still fails.
 
+Use **Copy Report** to place a support-ready snapshot on the clipboard. The
+report contains only the DockDeck version, macOS version, architecture,
+integration states and check times, system cadence, and module runtime states.
+It deliberately omits diagnostic detail strings, paths, URLs, account
+identifiers, command output, and tokens. Review any clipboard content before
+sharing it.
+
 ## Module runtime
 
 The same page reports the latest runtime state for every registered module:
@@ -38,4 +45,5 @@ The same page reports the latest runtime state for every registered module:
 `REDUCED CADENCE` means Low Power Mode or serious/critical thermal pressure is
 slowing eligible timers. The terminal preserves its shell across display sleep
 while read-only modules suspend. This snapshot is refreshed with the diagnostic
-checks and does not add a runtime polling loop.
+checks and does not add a runtime polling loop. Hover a module state to see when
+its current state began; the timestamp is also included in a copied report.

@@ -4,6 +4,11 @@ The root [README](../README.md) is the project overview and installation entry
 point. Detailed behavior is organized here so adding modules does not make the
 front page harder to scan.
 
+## Start here
+
+- [Install, permissions, Deck controls, and uninstall](getting-started.md)
+- [Privacy and data sources](privacy.md)
+
 ## Module guides
 
 - [Terminal](modules/terminal.md)

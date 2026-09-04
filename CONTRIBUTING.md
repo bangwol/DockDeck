@@ -69,6 +69,9 @@ swift test
   `gh` commands. Persist only a standardized local path or selected
   `owner/repository` name. Never persist file names, command output, remote
   URLs, or credentials; GitHub authentication remains owned by GitHub CLI.
+- Keep GitHub Inbox polling conditional with an in-memory validator and cached
+  result. Respect GitHub's `X-Poll-Interval`, validate API notification URLs
+  before converting them to browser links, and never expose GitHub CLI tokens.
 - Persist Focus Timer state only on transitions. Keep an absolute completion
   deadline separate from display refreshes so background and Low Power Mode
   cadence changes do not delay a completed phase.
@@ -83,7 +86,9 @@ swift test
   addresses, or destinations. Use Network framework only for local route
   properties, and clear the previous sample when disabled.
 - Read-only modules can be assigned to either Deck and must render correctly at
-  the compact panel size before they are registered. Keep active cards in their
+  compact and resizable detail sizes before they are registered. Add deterministic
+  dark and light fixtures to `ModuleGalleryTests`, and inspect the generated
+  gallery before committing visual changes. Keep active cards in their
   assigned Deck and inactive cards in the shared tray. Show must choose the
   shorter active Deck with a left-side tie break; an explicit drop must activate
   the module in its target Deck. Preserve independent Deck selections and test
@@ -102,6 +107,8 @@ swift test
   unit — split it up, even if it was all written in one sitting.
 - **Keep PRs small.** Prefer the smallest diff that does the thing. Put Dock
   queries and frame calculations in `DockCoordinator`, not in a panel view.
+- Keep copied diagnostics allowlisted and redacted. Do not add paths, URLs,
+  account identifiers, command output, token material, or free-form error detail.
 
 ## Everything else
 
