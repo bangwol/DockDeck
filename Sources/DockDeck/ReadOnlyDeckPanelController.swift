@@ -285,7 +285,7 @@ final class ReadOnlyDeckPanelController:
                 enabled: services.music.canControl)
             addMusicItem(
                 to: menu,
-                title: services.music.snapshot?.state == .playing ? "Pause" : "Play",
+                title: services.music.snapshot?.state.isPlaying == true ? "Pause" : "Play",
                 action: #selector(toggleMusicPlayback(_:)),
                 enabled: services.music.canControl)
             addMusicItem(

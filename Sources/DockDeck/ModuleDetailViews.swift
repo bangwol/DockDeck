@@ -606,11 +606,11 @@ struct MusicModuleDetailView: View {
     }
 
     private var playPauseTitle: String {
-        store.snapshot?.state == .playing ? "Pause" : "Play"
+        store.snapshot?.state.isPlaying == true ? "Pause" : "Play"
     }
 
     private var playPauseSymbol: String {
-        store.snapshot?.state == .playing ? "pause.fill" : "play.fill"
+        store.snapshot?.state.isPlaying == true ? "pause.fill" : "play.fill"
     }
 
     private var baseColor: Color { Color(nsColor: theme.foregroundColor) }

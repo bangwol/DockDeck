@@ -107,11 +107,11 @@ struct MusicPanelView: View {
     }
 
     private var playPauseSymbol: String {
-        store.snapshot?.state == .playing ? "pause.fill" : "play.fill"
+        store.snapshot?.state.isPlaying == true ? "pause.fill" : "play.fill"
     }
 
     private var playPauseLabel: String {
-        store.snapshot?.state == .playing ? "Pause" : "Play"
+        store.snapshot?.state.isPlaying == true ? "Pause" : "Play"
     }
 
     private var helpText: String {

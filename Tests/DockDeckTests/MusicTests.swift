@@ -36,6 +36,23 @@ final class MusicTests: XCTestCase {
         XCTAssertEqual(MusicAutomationAuthorization.resolved(-1), .unavailable)
     }
 
+    func testAppleEventParserAcceptsTransportStates() throws {
+        for state in [MusicPlaybackState.fastForwarding, .rewinding] {
+            let descriptor = NSAppleEventDescriptor.list()
+            descriptor.insert(NSAppleEventDescriptor(string: state.rawValue), at: 1)
+            descriptor.insert(NSAppleEventDescriptor(string: "Track"), at: 2)
+            descriptor.insert(NSAppleEventDescriptor(string: "Artist"), at: 3)
+            descriptor.insert(NSAppleEventDescriptor(string: "Album"), at: 4)
+            descriptor.insert(NSAppleEventDescriptor(double: 240), at: 5)
+            descriptor.insert(NSAppleEventDescriptor(double: 90), at: 6)
+
+            let snapshot = try MusicAppleEventParser.parse(descriptor, now: Date())
+
+            XCTAssertEqual(snapshot.state, state)
+            XCTAssertTrue(snapshot.state.isPlaying)
+        }
+    }
+
     func testAutomaticRefreshNeverPromptsAndConnectDoes() {
         let snapshot = fixtureSnapshot()
         let provider = FakeMusicAutomationProvider(snapshot: snapshot)

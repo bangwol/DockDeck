@@ -7,12 +7,23 @@ enum MusicPlaybackState: String, Equatable {
     case stopped
     case paused
     case playing
+    case fastForwarding = "fast forwarding"
+    case rewinding
 
     var title: String {
         switch self {
         case .stopped: "Stopped"
         case .paused: "Paused"
         case .playing: "Playing"
+        case .fastForwarding: "Fast Forwarding"
+        case .rewinding: "Rewinding"
+        }
+    }
+
+    var isPlaying: Bool {
+        switch self {
+        case .playing, .fastForwarding, .rewinding: true
+        case .stopped, .paused: false
         }
     }
 }
