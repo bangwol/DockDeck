@@ -289,16 +289,16 @@ final class ProjectPulseTests: XCTestCase {
 
     func testCommandRejectsCombinedOutputAboveLimit() throws {
         XCTAssertThrowsError(
-            try ProjectPulseCommand.run(
+            try BoundedProcessRunner.run(
                 executableURL: URL(fileURLWithPath: "/bin/dd"),
                 arguments: [
                     "if=/dev/zero",
-                    "bs=\(ProjectPulseCommand.maximumOutputBytes + 1)",
+                    "bs=\(BoundedProcessRunner.defaultMaximumOutputBytes + 1)",
                     "count=1",
                 ],
                 currentDirectoryURL: FileManager.default.temporaryDirectory)
         ) { error in
-            XCTAssertEqual(error as? ProjectPulseError, .outputTooLarge)
+            XCTAssertEqual(error as? BoundedProcessError, .outputTooLarge)
         }
     }
 
@@ -309,7 +309,7 @@ final class ProjectPulseTests: XCTestCase {
         try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
         defer { try? fileManager.removeItem(at: directory) }
         let git = try XCTUnwrap(ProjectPulseBinaryLocator.git())
-        _ = try ProjectPulseCommand.run(
+        _ = try BoundedProcessRunner.run(
             executableURL: git,
             arguments: ["init", "--quiet"],
             currentDirectoryURL: directory)

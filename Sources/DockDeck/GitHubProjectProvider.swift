@@ -29,11 +29,11 @@ final class GitHubCLIRequestBroker {
         cache = cache.filter { $0.value.expiresAt > now }
         if let cacheKey, let cached = cache[cacheKey] { return cached.data }
 
-        let data = try ProjectPulseCommand.run(
+        let data = try BoundedProcessRunner.run(
             executableURL: executableURL,
             arguments: arguments,
             currentDirectoryURL: currentDirectoryURL,
-            environment: environment)
+            environmentAdditions: environment)
         if let cacheKey, cacheDuration > 0 {
             cache[cacheKey] = CacheEntry(
                 data: data, expiresAt: now.addingTimeInterval(cacheDuration))

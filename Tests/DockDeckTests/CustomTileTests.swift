@@ -65,26 +65,26 @@ final class CustomTileTests: XCTestCase {
 
     func testCommandEnforcesCustomOutputLimit() {
         XCTAssertThrowsError(
-            try ProjectPulseCommand.run(
+            try BoundedProcessRunner.run(
                 executableURL: URL(fileURLWithPath: "/bin/dd"),
                 arguments: ["if=/dev/zero", "bs=32769", "count=1"],
                 currentDirectoryURL: FileManager.default.temporaryDirectory,
                 maximumOutputBytes: CustomTileOutputParser.maximumOutputBytes)
         ) { error in
-            XCTAssertEqual(error as? ProjectPulseError, .outputTooLarge)
+            XCTAssertEqual(error as? BoundedProcessError, .outputTooLarge)
         }
     }
 
     func testCommandEnforcesTimeout() {
         XCTAssertThrowsError(
-            try ProjectPulseCommand.run(
+            try BoundedProcessRunner.run(
                 executableURL: URL(fileURLWithPath: "/bin/sleep"),
                 arguments: ["2"],
                 currentDirectoryURL: FileManager.default.temporaryDirectory,
                 timeout: 0.05,
                 maximumOutputBytes: CustomTileOutputParser.maximumOutputBytes)
         ) { error in
-            XCTAssertEqual(error as? ProjectPulseError, .commandTimedOut)
+            XCTAssertEqual(error as? BoundedProcessError, .timedOut)
         }
     }
 

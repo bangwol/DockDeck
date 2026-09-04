@@ -1,6 +1,5 @@
 import ApplicationServices
 import Combine
-import Darwin
 import Foundation
 
 enum DiagnosticCheckID: String, CaseIterable, Identifiable {
@@ -38,29 +37,20 @@ enum DiagnosticCommandRunner {
         environment: [String: String] = ProcessInfo.processInfo.environment,
         timeout: TimeInterval = 3
     ) -> Bool? {
-        let process = Process()
-        process.executableURL = executable
-        process.arguments = arguments
-        process.environment = CodexBinaryLocator.launchEnvironment(
-            for: executable, environment: environment)
-        process.standardOutput = FileHandle.nullDevice
-        process.standardError = FileHandle.nullDevice
-        let terminated = DispatchSemaphore(value: 0)
-        process.terminationHandler = { _ in terminated.signal() }
         do {
-            try process.run()
+            _ = try BoundedProcessRunner.run(
+                executableURL: executable,
+                arguments: arguments,
+                environment: CodexBinaryLocator.launchEnvironment(
+                    for: executable, environment: environment),
+                timeout: timeout,
+                maximumOutputBytes: 64 * 1_024)
+            return true
+        } catch BoundedProcessError.nonZeroExit {
+            return false
         } catch {
             return nil
         }
-        if terminated.wait(timeout: .now() + max(timeout, 0.1)) == .timedOut {
-            process.terminate()
-            if terminated.wait(timeout: .now() + 0.5) == .timedOut {
-                kill(process.processIdentifier, SIGKILL)
-                _ = terminated.wait(timeout: .now() + 0.5)
-            }
-            return nil
-        }
-        return process.terminationStatus == 0
     }
 }
 

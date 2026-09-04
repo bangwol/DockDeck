@@ -161,11 +161,11 @@ struct DockerClient: DockerReading {
         }
         let containersData: Data
         do {
-            containersData = try ProjectPulseCommand.run(
+            containersData = try BoundedProcessRunner.run(
                 executableURL: docker,
                 arguments: ["ps", "-a", "--format", "{{json .}}"],
                 currentDirectoryURL: FileManager.default.homeDirectoryForCurrentUser,
-                environment: Self.environment,
+                environmentAdditions: Self.environment,
                 timeout: 5)
         } catch {
             throw DockerError.daemonUnavailable
@@ -174,11 +174,11 @@ struct DockerClient: DockerReading {
         var cpuPercent: Double? = counts.running == 0 ? 0 : nil
         var memoryBytes: Double? = counts.running == 0 ? 0 : nil
         if counts.running > 0,
-            let statsData = try? ProjectPulseCommand.run(
+            let statsData = try? BoundedProcessRunner.run(
                 executableURL: docker,
                 arguments: ["stats", "--no-stream", "--format", "{{json .}}"],
                 currentDirectoryURL: FileManager.default.homeDirectoryForCurrentUser,
-                environment: Self.environment,
+                environmentAdditions: Self.environment,
                 timeout: 5),
             let stats = try? DockerOutputParser.parseStats(statsData)
         {

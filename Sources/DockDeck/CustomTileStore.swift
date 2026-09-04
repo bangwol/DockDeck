@@ -226,16 +226,16 @@ struct CustomTileClient: CustomTileReading {
 
         let output: Data
         do {
-            output = try ProjectPulseCommand.run(
+            output = try BoundedProcessRunner.run(
                 executableURL: executable,
                 arguments: arguments,
                 currentDirectoryURL: FileManager.default.homeDirectoryForCurrentUser,
-                environment: ["NO_COLOR": "1", "TERM": "dumb"],
+                environmentAdditions: ["NO_COLOR": "1", "TERM": "dumb"],
                 timeout: 5,
                 maximumOutputBytes: CustomTileOutputParser.maximumOutputBytes)
-        } catch ProjectPulseError.commandTimedOut {
+        } catch BoundedProcessError.timedOut {
             throw CustomTileError.commandTimedOut
-        } catch ProjectPulseError.outputTooLarge {
+        } catch BoundedProcessError.outputTooLarge {
             throw CustomTileError.outputTooLarge
         } catch {
             throw CustomTileError.commandFailed

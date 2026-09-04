@@ -39,30 +39,12 @@ enum InstalledTemperatureReader {
 
     static func readHottestCPUCelsius() -> Double? {
         guard let executableURL = statsToolURL else { return nil }
-
-        let process = Process()
-        let output = Pipe()
-        process.executableURL = executableURL
-        process.arguments = ["list", "-t"]
-        process.standardOutput = output
-        process.standardError = FileHandle.nullDevice
-
-        do {
-            try process.run()
-        } catch {
-            return nil
-        }
-
-        let timeout = DispatchWorkItem {
-            if process.isRunning { process.terminate() }
-        }
-        DispatchQueue.global(qos: .utility).asyncAfter(
-            deadline: .now() + 2, execute: timeout)
-        let data = output.fileHandleForReading.readDataToEndOfFile()
-        process.waitUntilExit()
-        timeout.cancel()
-
-        guard process.terminationStatus == 0, data.count <= 256 * 1_024,
+        guard
+            let data = try? BoundedProcessRunner.run(
+                executableURL: executableURL,
+                arguments: ["list", "-t"],
+                timeout: 2,
+                maximumOutputBytes: 256 * 1_024),
             let text = String(data: data, encoding: .utf8)
         else { return nil }
         return SMCTemperatureOutputParser.hottestCPUCelsius(

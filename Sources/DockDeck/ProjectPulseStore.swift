@@ -258,16 +258,21 @@ struct ProjectPulseReader: ProjectPulseReading {
         let repositoryURL = URL(fileURLWithPath: path, isDirectory: true)
         let gitOutput: Data
         do {
-            gitOutput = try ProjectPulseCommand.run(
+            gitOutput = try BoundedProcessRunner.run(
                 executableURL: git,
                 arguments: [
                     "-C", path, "status", "--porcelain=v2", "--branch", "-z",
                     "--untracked-files=normal",
                 ],
                 currentDirectoryURL: repositoryURL)
-        } catch let error as ProjectPulseError {
-            if error == .commandFailed { throw ProjectPulseError.notRepository }
-            throw error
+        } catch BoundedProcessError.timedOut {
+            throw ProjectPulseError.commandTimedOut
+        } catch BoundedProcessError.outputTooLarge {
+            throw ProjectPulseError.outputTooLarge
+        } catch BoundedProcessError.nonZeroExit {
+            throw ProjectPulseError.notRepository
+        } catch {
+            throw ProjectPulseError.commandFailed
         }
 
         let repositoryName = repositoryURL.lastPathComponent.isEmpty
@@ -321,7 +326,7 @@ struct ProjectPulseReader: ProjectPulseReading {
 
 enum GitPorcelainV2Parser {
     static func parse(_ data: Data, repositoryName: String) throws -> ProjectGitSnapshot {
-        guard data.count <= ProjectPulseCommand.maximumOutputBytes,
+        guard data.count <= BoundedProcessRunner.defaultMaximumOutputBytes,
             let text = String(data: data, encoding: .utf8)
         else { throw ProjectPulseError.invalidOutput }
         let separator: Character = text.contains("\0") ? "\0" : "\n"
@@ -445,175 +450,6 @@ enum ProjectPulseBinaryLocator {
         return paths.first {
             seen.insert($0).inserted && FileManager.default.isExecutableFile(atPath: $0)
         }.map(URL.init(fileURLWithPath:))
-    }
-}
-
-enum ProjectPulseCommand {
-    static let maximumOutputBytes = 1_048_576
-
-    static func run(
-        executableURL: URL,
-        arguments: [String],
-        currentDirectoryURL: URL,
-        environment additions: [String: String] = [:],
-        timeout: TimeInterval = 8,
-        maximumOutputBytes: Int = maximumOutputBytes
-    ) throws -> Data {
-        let process = Process()
-        let outputPipe = Pipe()
-        let errorPipe = Pipe()
-        process.executableURL = executableURL
-        process.arguments = arguments
-        process.currentDirectoryURL = currentDirectoryURL
-        var environment = ProcessInfo.processInfo.environment
-        additions.forEach { environment[$0.key] = $0.value }
-        process.environment = environment
-        process.standardOutput = outputPipe
-        process.standardError = errorPipe
-
-        let capture = ProjectPulseCommandCapture(limit: maximumOutputBytes)
-        let collector = ProjectPulseCommandCollector(
-            outputHandle: outputPipe.fileHandleForReading,
-            errorHandle: errorPipe.fileHandleForReading,
-            capture: capture,
-            onLimitExceeded: { [weak process] in
-                if process?.isRunning == true { process?.terminate() }
-            })
-
-        let terminated = DispatchSemaphore(value: 0)
-        process.terminationHandler = { _ in terminated.signal() }
-        do {
-            try process.run()
-        } catch {
-            outputPipe.fileHandleForWriting.closeFile()
-            errorPipe.fileHandleForWriting.closeFile()
-            collector.finish()
-            throw ProjectPulseError.commandFailed
-        }
-        outputPipe.fileHandleForWriting.closeFile()
-        errorPipe.fileHandleForWriting.closeFile()
-
-        if terminated.wait(timeout: .now() + timeout) == .timedOut {
-            process.terminate()
-            if terminated.wait(timeout: .now() + 1) == .timedOut {
-                kill(process.processIdentifier, SIGKILL)
-                _ = terminated.wait(timeout: .now() + 1)
-            }
-            collector.finish()
-            throw ProjectPulseError.commandTimedOut
-        }
-        collector.finish()
-        guard !capture.exceededLimit else { throw ProjectPulseError.outputTooLarge }
-        guard process.terminationStatus == 0 else { throw ProjectPulseError.commandFailed }
-        return capture.output
-    }
-}
-
-private final class ProjectPulseCommandCapture {
-    private let lock = NSLock()
-    private let limit: Int
-    private var storedOutput = Data()
-    private var storedByteCount = 0
-    private var didExceedLimit = false
-
-    var output: Data { lock.withLock { storedOutput } }
-    var exceededLimit: Bool { lock.withLock { didExceedLimit } }
-
-    init(limit: Int) { self.limit = max(limit, 0) }
-
-    func appendOutput(_ data: Data) -> Bool {
-        append(data, capturesOutput: true)
-    }
-
-    func appendError(_ data: Data) -> Bool {
-        append(data, capturesOutput: false)
-    }
-
-    private func append(_ data: Data, capturesOutput: Bool) -> Bool {
-        lock.withLock {
-            guard !data.isEmpty else { return false }
-            let wasWithinLimit = !didExceedLimit
-            let remaining = max(limit - storedByteCount, 0)
-            if capturesOutput { storedOutput.append(data.prefix(remaining)) }
-            storedByteCount += min(data.count, remaining)
-            if data.count > remaining { didExceedLimit = true }
-            return wasWithinLimit && didExceedLimit
-        }
-    }
-}
-
-private final class ProjectPulseCommandCollector {
-    private struct Reader {
-        let handle: FileHandle
-        let capturesOutput: Bool
-        let source: DispatchSourceRead
-    }
-
-    private let queue = DispatchQueue(label: "DockDeck.ProjectPulseCommandCollector")
-    private let cancellationGroup = DispatchGroup()
-    private let capture: ProjectPulseCommandCapture
-    private let onLimitExceeded: () -> Void
-    private let lock = NSLock()
-    private var readers: [Reader] = []
-    private var finished = false
-
-    init(
-        outputHandle: FileHandle,
-        errorHandle: FileHandle,
-        capture: ProjectPulseCommandCapture,
-        onLimitExceeded: @escaping () -> Void
-    ) {
-        self.capture = capture
-        self.onLimitExceeded = onLimitExceeded
-        readers = [(outputHandle, true), (errorHandle, false)].map { handle, capturesOutput in
-            let descriptor = handle.fileDescriptor
-            let flags = fcntl(descriptor, F_GETFL)
-            if flags >= 0 { _ = fcntl(descriptor, F_SETFL, flags | O_NONBLOCK) }
-            let source = DispatchSource.makeReadSource(
-                fileDescriptor: descriptor, queue: queue)
-            cancellationGroup.enter()
-            source.setEventHandler { [weak self] in
-                self?.drain(descriptor, capturesOutput: capturesOutput)
-            }
-            source.setCancelHandler { [cancellationGroup] in cancellationGroup.leave() }
-            source.resume()
-            return Reader(
-                handle: handle, capturesOutput: capturesOutput, source: source)
-        }
-    }
-
-    func finish() {
-        let shouldFinish = lock.withLock { () -> Bool in
-            guard !finished else { return false }
-            finished = true
-            return true
-        }
-        guard shouldFinish else { return }
-        queue.sync {
-            for reader in readers {
-                drain(reader.handle.fileDescriptor, capturesOutput: reader.capturesOutput)
-                reader.source.cancel()
-            }
-        }
-        _ = cancellationGroup.wait(timeout: .now() + 1)
-        readers.forEach { try? $0.handle.close() }
-    }
-
-    private func drain(_ descriptor: Int32, capturesOutput: Bool) {
-        var bytes = [UInt8](repeating: 0, count: 16_384)
-        while true {
-            let count = Darwin.read(descriptor, &bytes, bytes.count)
-            if count > 0 {
-                let data = Data(bytes.prefix(count))
-                let exceeded = capturesOutput
-                    ? capture.appendOutput(data) : capture.appendError(data)
-                if exceeded { onLimitExceeded() }
-            } else if count == -1, errno == EINTR {
-                continue
-            } else {
-                return
-            }
-        }
     }
 }
 
