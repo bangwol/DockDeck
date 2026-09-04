@@ -737,6 +737,29 @@ final class PanelAppearanceTests: XCTestCase {
         XCTAssertEqual(presentation.pageIndicator, "2/3")
     }
 
+    func testAutomaticDeckSelectionHidesPageIndicator() {
+        let previousConfiguration = PanelSettings.deckConfiguration
+        let previousRight = PanelSettings.activeModule(on: .right)
+        defer {
+            PanelSettings.deckConfiguration = previousConfiguration
+            PanelSettings.setActiveModule(previousRight, on: .right)
+        }
+        PanelSettings.deckConfiguration = PanelDeckConfiguration(
+            left: [.terminal], right: [.usage, .weather],
+            enabled: [.terminal, .usage, .weather])
+        PanelSettings.setActiveModule(.usage, on: .right)
+        let controller = makeReadOnlyDeckController(side: .right)
+
+        controller.selectForAutoSlide(.weather)
+
+        XCTAssertEqual(controller.activeModule, .weather)
+        XCTAssertNil(controller.pageIndicatorForTesting)
+
+        controller.select(.usage)
+
+        XCTAssertEqual(controller.pageIndicatorForTesting, "1/2")
+    }
+
     func testTerminalScrollUsesDeckOnlyWhileDocked() {
         XCTAssertEqual(TerminalScrollRoute.resolved(for: .docked), .deck)
         XCTAssertEqual(TerminalScrollRoute.resolved(for: .focused), .terminal)

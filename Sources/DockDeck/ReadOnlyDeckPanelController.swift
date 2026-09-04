@@ -176,7 +176,9 @@ final class ReadOnlyDeckPanelController:
         notifiesSelection: Bool
     ) {
         guard PanelSettings.enabledModules(on: side).contains(module) else { return }
-        render(activeModule: module, direction: direction, showsIndicator: true)
+        render(
+            activeModule: module, direction: direction,
+            showsIndicator: notifiesSelection)
         if notifiesSelection { onSelectionChange(side) }
     }
 
@@ -365,6 +367,7 @@ final class ReadOnlyDeckPanelController:
     }
 
     var detailWindowForTesting: NSPanel? { detailPanel }
+    var pageIndicatorForTesting: String? { presentation.pageIndicator }
 
     @objc private func selectModuleFromMenu(_ sender: Any?) {
         guard let item = sender as? NSMenuItem,
