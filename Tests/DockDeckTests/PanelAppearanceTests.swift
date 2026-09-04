@@ -377,6 +377,28 @@ final class PanelAppearanceTests: XCTestCase {
         XCTAssertEqual(merged.first?.lastSuccessfulAt, previousDate)
     }
 
+    func testDiagnosticsReportOmitsUntrustedDetails() {
+        let date = Date(timeIntervalSince1970: 1_700_000_000)
+        let item = DiagnosticCheckItem(
+            id: .github, title: "ignored", symbolName: "ignored", state: .warning,
+            detail: "token ghp_secret at /Users/private/project", checkedAt: date,
+            lastSuccessfulAt: nil)
+        let runtime = ModuleRuntimeDiagnostics(
+            states: [.githubInbox: .background], systemActive: true,
+            constrained: true, stateChangedAt: [.githubInbox: date])
+
+        let report = DiagnosticsReportBuilder.build(
+            items: [item], runtime: runtime, appVersion: "0.2.0-preview.1",
+            operatingSystem: "macOS 15.6", architecture: "arm64")
+
+        XCTAssertTrue(report.contains("GitHub CLI: check"))
+        XCTAssertTrue(report.contains("GitHub Inbox: background"))
+        XCTAssertTrue(report.contains("Cadence: reduced"))
+        XCTAssertFalse(report.contains("ghp_secret"))
+        XCTAssertFalse(report.contains("/Users/private"))
+        XCTAssertFalse(report.contains("ignored"))
+    }
+
     func testDiagnosticCommandRunnerReportsExitStatus() {
         XCTAssertEqual(
             DiagnosticCommandRunner.exitsSuccessfully(
@@ -448,6 +470,22 @@ final class PanelAppearanceTests: XCTestCase {
         XCTAssertTrue(usageActivities[1].1)
     }
 
+    func testModuleRuntimeDiagnosticsTrackStateChangeTime() {
+        var time = Date(timeIntervalSince1970: 100)
+        let coordinator = ModuleRuntimeCoordinator(now: { time })
+        coordinator.register(.usage, start: {}, stop: {})
+
+        XCTAssertEqual(coordinator.diagnostics().stateChangedAt[.usage], time)
+        time = Date(timeIntervalSince1970: 200)
+        coordinator.synchronize(enabledModules: [.usage], visibleModules: [.usage])
+        XCTAssertEqual(coordinator.diagnostics().stateChangedAt[.usage], time)
+        time = Date(timeIntervalSince1970: 300)
+        coordinator.synchronize(enabledModules: [.usage], visibleModules: [.usage])
+        XCTAssertEqual(
+            coordinator.diagnostics().stateChangedAt[.usage],
+            Date(timeIntervalSince1970: 200))
+    }
+
     func testModuleRuntimeCoordinatorSuspendsBackgroundWorkAndPreservesTerminal() {
         let coordinator = ModuleRuntimeCoordinator()
         var starts: [PanelModuleID] = []
@@ -470,12 +508,13 @@ final class PanelAppearanceTests: XCTestCase {
         XCTAssertEqual(usageStops, 1)
         XCTAssertEqual(coordinator.state(for: .terminal), .visible)
         XCTAssertEqual(coordinator.state(for: .usage), .suspended)
+        let diagnostics = coordinator.diagnostics()
         XCTAssertEqual(
-            coordinator.diagnostics(),
-            ModuleRuntimeDiagnostics(
-                states: [.terminal: .visible, .usage: .suspended],
-                systemActive: false,
-                constrained: false))
+            diagnostics.states, [.terminal: .visible, .usage: .suspended])
+        XCTAssertFalse(diagnostics.systemActive)
+        XCTAssertFalse(diagnostics.constrained)
+        XCTAssertNotNil(diagnostics.stateChangedAt[.terminal])
+        XCTAssertNotNil(diagnostics.stateChangedAt[.usage])
 
         coordinator.synchronize(
             enabledModules: [.terminal, .usage], visibleModules: [.usage])

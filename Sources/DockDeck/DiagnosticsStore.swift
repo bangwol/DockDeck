@@ -1,4 +1,5 @@
 import ApplicationServices
+import AppKit
 import Combine
 import Foundation
 
@@ -154,6 +155,88 @@ enum DiagnosticsChecker {
     }
 }
 
+enum DiagnosticsReportBuilder {
+    static func build(
+        items: [DiagnosticCheckItem],
+        runtime: ModuleRuntimeDiagnostics,
+        appVersion: String,
+        operatingSystem: String,
+        architecture: String
+    ) -> String {
+        var lines = [
+            "DockDeck diagnostics",
+            "App: \(singleLine(appVersion))",
+            "macOS: \(singleLine(operatingSystem))",
+            "Architecture: \(singleLine(architecture))",
+            "System: \(runtime.systemActive ? "active" : "paused")",
+            "Cadence: \(runtime.constrained ? "reduced" : "normal")",
+            "",
+            "Integrations",
+        ]
+        for id in DiagnosticCheckID.allCases {
+            guard let item = items.first(where: { $0.id == id }) else { continue }
+            var line = "- \(title(for: id)): \(title(for: item.state))"
+            if let checkedAt = item.checkedAt { line += "; checked \(timestamp(checkedAt))" }
+            if let lastSuccessfulAt = item.lastSuccessfulAt {
+                line += "; last OK \(timestamp(lastSuccessfulAt))"
+            }
+            lines.append(line)
+        }
+        lines.append(contentsOf: ["", "Modules"])
+        for definition in PanelModuleRegistry.all {
+            guard let state = runtime.states[definition.id] else { continue }
+            var line = "- \(definition.title): \(title(for: state))"
+            if let changedAt = runtime.stateChangedAt[definition.id] {
+                line += "; since \(timestamp(changedAt))"
+            }
+            lines.append(line)
+        }
+        lines.append("")
+        lines.append("Details, paths, URLs, command output, and account identifiers are omitted.")
+        return lines.joined(separator: "\n")
+    }
+
+    private static func title(for id: DiagnosticCheckID) -> String {
+        switch id {
+        case .codex: "Codex"
+        case .claude: "Claude Code"
+        case .github: "GitHub CLI"
+        case .accessibility: "Accessibility"
+        case .temperature: "Temperature sensor"
+        case .network: "Network"
+        }
+    }
+
+    private static func title(for state: DiagnosticCheckState) -> String {
+        switch state {
+        case .checking: "checking"
+        case .ready: "ready"
+        case .warning: "check"
+        case .unavailable: "missing"
+        }
+    }
+
+    private static func title(for state: ModuleRuntimeCoordinator.State) -> String {
+        switch state {
+        case .stopped: "disabled"
+        case .suspended: "paused"
+        case .background: "background"
+        case .visible: "visible"
+        }
+    }
+
+    private static func timestamp(_ date: Date) -> String {
+        ISO8601DateFormatter().string(from: date)
+    }
+
+    private static func singleLine(_ value: String) -> String {
+        value.replacingOccurrences(of: "\r", with: " ")
+            .replacingOccurrences(of: "\n", with: " ")
+            .prefix(160)
+            .description
+    }
+}
+
 final class DiagnosticsStore: ObservableObject {
     @Published private(set) var items: [DiagnosticCheckItem]
     @Published private(set) var moduleRuntime: ModuleRuntimeDiagnostics
@@ -195,6 +278,23 @@ final class DiagnosticsStore: ObservableObject {
         }
     }
 
+    func copyReport() {
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        pasteboard.setString(report(), forType: .string)
+    }
+
+    func report(
+        appVersion: String = Bundle.main.object(
+            forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "development",
+        operatingSystem: String = ProcessInfo.processInfo.operatingSystemVersionString,
+        architecture: String = DiagnosticsStore.architecture
+    ) -> String {
+        DiagnosticsReportBuilder.build(
+            items: items, runtime: runtimeProvider(), appVersion: appVersion,
+            operatingSystem: operatingSystem, architecture: architecture)
+    }
+
     static func merging(
         _ results: [DiagnosticCheckItem], previous: [DiagnosticCheckItem]
     ) -> [DiagnosticCheckItem] {
@@ -232,5 +332,15 @@ final class DiagnosticsStore: ObservableObject {
         case .temperature: "thermometer.medium"
         case .network: "network"
         }
+    }
+
+    private static var architecture: String {
+        #if arch(arm64)
+            "arm64"
+        #elseif arch(x86_64)
+            "x86_64"
+        #else
+            "unknown"
+        #endif
     }
 }

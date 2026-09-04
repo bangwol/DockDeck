@@ -93,8 +93,21 @@ extension FocusTimerStore: PanelModuleRuntime {}
 
 struct ModuleRuntimeDiagnostics: Equatable {
     let states: [PanelModuleID: ModuleRuntimeCoordinator.State]
+    let stateChangedAt: [PanelModuleID: Date]
     let systemActive: Bool
     let constrained: Bool
+
+    init(
+        states: [PanelModuleID: ModuleRuntimeCoordinator.State],
+        systemActive: Bool,
+        constrained: Bool,
+        stateChangedAt: [PanelModuleID: Date] = [:]
+    ) {
+        self.states = states
+        self.stateChangedAt = stateChangedAt
+        self.systemActive = systemActive
+        self.constrained = constrained
+    }
 
     static let empty = ModuleRuntimeDiagnostics(
         states: [:], systemActive: true, constrained: false)
@@ -127,8 +140,14 @@ final class ModuleRuntimeCoordinator {
 
     private var runtimes: [PanelModuleID: Runtime] = [:]
     private var states: [PanelModuleID: State] = [:]
+    private var stateChangedAt: [PanelModuleID: Date] = [:]
     private var lowPowerMode = false
     private var systemActive = true
+    private let now: () -> Date
+
+    init(now: @escaping () -> Date = Date.init) {
+        self.now = now
+    }
 
     func register(
         _ module: PanelModuleID,
@@ -142,6 +161,7 @@ final class ModuleRuntimeCoordinator {
             start: start, stop: stop, updateActivity: updateActivity,
             suspendsWhenInactive: suspendsWhenInactive)
         states[module] = .stopped
+        stateChangedAt[module] = now()
     }
 
     func synchronize(
@@ -176,6 +196,7 @@ final class ModuleRuntimeCoordinator {
             let previous = states[module] ?? .stopped
             let next = nextStates[module] ?? .stopped
             if previous.isRunning, !next.isRunning { runtime.stop() }
+            if previous != next { stateChangedAt[module] = now() }
             states[module] = next
         }
 
@@ -203,9 +224,11 @@ final class ModuleRuntimeCoordinator {
         for (module, runtime) in runtimes where states[module]?.isRunning == true {
             runtime.stop()
             states[module] = .stopped
+            stateChangedAt[module] = now()
         }
         for module in runtimes.keys where states[module] == .suspended {
             states[module] = .stopped
+            stateChangedAt[module] = now()
         }
     }
 
@@ -215,6 +238,7 @@ final class ModuleRuntimeCoordinator {
 
     func diagnostics() -> ModuleRuntimeDiagnostics {
         ModuleRuntimeDiagnostics(
-            states: states, systemActive: systemActive, constrained: lowPowerMode)
+            states: states, systemActive: systemActive, constrained: lowPowerMode,
+            stateChangedAt: stateChangedAt)
     }
 }

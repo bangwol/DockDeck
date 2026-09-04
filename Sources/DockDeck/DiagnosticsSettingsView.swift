@@ -11,6 +11,10 @@ struct DiagnosticsSettingsView: View {
                     Text("Current local integration status")
                         .foregroundStyle(.secondary)
                     Spacer()
+                    Button(action: store.copyReport) {
+                        Label("Copy Report", systemImage: "doc.on.doc")
+                    }
+                    .help("Copy a redacted diagnostics report")
                     Button(action: store.refresh) {
                         if store.isRefreshing {
                             ProgressView().controlSize(.small)
@@ -40,7 +44,7 @@ struct DiagnosticsSettingsView: View {
 
                 Text(
                     "Checks run only when this page opens or Refresh is pressed. "
-                        + "Command output and account identifiers are discarded.")
+                        + "Copied reports omit details, paths, URLs, command output, and account identifiers.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -87,6 +91,7 @@ private struct ModuleRuntimeDiagnosticsView: View {
                             .background(
                                 .secondary.opacity(0.07),
                                 in: RoundedRectangle(cornerRadius: 6))
+                            .help(stateHelp(definition.id, state: state))
                         }
                     }
                 }
@@ -123,6 +128,13 @@ private struct ModuleRuntimeDiagnosticsView: View {
         case .background: .secondary
         case .visible: .green
         }
+    }
+
+    private func stateHelp(
+        _ module: PanelModuleID, state: ModuleRuntimeCoordinator.State
+    ) -> String {
+        guard let date = snapshot.stateChangedAt[module] else { return title(state) }
+        return "\(title(state)) since \(date.formatted(date: .abbreviated, time: .shortened))"
     }
 }
 
