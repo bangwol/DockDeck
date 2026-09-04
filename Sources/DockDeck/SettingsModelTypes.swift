@@ -1,0 +1,356 @@
+import Cocoa
+import Combine
+
+enum SettingsPaneID: String, CaseIterable, Identifiable {
+    case decks
+    case notifications
+    case diagnostics
+    case terminal
+    case usage
+    case systemStats
+    case serviceMonitor
+    case weather
+    case schedule
+    case clock
+    case battery
+    case network
+    case projectPulse
+    case githubInbox
+    case docker
+    case customTile
+    case focusTimer
+    case appearance
+
+    var id: Self { self }
+
+    var title: String {
+        switch self {
+        case .decks: "Decks"
+        case .notifications: "Notifications"
+        case .diagnostics: "Diagnostics"
+        case .terminal: "Terminal"
+        case .usage: "Usage"
+        case .systemStats: "System Stats"
+        case .serviceMonitor: "Service Monitor"
+        case .weather: "Weather"
+        case .schedule: "Schedule"
+        case .clock: "World Clock"
+        case .battery: "Battery"
+        case .network: "Network"
+        case .projectPulse: "Project Pulse"
+        case .githubInbox: "GitHub Inbox"
+        case .docker: "Docker"
+        case .customTile: "Custom Tile"
+        case .focusTimer: "Focus Timer"
+        case .appearance: "Appearance"
+        }
+    }
+
+    var subtitle: String {
+        switch self {
+        case .decks: "Choose which modules appear beside the Dock."
+        case .notifications: "Choose which local events can alert you."
+        case .diagnostics: "Check local tools, permissions, sensors, and connectivity."
+        case .terminal: "Control terminal expansion and text."
+        case .usage: "Choose how account limits are displayed."
+        case .systemStats: "Choose compact local performance metrics."
+        case .serviceMonitor: "Check the availability of your services."
+        case .weather: "Show current conditions for a selected city."
+        case .schedule: "Show the current event or next calendar and reminder item."
+        case .clock: "Show local time or another time zone."
+        case .battery: "Show charge, power state, and time left."
+        case .network: "Show local download and upload throughput."
+        case .projectPulse: "Show local Git or remote GitHub repository activity."
+        case .githubInbox: "Summarize account notifications, reviews, and Actions failures."
+        case .docker: "Show local container health and resource use."
+        case .customTile: "Show bounded output from a trusted executable or Shortcut."
+        case .focusTimer: "Run persistent focus and break countdowns."
+        case .appearance: "Adjust the shared panel surface."
+        }
+    }
+
+    var symbolName: String {
+        switch self {
+        case .decks: "rectangle.stack"
+        case .notifications: "bell.badge"
+        case .diagnostics: "stethoscope"
+        case .terminal: "terminal"
+        case .usage: "chart.bar"
+        case .systemStats: "gauge.with.dots.needle.67percent"
+        case .serviceMonitor: "server.rack"
+        case .weather: "cloud.sun"
+        case .schedule: "calendar"
+        case .clock: "clock"
+        case .battery: "battery.75percent"
+        case .network: "network"
+        case .projectPulse: "point.3.connected.trianglepath.dotted"
+        case .githubInbox: "bell.badge"
+        case .docker: "shippingbox"
+        case .customTile: "command"
+        case .focusTimer: "timer"
+        case .appearance: "paintbrush"
+        }
+    }
+
+    var windowTitle: String { "DockDeck — \(title)" }
+}
+struct PanelModuleDefinition: Identifiable, Equatable {
+    let id: PanelModuleID
+    let title: String
+    let subtitle: String
+    let symbolName: String
+    let settingsPane: SettingsPaneID?
+}
+
+enum SettingsSidebarSectionID: String {
+    case general
+    case modules
+    case interface
+}
+
+struct SettingsSidebarSection: Identifiable, Equatable {
+    let id: SettingsSidebarSectionID
+    let title: String
+    let panes: [SettingsPaneID]
+}
+
+enum PanelModuleRegistry {
+    static let all = [
+        PanelModuleDefinition(
+            id: .terminal, title: "Terminal", subtitle: "Interactive login shell",
+            symbolName: "terminal", settingsPane: .terminal),
+        PanelModuleDefinition(
+            id: .usage, title: "Usage", subtitle: "Codex and Claude limits",
+            symbolName: "chart.bar", settingsPane: .usage),
+        PanelModuleDefinition(
+            id: .systemStats, title: "System Stats", subtitle: "Selectable local metrics",
+            symbolName: "gauge.with.dots.needle.67percent", settingsPane: .systemStats),
+        PanelModuleDefinition(
+            id: .serviceMonitor, title: "Service Monitor", subtitle: "HTTPS availability",
+            symbolName: "server.rack", settingsPane: .serviceMonitor),
+        PanelModuleDefinition(
+            id: .weather, title: "Weather", subtitle: "Selected-city conditions",
+            symbolName: "cloud.sun", settingsPane: .weather),
+        PanelModuleDefinition(
+            id: .schedule, title: "Schedule", subtitle: "Calendar and reminders",
+            symbolName: "calendar", settingsPane: .schedule),
+        PanelModuleDefinition(
+            id: .clock, title: "World Clock", subtitle: "Local or selected time zone",
+            symbolName: "clock", settingsPane: .clock),
+        PanelModuleDefinition(
+            id: .battery, title: "Battery", subtitle: "Charge and power state",
+            symbolName: "battery.75percent", settingsPane: .battery),
+        PanelModuleDefinition(
+            id: .network, title: "Network", subtitle: "Download and upload rates",
+            symbolName: "network", settingsPane: .network),
+        PanelModuleDefinition(
+            id: .projectPulse, title: "Project Pulse", subtitle: "Git and GitHub activity",
+            symbolName: "point.3.connected.trianglepath.dotted", settingsPane: .projectPulse),
+        PanelModuleDefinition(
+            id: .githubInbox, title: "GitHub Inbox", subtitle: "Notifications and reviews",
+            symbolName: "bell.badge", settingsPane: .githubInbox),
+        PanelModuleDefinition(
+            id: .docker, title: "Docker", subtitle: "Containers and resources",
+            symbolName: "shippingbox", settingsPane: .docker),
+        PanelModuleDefinition(
+            id: .customTile, title: "Custom Tile", subtitle: "Command or Shortcut output",
+            symbolName: "command", settingsPane: .customTile),
+        PanelModuleDefinition(
+            id: .focusTimer, title: "Focus Timer", subtitle: "Focus and break countdowns",
+            symbolName: "timer", settingsPane: .focusTimer),
+    ]
+
+    static func definition(for id: PanelModuleID) -> PanelModuleDefinition? {
+        all.first { $0.id == id }
+    }
+
+    static func definition(for settingsPane: SettingsPaneID) -> PanelModuleDefinition? {
+        all.first { $0.settingsPane == settingsPane }
+    }
+}
+
+struct TerminalSettingsState: Equatable {
+    var focusWidthMultiplier: CGFloat
+    var focusHeightMultiplier: CGFloat
+    var fontName: String
+}
+
+struct UsageSettingsState: Equatable {
+    var enabledProviders: [UsageProviderID]
+    var claudeRefreshMode: ClaudeUsageRefreshMode
+    var fontName: String
+    var fontSize: CGFloat
+    var displayMode: UsageDisplayMode
+    var textColor: UsageTextColor
+    var showsPace: Bool
+}
+
+struct SystemStatsSettingsState: Equatable {
+    var refreshInterval: TimeInterval
+    var metrics: [SystemStatsMetric]
+}
+
+struct ServiceMonitorSettingsState: Equatable {
+    var endpoints: [ServiceMonitorEndpoint]
+    var refreshInterval: TimeInterval
+}
+
+struct WeatherSettingsState: Equatable {
+    var location: WeatherLocation?
+    var temperatureUnit: WeatherTemperatureUnit
+    var refreshInterval: TimeInterval
+}
+
+struct ScheduleSettingsState: Equatable {
+    var calendarIDs: [String]
+    var reminderListIDs: [String]
+    var includeAllDay: Bool
+    var includeReminders: Bool
+    var refreshInterval: TimeInterval
+}
+
+struct ClockSettingsState: Equatable {
+    var timeZoneIdentifier: String
+    var hourFormat: ClockHourFormat
+}
+
+struct BatterySettingsState: Equatable {
+    var refreshInterval: TimeInterval
+}
+
+struct NetworkSettingsState: Equatable {
+    var refreshInterval: TimeInterval
+}
+
+struct AppearanceSettingsState: Equatable {
+    var cornerRadius: CGFloat
+    var tintOpacity: CGFloat
+}
+
+struct SettingsPanelValues: Equatable {
+    var deckConfiguration: PanelDeckConfiguration
+    var deckAutoSlide: DeckAutoSlideSettings
+    var notifications: DockNotificationSettings
+    var terminal: TerminalSettingsState
+    var usage: UsageSettingsState
+    var systemStats: SystemStatsSettingsState
+    var serviceMonitor: ServiceMonitorSettingsState
+    var weather: WeatherSettingsState
+    var schedule: ScheduleSettingsState
+    var clock: ClockSettingsState
+    var battery: BatterySettingsState
+    var network: NetworkSettingsState
+    var projectPulse: ProjectPulseConfiguration
+    var githubInbox: GitHubInboxConfiguration
+    var docker: DockerConfiguration
+    var customTile: CustomTileConfiguration
+    var focusTimer: FocusTimerSettings
+    var appearance: AppearanceSettingsState
+
+    func normalized() -> Self {
+        var values = self
+        values.deckConfiguration = deckConfiguration.normalized()
+        values.deckAutoSlide = deckAutoSlide.normalized()
+        values.systemStats.metrics = SystemStatsMetric.normalized(systemStats.metrics)
+        values.projectPulse = projectPulse.normalized()
+        values.githubInbox = githubInbox.normalized()
+        values.docker = docker.normalized()
+        values.customTile = customTile.normalized()
+        values.focusTimer = focusTimer.normalized()
+        return values
+    }
+}
+
+enum TerminalSettingsChange {
+    case focusSize(width: CGFloat, height: CGFloat)
+    case font(String)
+}
+
+enum UsageSettingsChange {
+    case providers([UsageProviderID])
+    case claudeRefreshMode(ClaudeUsageRefreshMode)
+    case displayMode(UsageDisplayMode)
+    case font(String)
+    case fontSize(CGFloat)
+    case textColor(UsageTextColor)
+    case showsPace(Bool)
+}
+
+enum SystemStatsSettingsChange {
+    case refreshInterval(TimeInterval)
+    case metrics([SystemStatsMetric])
+}
+
+enum ServiceMonitorSettingsChange {
+    case endpoints([ServiceMonitorEndpoint])
+    case refreshInterval(TimeInterval)
+}
+
+enum WeatherSettingsChange {
+    case location(WeatherLocation?)
+    case temperatureUnit(WeatherTemperatureUnit)
+    case refreshInterval(TimeInterval)
+}
+
+enum ScheduleSettingsChange {
+    case calendarIDs([String])
+    case reminderListIDs([String])
+    case includeAllDay(Bool)
+    case includeReminders(Bool)
+    case refreshInterval(TimeInterval)
+}
+
+enum ClockSettingsChange {
+    case timeZoneIdentifier(String)
+    case hourFormat(ClockHourFormat)
+}
+
+enum BatterySettingsChange {
+    case refreshInterval(TimeInterval)
+}
+
+enum NetworkSettingsChange {
+    case refreshInterval(TimeInterval)
+}
+
+enum ProjectPulseSettingsChange {
+    case configuration(ProjectPulseConfiguration)
+}
+
+enum GitHubInboxSettingsChange {
+    case configuration(GitHubInboxConfiguration)
+}
+
+enum DockerSettingsChange {
+    case configuration(DockerConfiguration)
+}
+
+enum FocusTimerSettingsChange {
+    case settings(FocusTimerSettings)
+}
+
+enum AppearanceSettingsChange {
+    case cornerRadius(CGFloat)
+    case tintOpacity(CGFloat)
+}
+
+enum SettingsPanelChange {
+    case deck(PanelDeckConfiguration)
+    case deckAutoSlide(DeckAutoSlideSettings)
+    case notifications(DockNotificationSettings)
+    case terminal(TerminalSettingsChange)
+    case usage(UsageSettingsChange)
+    case systemStats(SystemStatsSettingsChange)
+    case serviceMonitor(ServiceMonitorSettingsChange)
+    case weather(WeatherSettingsChange)
+    case schedule(ScheduleSettingsChange)
+    case clock(ClockSettingsChange)
+    case battery(BatterySettingsChange)
+    case network(NetworkSettingsChange)
+    case projectPulse(ProjectPulseSettingsChange)
+    case githubInbox(GitHubInboxSettingsChange)
+    case docker(DockerSettingsChange)
+    case customTile(CustomTileConfiguration)
+    case focusTimer(FocusTimerSettingsChange)
+    case appearance(AppearanceSettingsChange)
+}
