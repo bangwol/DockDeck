@@ -282,8 +282,8 @@ struct ReadOnlyModuleDetailView: View {
 
     @ViewBuilder private var detailContent: some View {
         switch presentation.activeModule {
-        case .focusTimer:
-            FocusTimerModuleDetailView(store: services.focusTimer)
+        case .battery:
+            BatteryModuleDetailView(store: services.battery)
         case .usage:
             UsageModuleDetailView(store: services.usage, theme: presentation.theme)
         case .systemStats:
@@ -303,6 +303,8 @@ struct ReadOnlyModuleDetailView: View {
             GitHubInboxDetailView(store: services.githubInbox, theme: presentation.theme)
         case .docker:
             DockerModuleDetailView(store: services.docker, theme: presentation.theme)
+        case .focusTimer:
+            FocusTimerModuleDetailView(store: services.focusTimer)
         case .customTile, .customTile2, .customTile3:
             if let module = presentation.activeModule,
                 let store = services.runtime(for: module) as? CustomTileStore

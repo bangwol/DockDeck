@@ -32,10 +32,7 @@ final class ModuleGalleryTests: XCTestCase {
                     to: outputURL.appendingPathComponent(
                         "\(themeName)-compact-\(module.rawValue).png"))
             }
-            for module in [
-                PanelModuleID.usage, .focusTimer, .systemStats, .serviceMonitor, .schedule,
-                .music, .projectPulse, .githubInbox, .docker, .customTile,
-            ] {
+            for module in PanelModuleID.readOnlyBuiltIns {
                 let presentation = ReadOnlyDeckPresentation(
                     activeModule: module, theme: theme)
                 try render(
@@ -45,6 +42,11 @@ final class ModuleGalleryTests: XCTestCase {
                     dark: theme.isDark,
                     to: outputURL.appendingPathComponent(
                         "\(themeName)-detail-\(module.rawValue).png"))
+                if module == .battery {
+                    try render(ReadOnlyModuleDetailView(services: services, presentation: presentation),
+                        size: ReadOnlyModuleDetailLayout.minimumSize, dark: theme.isDark,
+                        to: outputURL.appendingPathComponent("\(themeName)-detail-battery-minimum.png"))
+                }
             }
         }
     }
