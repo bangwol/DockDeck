@@ -82,5 +82,4 @@ accidental resource use; they are not a security sandbox.
 
 Choose a 1-, 5-, or 15-minute interval. Disabling the module stops scheduled runs and discards late results; an already
 running command remains subject to the 5-second limit. Hidden polling is three times slower, and macOS Low Power Mode
-adds another two-times multiplier. `⌘R` requests an immediate run while the
-module is enabled.
+adds another two-times multiplier. `⌘R` requests an immediate run for every enabled Custom Tile slot.

@@ -5,6 +5,15 @@ import XCTest
 @testable import DockDeck
 
 final class PanelAppearanceTests: XCTestCase {
+    func testTextTileExampleSurvivesArgumentEditing() throws {
+        let model = makeSettingsModel(configuration: .legacy(order: .terminalLeft, enabledPanels: .all))
+        model.useCustomTileExample(json: false)
+        model.setCustomTileArguments(model.customTileConfiguration.arguments.joined(separator: "\n"))
+        let snapshot = try CustomTileClient().read(configuration: model.customTileConfiguration, now: Date())
+        XCTAssertEqual(snapshot.content.value, "Ready")
+        XCTAssertEqual(snapshot.content.detail, "Example output")
+    }
+
     func testCustomTileSlotsCanBeConfiguredIndependentlyWhileDisabled() {
         let model = makeSettingsModel(configuration: .legacy(order: .terminalLeft, enabledPanels: .all))
         let original = model.values.customTile

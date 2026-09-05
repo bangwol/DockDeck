@@ -93,7 +93,9 @@ extension AppDelegate {
         if enabled.contains(.projectPulse) { projectPulseStore.refresh() }
         if enabled.contains(.githubInbox) { githubInboxStore.refresh() }
         if enabled.contains(.docker) { dockerStore.refresh() }
-        if enabled.contains(.customTile) { customTileStore.refresh() }
+        for module in PanelModuleID.customTiles where enabled.contains(module) {
+            (moduleServices.runtime(for: module) as? CustomTileStore)?.refresh()
+        }
         if enabled.contains(.focusTimer) { focusTimerStore.refresh() }
         refreshCoarseCaches()
         startTrackingTimer()
