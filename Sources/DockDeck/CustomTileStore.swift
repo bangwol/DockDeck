@@ -275,6 +275,33 @@ final class CustomTileStore: ObservableObject {
             ? (self.configuration.isConfigured ? .loading : .notConfigured) : .ready
     }
 
+    var isStale: Bool {
+        if case .unavailable = status { return snapshot != nil }
+        return false
+    }
+
+    var statusDescription: String {
+        switch status {
+        case .notConfigured: "Configure a command or Shortcut"
+        case .loading: "Running tile command"
+        case .ready: "Ready"
+        case .unavailable(let message): "Refresh failed: \(message)"
+        }
+    }
+
+    var accessibilitySummary: String {
+        guard let snapshot else { return statusDescription }
+        return [snapshot.content.title, snapshot.content.value, snapshot.content.detail,
+                statusDescription,
+                "Last success: \(snapshot.observedAt.formatted(date: .abbreviated, time: .shortened))"]
+            .compactMap { $0 }.joined(separator: ", ")
+    }
+
+    func runOnce(configuration: CustomTileConfiguration) {
+        updateConfiguration(configuration)
+        refresh(allowsStopped: true)
+    }
+
     func start() {
         guard !isRunning else { return }
         isRunning = true
@@ -283,7 +310,7 @@ final class CustomTileStore: ObservableObject {
     }
 
     func stop() {
-        guard isRunning || timer != nil || delayedRefresh != nil else { return }
+        guard isRunning || timer != nil || delayedRefresh != nil || requestID != nil else { return }
         isRunning = false
         generation += 1
         timer?.invalidate()
@@ -316,11 +343,13 @@ final class CustomTileStore: ObservableObject {
         scheduleTimer()
     }
 
-    func refresh() {
+    func refresh() { refresh(allowsStopped: false) }
+
+    private func refresh(allowsStopped: Bool) {
         delayedRefresh?.cancel()
         delayedRefresh = nil
-        guard isRunning, configuration.isConfigured else {
-            if isRunning { status = .notConfigured }
+        guard (isRunning || allowsStopped), configuration.isConfigured else {
+            if isRunning || allowsStopped { status = .notConfigured }
             return
         }
         guard requestID == nil else { return }
@@ -328,7 +357,7 @@ final class CustomTileStore: ObservableObject {
         let generation = generation
         let configuration = configuration
         self.requestID = requestID
-        if snapshot == nil { status = .loading }
+        if snapshot == nil || allowsStopped { status = .loading }
 
         queue.async { [weak self] in
             guard let self else { return }
@@ -338,7 +367,7 @@ final class CustomTileStore: ObservableObject {
             DispatchQueue.main.async {
                 guard self.requestID == requestID else { return }
                 self.requestID = nil
-                guard self.isRunning else { return }
+                guard self.isRunning || allowsStopped else { return }
                 guard self.generation == generation else {
                     self.refresh()
                     return

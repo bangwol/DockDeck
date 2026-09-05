@@ -675,14 +675,39 @@ final class SettingsPanelModel: ObservableObject {
         onChange?(.githubInbox(.configuration(configuration)))
     }
 
+    var selectedCustomTile: PanelModuleID {
+        let module = moduleDefinition(for: selectedPane)?.id ?? .customTile
+        return PanelModuleID.customTiles.contains(module) ? module : .customTile
+    }
+
+    var customTileConfiguration: CustomTileConfiguration {
+        selectedCustomTile == .customTile ? values.customTile
+            : values.extraCustomTiles[selectedCustomTile]
+                ?? CustomTileConfiguration(title: selectedPane.title)
+    }
+
+    func useCustomTileExample(json: Bool) {
+        updateCustomTileConfiguration { configuration in
+            configuration.source = .executable
+            configuration.executablePath = "/usr/bin/printf"
+            configuration.arguments = [json
+                ? #"{"value":"Ready","detail":"Example output","symbol":"checkmark.circle"}"#
+                : "Ready\nExample output"]
+        }
+    }
+
     private func updateCustomTileConfiguration(
         _ update: (inout CustomTileConfiguration) -> Void
     ) {
-        var configuration = values.customTile
+        let module = selectedCustomTile
+        var configuration = customTileConfiguration
         update(&configuration)
         configuration = configuration.normalized()
-        updateValues { $0.customTile = configuration }
-        onChange?(.customTile(configuration))
+        updateValues {
+            if module == .customTile { $0.customTile = configuration }
+            else { $0.extraCustomTiles[module] = configuration }
+        }
+        onChange?(.customTile(module, configuration))
     }
 
     private func updateFocusTimerSettings(

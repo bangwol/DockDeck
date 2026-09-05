@@ -113,7 +113,6 @@ private struct SettingsRootView: View {
                     Divider()
                 }
                 selectedPane
-                    .disabled(selectedModule.map { !model.isEnabled($0.id) } ?? false)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(Color(nsColor: .windowBackgroundColor))
@@ -161,8 +160,8 @@ private struct SettingsRootView: View {
             GitHubInboxSettingsView(model: model)
         case .docker:
             DockerSettingsView(model: model)
-        case .customTile:
-            CustomTileSettingsView(model: model)
+        case .customTile, .customTile2, .customTile3:
+            CustomTileSettingsView(model: model).id(model.selectedPane)
         case .focusTimer:
             FocusTimerSettingsView(model: model)
         case .appearance:
@@ -247,7 +246,7 @@ private struct DisabledModuleNotice: View {
     var body: some View {
         HStack(spacing: 8) {
             Image(systemName: "pause.circle")
-            Text("Enable \(moduleTitle) to run it and apply these settings.")
+            Text("Configure \(moduleTitle) here. Enable it in Decks for automatic updates.")
                 .font(.callout)
             Spacer()
         }

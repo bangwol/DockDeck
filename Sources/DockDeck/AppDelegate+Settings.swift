@@ -253,7 +253,10 @@ extension AppDelegate {
             self.githubInboxStore.updateConfiguration(
                 PanelSettings.githubInboxConfiguration)
             self.dockerStore.updateConfiguration(PanelSettings.dockerConfiguration)
-            self.customTileStore.updateConfiguration(PanelSettings.customTileConfiguration)
+            for module in PanelModuleID.customTiles {
+                (self.moduleServices.runtime(for: module) as? CustomTileStore)?
+                    .updateConfiguration(PanelSettings.customTileConfiguration(for: module))
+            }
             self.focusTimerStore.updateSettings(PanelSettings.focusTimerSettings)
             self.focusTimerStore.replaceSession(PanelSettings.focusTimerSession)
             self.applyCornerRadius()
@@ -344,7 +347,8 @@ extension AppDelegate {
             appearance: AppearanceSettingsState(
                 cornerRadius: PanelSettings.cornerRadius,
                 tintOpacity: PanelSettings.tintOpacity
-                    ?? currentTheme.panelTintColor.alphaComponent))
+                    ?? currentTheme.panelTintColor.alphaComponent),
+            extraCustomTiles: PanelSettings.extraCustomTileConfigurations)
     }
 
     private func applySettingsChange(_ change: SettingsPanelChange) {
@@ -465,9 +469,10 @@ extension AppDelegate {
         case .docker(.configuration(let configuration)):
             PanelSettings.dockerConfiguration = configuration
             dockerStore.updateConfiguration(configuration)
-        case .customTile(let configuration):
-            PanelSettings.customTileConfiguration = configuration
-            customTileStore.updateConfiguration(configuration)
+        case .customTile(let module, let configuration):
+            PanelSettings.setCustomTileConfiguration(configuration, for: module)
+            (moduleServices.runtime(for: module) as? CustomTileStore)?
+                .updateConfiguration(configuration)
         case .focusTimer(.settings(let settings)):
             PanelSettings.focusTimerSettings = settings
             focusTimerStore.updateSettings(settings)

@@ -173,6 +173,12 @@ struct PanelModuleID: Hashable, Codable {
     static let githubInbox = PanelModuleID(rawValue: "github-inbox")
     static let docker = PanelModuleID(rawValue: "docker")
     static let customTile = PanelModuleID(rawValue: "custom-tile")
+    static let customTile2 = PanelModuleID(rawValue: "custom-tile-2")
+    static let customTile3 = PanelModuleID(rawValue: "custom-tile-3")
+    // ponytail: three stable slots preserve saved deck IDs. Use UUID-backed entries
+    // if configurable slot counts are needed later.
+    static let extraCustomTiles: [PanelModuleID] = [.customTile2, .customTile3]
+    static let customTiles: [PanelModuleID] = [.customTile] + extraCustomTiles
     static let focusTimer = PanelModuleID(rawValue: "focus-timer")
 
     static let readOnlyBuiltIns: [PanelModuleID] = [
@@ -181,7 +187,7 @@ struct PanelModuleID: Hashable, Codable {
         .projectPulse,
         .githubInbox,
         .docker,
-        .customTile,
+        .customTile, .customTile2, .customTile3,
         .focusTimer,
     ]
     static let builtIns: [PanelModuleID] = [.terminal] + readOnlyBuiltIns

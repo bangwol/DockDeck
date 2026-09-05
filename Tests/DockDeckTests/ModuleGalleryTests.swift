@@ -34,7 +34,7 @@ final class ModuleGalleryTests: XCTestCase {
             }
             for module in [
                 PanelModuleID.usage, .systemStats, .serviceMonitor, .schedule,
-                .music, .projectPulse, .githubInbox, .docker,
+                .music, .projectPulse, .githubInbox, .docker, .customTile,
             ] {
                 let presentation = ReadOnlyDeckPresentation(
                     activeModule: module, theme: theme)

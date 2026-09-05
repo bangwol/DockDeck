@@ -653,6 +653,31 @@ private struct DetailValueCard: View {
     }
 }
 
+struct CustomTileModuleDetailView: View {
+    @ObservedObject var store: CustomTileStore
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 12) {
+                if let snapshot = store.snapshot {
+                    Text(snapshot.content.title).font(.headline)
+                    Text(snapshot.content.value).font(.title2).textSelection(.enabled)
+                    if let detail = snapshot.content.detail {
+                        Text(detail).textSelection(.enabled)
+                    }
+                    Text("Last success: \(snapshot.observedAt.formatted(date: .abbreviated, time: .shortened))")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+                Text(store.statusDescription)
+                    .foregroundStyle(store.isStale ? Color.orange : .secondary)
+                Button("Run again", action: store.refresh)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .moduleDetailSurface()
+    }
+}
+
 private extension View {
     func moduleDetailSurface() -> some View {
         padding(12)

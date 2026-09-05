@@ -22,7 +22,7 @@ without taking over the menu bar or desktop.
 
 - Keep a persistent interactive terminal beside the Dock.
 - See Codex and Claude limits, remaining capacity, and reset times.
-- Arrange 15 modules between left and right decks with drag and drop.
+- Arrange 17 modules between left and right decks with drag and drop.
 - Scroll manually or auto-slide selected modules on a shared timer.
 - Open resizable detail views without losing the compact deck layout.
 - Stop disabled work and reduce sampling in Low Power Mode, while inactive, and

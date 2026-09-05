@@ -14,30 +14,37 @@ struct CustomTilePanelView: View {
                         .foregroundStyle(.cyan)
                         .frame(width: 24)
                     VStack(alignment: .leading, spacing: 1) {
-                        Text(snapshot.content.title.uppercased())
-                            .font(.system(size: 7.5, weight: .bold, design: .rounded))
-                            .foregroundStyle(baseColor.opacity(0.68))
+                        HStack(spacing: 4) {
+                            Text(snapshot.content.title.uppercased())
+                                .font(.system(size: 10, weight: .bold, design: .rounded))
+                                .foregroundStyle(baseColor.opacity(0.68))
+                                .lineLimit(1)
+                            if store.isStale {
+                                Image(systemName: "exclamationmark.triangle.fill")
+                                    .font(.system(size: 10))
+                                    .foregroundStyle(.orange)
+                            }
+                        }
                         Text(snapshot.content.value)
-                            .font(.system(size: 13, weight: .bold, design: .rounded))
+                            .font(.system(size: 14, weight: .bold, design: .rounded))
                             .foregroundStyle(baseColor)
                             .lineLimit(1)
-                            .minimumScaleFactor(0.6)
+                            .minimumScaleFactor(0.75)
                         if let detail = snapshot.content.detail {
                             Text(detail)
-                                .font(.system(size: 7.5, weight: .medium, design: .rounded))
+                                .font(.system(size: 10, weight: .medium, design: .rounded))
                                 .foregroundStyle(baseColor.opacity(0.7))
                                 .lineLimit(1)
-                                .minimumScaleFactor(0.7)
                         }
                     }
                     Spacer(minLength: 0)
                 }
                 .padding(.horizontal, 10)
                 .padding(.vertical, 5)
-                .help(helpText(snapshot))
+                .help(store.accessibilitySummary)
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel(snapshot.content.title)
-                .accessibilityValue(helpText(snapshot))
+                .accessibilityValue(store.accessibilitySummary)
             } else {
                 placeholder
             }
@@ -80,9 +87,4 @@ struct CustomTilePanelView: View {
         return NSImage(systemSymbolName: "command", accessibilityDescription: nil) ?? NSImage()
     }
 
-    private func helpText(_ snapshot: CustomTileSnapshot) -> String {
-        [snapshot.content.title, snapshot.content.value, snapshot.content.detail]
-            .compactMap { $0 }
-            .joined(separator: ", ")
-    }
 }

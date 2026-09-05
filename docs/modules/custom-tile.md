@@ -1,13 +1,21 @@
 # Custom Tile
 
-Custom Tile displays bounded output from one trusted executable or macOS
-Shortcut. It is intended for small local summaries such as a build state,
+Each Custom Tile displays bounded output from one trusted executable or macOS
+Shortcut. Three independent slots are available: Custom Tile, Custom Tile 2, and
+Custom Tile 3. Existing configurations remain in the first slot. It is intended for small local summaries such as a build state,
 queue length, or environment status—not an interactive terminal.
 
 ## Configure a source
 
-Enable **Custom Tile** under **Settings → Decks**, then open
-**Settings → Custom Tile**.
+Open **Settings → Custom Tile** (or slot 2 or 3) to prepare a source, even while
+the slot is disabled. **Text example** and **JSON example** fill a small local
+`/usr/bin/printf` example. **Test once** explicitly runs the current configuration
+and shows the parsed value or error. Editing an inactive slot does not execute it.
+
+Enable the slot under **Settings → Decks** for automatic updates. Each slot has
+its own title, source, interval, and last result. Double-click a tile to see its
+full result, last successful update, and **Run again**. If a later run fails, the
+last successful value remains visible with a warning and the failure reason.
 
 ### Executable
 
@@ -72,7 +80,7 @@ program or Shortcut runs with the macOS user's file, network, and environment
 access, so configure only software you trust. Runtime and output limits reduce
 accidental resource use; they are not a security sandbox.
 
-Choose a 1-, 5-, or 15-minute interval. Disabling the module stops its timer and
-subprocesses. Hidden polling is three times slower, and macOS Low Power Mode
+Choose a 1-, 5-, or 15-minute interval. Disabling the module stops scheduled runs and discards late results; an already
+running command remains subject to the 5-second limit. Hidden polling is three times slower, and macOS Low Power Mode
 adds another two-times multiplier. `⌘R` requests an immediate run while the
 module is enabled.
