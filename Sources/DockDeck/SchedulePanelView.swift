@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct SchedulePanelView: View {
+    @Environment(\.compactReadable) private var readable
     @ObservedObject var store: ScheduleStore
     let theme: Theme
 
@@ -43,18 +44,18 @@ struct SchedulePanelView: View {
         return VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 6) {
                 Text(overdue ? "DUE" : "TODO")
-                    .font(.system(size: 7.5, weight: .bold, design: .rounded))
+                    .font(.system(size: CompactReadability.size(7.5, enabled: readable), weight: .bold, design: .rounded))
                     .foregroundStyle(baseColor)
                     .padding(.horizontal, 5)
                     .padding(.vertical, 2)
                     .background(Capsule().fill(reminderColor(overdue: overdue).opacity(0.24)))
                 Text(item.title)
-                    .font(.system(size: 10, weight: .semibold, design: .rounded))
+                    .font(.system(size: CompactReadability.size(10, enabled: readable), weight: .semibold, design: .rounded))
                     .foregroundStyle(baseColor)
                     .lineLimit(1)
                 Spacer(minLength: 2)
                 Text(reminderRelativeText(item, now: now))
-                    .font(.system(size: 8, weight: .semibold, design: .monospaced))
+                    .font(.system(size: CompactReadability.size(8, enabled: readable), weight: .semibold, design: .monospaced))
                     .foregroundStyle(baseColor.opacity(0.76))
                     .lineLimit(1)
             }
@@ -77,7 +78,7 @@ struct SchedulePanelView: View {
                 Text(item.listTitle).lineLimit(1)
                 Spacer(minLength: 0)
             }
-            .font(.system(size: 7.5, weight: .medium, design: .rounded))
+            .font(.system(size: CompactReadability.size(7.5, enabled: readable), weight: .medium, design: .rounded))
             .foregroundStyle(baseColor.opacity(0.66))
         }
         .padding(.horizontal, 9)
@@ -93,20 +94,20 @@ struct SchedulePanelView: View {
         return VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 6) {
                 Text(presentation.mode == .current ? "NOW" : "NEXT")
-                    .font(.system(size: 7.5, weight: .bold, design: .rounded))
+                    .font(.system(size: CompactReadability.size(7.5, enabled: readable), weight: .bold, design: .rounded))
                     .foregroundStyle(baseColor)
                     .padding(.horizontal, 5)
                     .padding(.vertical, 2)
                     .background(
                         Capsule().fill(badgeColor(presentation.mode).opacity(0.24)))
                 Text(item.title)
-                    .font(.system(size: 10, weight: .semibold, design: .rounded))
+                    .font(.system(size: CompactReadability.size(10, enabled: readable), weight: .semibold, design: .rounded))
                     .foregroundStyle(baseColor)
                     .lineLimit(1)
                 if let joinURL = item.joinURL {
                     Link(destination: joinURL) {
                         Image(systemName: "video.fill")
-                            .font(.system(size: 8, weight: .semibold))
+                            .font(.system(size: CompactReadability.size(8, enabled: readable), weight: .semibold))
                             .foregroundStyle(Color.accentColor)
                     }
                     .buttonStyle(.plain)
@@ -115,7 +116,7 @@ struct SchedulePanelView: View {
                 }
                 Spacer(minLength: 2)
                 Text(relativeText(presentation, now: now))
-                    .font(.system(size: 8, weight: .semibold, design: .monospaced))
+                    .font(.system(size: CompactReadability.size(8, enabled: readable), weight: .semibold, design: .monospaced))
                     .foregroundStyle(baseColor.opacity(0.76))
                     .lineLimit(1)
             }
@@ -139,7 +140,7 @@ struct SchedulePanelView: View {
                 Text(item.calendarTitle).lineLimit(1)
                 Spacer(minLength: 0)
             }
-            .font(.system(size: 7.5, weight: .medium, design: .rounded))
+            .font(.system(size: CompactReadability.size(7.5, enabled: readable), weight: .medium, design: .rounded))
             .foregroundStyle(baseColor.opacity(0.66))
         }
         .padding(.horizontal, 9)
@@ -152,7 +153,7 @@ struct SchedulePanelView: View {
 
     private func placeholder(text: String, symbol: String) -> some View {
         Label(text, systemImage: symbol)
-            .font(.system(size: 9.5, weight: .semibold, design: .rounded))
+            .font(.system(size: CompactReadability.size(9.5, enabled: readable), weight: .semibold, design: .rounded))
             .foregroundStyle(baseColor.opacity(0.78))
             .padding(.horizontal, 10)
             .accessibilityElement(children: .combine)

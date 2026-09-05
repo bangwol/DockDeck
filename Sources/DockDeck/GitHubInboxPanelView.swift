@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct GitHubInboxPanelView: View {
+    @Environment(\.compactReadable) private var readable
     @ObservedObject var store: GitHubInboxStore
     let theme: Theme
 
@@ -19,7 +20,7 @@ struct GitHubInboxPanelView: View {
                         }
                     }
                     .frame(maxHeight: .infinity)
-                    if let entry = snapshot.entries.first {
+                    if !readable, let entry = snapshot.entries.first {
                         notificationLine(entry)
                     }
                 }
@@ -40,14 +41,14 @@ struct GitHubInboxPanelView: View {
     private func metric(_ title: String, _ value: Int?, color: Color) -> some View {
         VStack(spacing: 1) {
             Text(title)
-                .font(.system(size: 8, weight: .bold, design: .rounded))
+                .font(.system(size: CompactReadability.size(8, enabled: readable), weight: .bold, design: .rounded))
                 .foregroundStyle(color)
             Text(value.map(compactGitHubCount) ?? "--")
-                .font(.system(size: 14, weight: .bold, design: .rounded))
+                .font(.system(size: CompactReadability.size(readable ? 17 : 14, enabled: readable), weight: .bold, design: .rounded))
                 .foregroundStyle(baseColor)
                 .monospacedDigit()
                 .lineLimit(1)
-                .minimumScaleFactor(0.7)
+                .minimumScaleFactor(readable ? 1 : 0.7)
         }
         .frame(maxWidth: .infinity)
     }
@@ -55,16 +56,16 @@ struct GitHubInboxPanelView: View {
     private func notificationLine(_ entry: GitHubInboxEntry) -> some View {
         HStack(spacing: 4) {
             Text(entry.reasonLabel)
-                .font(.system(size: 7, weight: .bold, design: .rounded))
+                .font(.system(size: CompactReadability.size(7, enabled: readable), weight: .bold, design: .rounded))
                 .foregroundStyle(githubReasonColor(entry.reason))
                 .fixedSize()
             Text(entry.repositoryName)
-                .font(.system(size: 7.5, weight: .semibold, design: .rounded))
+                .font(.system(size: CompactReadability.size(7.5, enabled: readable), weight: .semibold, design: .rounded))
                 .foregroundStyle(baseColor.opacity(0.62))
                 .lineLimit(1)
                 .frame(maxWidth: 44)
             Text(entry.title)
-                .font(.system(size: 8.5, weight: .semibold, design: .rounded))
+                .font(.system(size: CompactReadability.size(8.5, enabled: readable), weight: .semibold, design: .rounded))
                 .foregroundStyle(baseColor.opacity(0.92))
                 .lineLimit(1)
                 .truncationMode(.tail)
@@ -83,7 +84,7 @@ struct GitHubInboxPanelView: View {
             Text(placeholderText)
                 .lineLimit(2)
         }
-        .font(.system(size: 9.5, weight: .semibold, design: .rounded))
+        .font(.system(size: CompactReadability.size(9.5, enabled: readable), weight: .semibold, design: .rounded))
         .foregroundStyle(baseColor.opacity(0.78))
         .padding(.horizontal, 9)
     }

@@ -22,6 +22,12 @@ final class ModuleGalleryTests: XCTestCase {
             ("light", Theme.theme(id: "github-light")),
         ] {
             for module in PanelModuleID.readOnlyBuiltIns {
+                try render(ReadOnlyDeckPanelView(readabilityOverride: true, services: services,
+                    presentation: ReadOnlyDeckPresentation(activeModule: module, theme: theme)),
+                    size: NSSize(width: 214, height: 59), dark: theme.isDark,
+                    to: outputURL.appendingPathComponent("\(themeName)-readable-\(module.rawValue).png"))
+            }
+            for module in PanelModuleID.readOnlyBuiltIns {
                 let presentation = ReadOnlyDeckPresentation(
                     activeModule: module, theme: theme)
                 try render(

@@ -5,6 +5,12 @@ import XCTest
 @testable import DockDeck
 
 final class PanelAppearanceTests: XCTestCase {
+    func testReadableCompactTypeKeepsTenPointFloorWithoutShrinkingLargerText() {
+        XCTAssertEqual(CompactReadability.size(7.5, enabled: false), 7.5)
+        XCTAssertEqual(CompactReadability.size(7.5, enabled: true), 10)
+        XCTAssertEqual(CompactReadability.size(20, enabled: true), 20)
+    }
+
     func testTextTileExampleSurvivesArgumentEditing() throws {
         let model = makeSettingsModel(configuration: .legacy(order: .terminalLeft, enabledPanels: .all))
         model.useCustomTileExample(json: false)

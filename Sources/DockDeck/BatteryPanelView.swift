@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct BatteryPanelView: View {
+    @Environment(\.compactReadable) private var readable
     @ObservedObject var store: BatteryStore
     let theme: Theme
 
@@ -20,12 +21,12 @@ struct BatteryPanelView: View {
         HStack(spacing: 9) {
             Image(systemName: symbolName(snapshot))
                 .symbolRenderingMode(.hierarchical)
-                .font(.system(size: 23, weight: .semibold))
+                .font(.system(size: CompactReadability.size(23, enabled: readable), weight: .semibold))
                 .foregroundStyle(statusColor(snapshot))
                 .frame(width: 28)
 
             Text(String(Int(snapshot.percent.rounded())) + "%")
-                .font(.system(size: 20, weight: .bold, design: .rounded))
+                .font(.system(size: CompactReadability.size(20, enabled: readable), weight: .bold, design: .rounded))
                 .foregroundStyle(baseColor)
                 .monospacedDigit()
                 .lineLimit(1)
@@ -38,9 +39,9 @@ struct BatteryPanelView: View {
                     Text(estimateText(snapshot))
                         .foregroundStyle(baseColor.opacity(0.7))
                 }
-                .font(.system(size: 8.5, weight: .semibold, design: .rounded))
+                .font(.system(size: CompactReadability.size(8.5, enabled: readable), weight: .semibold, design: .rounded))
                 .lineLimit(1)
-                .minimumScaleFactor(0.72)
+                .minimumScaleFactor(readable ? 1 : 0.72)
 
                 GeometryReader { proxy in
                     ZStack(alignment: .leading) {
@@ -67,7 +68,7 @@ struct BatteryPanelView: View {
             Image(systemName: "battery.0percent")
             Text("No internal battery")
         }
-        .font(.system(size: 9.5, weight: .semibold, design: .rounded))
+        .font(.system(size: CompactReadability.size(9.5, enabled: readable), weight: .semibold, design: .rounded))
         .foregroundStyle(baseColor.opacity(0.78))
         .accessibilityElement(children: .combine)
     }

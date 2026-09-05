@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct DockerPanelView: View {
+    @Environment(\.compactReadable) private var readable
     @ObservedObject var store: DockerStore
     let theme: Theme
 
@@ -9,7 +10,7 @@ struct DockerPanelView: View {
             if let snapshot = store.snapshot {
                 HStack(spacing: 3) {
                     metric("RUN", String(snapshot.runningCount), color: .green)
-                    metric("STOP", String(snapshot.stoppedCount), color: .secondary)
+                    if !readable { metric("STOP", String(snapshot.stoppedCount), color: .secondary) }
                     metric("BAD", String(snapshot.unhealthyCount), color: .red)
                     metric("CPU", percent(snapshot.cpuPercent), color: .cyan)
                     metric("RAM", memory(snapshot.memoryBytes), color: .orange)
@@ -31,14 +32,14 @@ struct DockerPanelView: View {
     private func metric(_ title: String, _ value: String, color: Color) -> some View {
         VStack(spacing: 3) {
             Text(title)
-                .font(.system(size: 6.5, weight: .bold, design: .rounded))
+                .font(.system(size: CompactReadability.size(6.5, enabled: readable), weight: .bold, design: .rounded))
                 .foregroundStyle(color)
             Text(value)
-                .font(.system(size: 9.5, weight: .bold, design: .rounded))
+                .font(.system(size: CompactReadability.size(9.5, enabled: readable), weight: .bold, design: .rounded))
                 .foregroundStyle(baseColor)
                 .monospacedDigit()
                 .lineLimit(1)
-                .minimumScaleFactor(0.58)
+                .minimumScaleFactor(readable ? 1 : 0.58)
         }
         .frame(maxWidth: .infinity)
     }
@@ -52,7 +53,7 @@ struct DockerPanelView: View {
             }
             Text(placeholderText).lineLimit(2)
         }
-        .font(.system(size: 9.5, weight: .semibold, design: .rounded))
+        .font(.system(size: CompactReadability.size(9.5, enabled: readable), weight: .semibold, design: .rounded))
         .foregroundStyle(baseColor.opacity(0.78))
         .padding(.horizontal, 9)
     }

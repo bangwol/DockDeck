@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct FocusTimerPanelView: View {
+    @Environment(\.compactReadable) private var readable
     @ObservedObject var store: FocusTimerStore
     let theme: Theme
 
@@ -8,7 +9,7 @@ struct FocusTimerPanelView: View {
         HStack(spacing: 7) {
             Button(action: { store.toggle() }) {
                 Image(systemName: store.snapshot.mode == .running ? "pause.fill" : "play.fill")
-                    .font(.system(size: 10, weight: .bold))
+                    .font(.system(size: CompactReadability.size(10, enabled: readable), weight: .bold))
                     .foregroundStyle(accentColor)
                     .frame(width: 25, height: 25)
                     .background(Circle().fill(baseColor.opacity(0.1)))
@@ -20,10 +21,10 @@ struct FocusTimerPanelView: View {
             VStack(alignment: .leading, spacing: 3) {
                 HStack(alignment: .firstTextBaseline, spacing: 6) {
                     Text(store.snapshot.phase.title)
-                        .font(.system(size: 8, weight: .bold, design: .rounded))
+                        .font(.system(size: CompactReadability.size(8, enabled: readable), weight: .bold, design: .rounded))
                         .foregroundStyle(accentColor)
                     Text(store.snapshot.timeLabel)
-                        .font(.system(size: 15, weight: .semibold, design: .monospaced))
+                        .font(.system(size: CompactReadability.size(15, enabled: readable), weight: .semibold, design: .monospaced))
                         .monospacedDigit()
                         .foregroundStyle(baseColor)
                     Spacer(minLength: 0)
@@ -41,7 +42,7 @@ struct FocusTimerPanelView: View {
 
             Button(action: { store.reset() }) {
                 Image(systemName: "arrow.counterclockwise")
-                    .font(.system(size: 9, weight: .semibold))
+                    .font(.system(size: CompactReadability.size(9, enabled: readable), weight: .semibold))
                     .foregroundStyle(baseColor.opacity(0.72))
                     .frame(width: 20, height: 24)
             }
@@ -51,7 +52,7 @@ struct FocusTimerPanelView: View {
 
             Button(action: { store.skip() }) {
                 Image(systemName: "forward.end.fill")
-                    .font(.system(size: 9, weight: .semibold))
+                    .font(.system(size: CompactReadability.size(9, enabled: readable), weight: .semibold))
                     .foregroundStyle(baseColor.opacity(0.72))
                     .frame(width: 20, height: 24)
             }

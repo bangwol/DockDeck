@@ -1,13 +1,14 @@
 import SwiftUI
 
 struct ServiceMonitorPanelView: View {
+    @Environment(\.compactReadable) private var readable
     @ObservedObject var store: ServiceMonitorStore
     let theme: Theme
 
     var body: some View {
         if store.items.isEmpty {
             Label("Add services in Settings", systemImage: "plus.circle")
-                .font(.system(size: 10, weight: .semibold, design: .rounded))
+                .font(.system(size: CompactReadability.size(10, enabled: readable), weight: .semibold, design: .rounded))
                 .foregroundStyle(baseColor.opacity(0.78))
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(Color.black.opacity(0.001))
@@ -39,6 +40,7 @@ struct ServiceMonitorPanelView: View {
 }
 
 private struct ServiceMonitorCell: View {
+    @Environment(\.compactReadable) private var readable
     let item: ServiceMonitorItem
     let history: MetricHistory
     let baseColor: Color
@@ -51,14 +53,14 @@ private struct ServiceMonitorCell: View {
             Text(item.endpoint.displayName)
                 .foregroundStyle(baseColor)
                 .lineLimit(1)
-                .minimumScaleFactor(0.75)
+                .minimumScaleFactor(readable ? 1 : 0.75)
             Spacer(minLength: 1)
             Text(item.state.shortLabel)
                 .foregroundStyle(statusColor)
                 .monospacedDigit()
                 .lineLimit(1)
         }
-        .font(.system(size: 8.5, weight: .semibold, design: .rounded))
+        .font(.system(size: CompactReadability.size(8.5, enabled: readable), weight: .semibold, design: .rounded))
         .padding(.horizontal, 6)
         .frame(maxWidth: .infinity, minHeight: 20, maxHeight: .infinity)
         .background(Capsule().fill(baseColor.opacity(0.09)))

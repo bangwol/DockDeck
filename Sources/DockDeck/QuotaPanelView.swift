@@ -175,6 +175,7 @@ struct QuotaPanelView: View {
 }
 
 private struct QuotaRow: View {
+    @Environment(\.compactReadable) private var readable
     let provider: ProviderUsage
     let theme: Theme
     let configuration: UsagePanelConfiguration
@@ -199,10 +200,10 @@ private struct QuotaRow: View {
                 Text(provider.freshness.label ?? "WAITING")
                     .font(
                         configuration.font(
-                            size: max(configuration.fontSize - 1, 7), weight: .semibold))
+                            size: CompactReadability.size(max(configuration.fontSize - 1, 7), enabled: readable), weight: .semibold))
                     .foregroundStyle(providerColor)
                     .lineLimit(1)
-                    .minimumScaleFactor(0.75)
+                    .minimumScaleFactor(readable ? 1 : 0.75)
                     .frame(maxWidth: .infinity, alignment: .leading)
             } else {
                 HStack(spacing: spacing) {
@@ -330,6 +331,7 @@ private struct UsageProviderMark: View {
 }
 
 private struct UsageMeter: View {
+    @Environment(\.compactReadable) private var readable
     let window: UsageWindow
     let configuration: UsagePanelConfiguration
     let baseColor: Color
@@ -341,7 +343,7 @@ private struct UsageMeter: View {
 
     var body: some View {
         VStack(spacing: resetPlacement == .splitHeader ? 2 : 1) {
-            if resetPlacement == .splitHeader {
+            if resetPlacement == .splitHeader && !readable {
                 HStack(alignment: .firstTextBaseline, spacing: columnSpacing) {
                     MeterLabel(
                         window: window,
@@ -373,7 +375,7 @@ private struct UsageMeter: View {
                 paceValue: pace?.markerValue(for: configuration.displayMode),
                 baseColor: baseColor,
                 meterColor: meterColor)
-            if resetPlacement == .below {
+            if resetPlacement == .below && !readable {
                 ResetLabel(
                     window: window,
                     configuration: configuration,
@@ -386,6 +388,7 @@ private struct UsageMeter: View {
 }
 
 private struct MeterLabel: View {
+    @Environment(\.compactReadable) private var readable
     let window: UsageWindow
     let configuration: UsagePanelConfiguration
     let baseColor: Color
@@ -399,10 +402,10 @@ private struct MeterLabel: View {
             + Text(" \(value)%").foregroundColor(meterColor))
             .font(
                 configuration.font(
-                    size: max(configuration.fontSize - (dense ? 0.5 : 0), 7),
+                    size: CompactReadability.size(max(configuration.fontSize - (dense ? 0.5 : 0), 7), enabled: readable),
                     weight: .medium))
             .lineLimit(1)
-            .minimumScaleFactor(0.68)
+            .minimumScaleFactor(readable ? 1 : 0.68)
             .help(
                 "\(value)% \(configuration.displayMode.title.lowercased()) · "
                     + UsageResetFormatter.helpText(for: window)

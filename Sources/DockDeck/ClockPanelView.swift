@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct ClockPanelView: View {
+    @Environment(\.compactReadable) private var readable
     @ObservedObject var store: ClockStore
     let theme: Theme
     let timeZoneIdentifier: String
@@ -11,27 +12,27 @@ struct ClockPanelView: View {
         HStack(spacing: 9) {
             Image(systemName: "clock.fill")
                 .symbolRenderingMode(.hierarchical)
-                .font(.system(size: 21, weight: .semibold))
+                .font(.system(size: CompactReadability.size(21, enabled: readable), weight: .semibold))
                 .foregroundStyle(Color.cyan)
 
             Text(ClockTextFormatter.time(store.now, timeZone: timeZone, format: hourFormat))
-                .font(.system(size: 20, weight: .bold, design: .rounded))
+                .font(.system(size: CompactReadability.size(20, enabled: readable), weight: .bold, design: .rounded))
                 .foregroundStyle(baseColor)
                 .monospacedDigit()
                 .lineLimit(1)
-                .minimumScaleFactor(0.72)
+                .minimumScaleFactor(readable ? 1 : 0.72)
 
             VStack(alignment: .leading, spacing: 1) {
                 Text(ClockTextFormatter.date(store.now, timeZone: timeZone))
-                    .font(.system(size: 9.5, weight: .semibold, design: .rounded))
+                    .font(.system(size: CompactReadability.size(9.5, enabled: readable), weight: .semibold, design: .rounded))
                     .foregroundStyle(baseColor)
                     .lineLimit(1)
-                    .minimumScaleFactor(0.8)
+                    .minimumScaleFactor(readable ? 1 : 0.8)
                 Text(timeZoneLabel(timeZone))
-                    .font(.system(size: 8, weight: .medium, design: .rounded))
+                    .font(.system(size: CompactReadability.size(8, enabled: readable), weight: .medium, design: .rounded))
                     .foregroundStyle(baseColor.opacity(0.7))
                     .lineLimit(1)
-                    .minimumScaleFactor(0.8)
+                    .minimumScaleFactor(readable ? 1 : 0.8)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }

@@ -744,6 +744,7 @@ enum PanelSettings {
         defaults.removeObject(forKey: networkRefreshIntervalKey)
         defaults.removeObject(forKey: networkInterfaceNameKey)
         defaults.removeObject(forKey: notificationsKey)
+        defaults.removeObject(forKey: CompactReadability.preferenceKey)
         defaults.removeObject(forKey: projectPulseConfigurationKey)
         defaults.removeObject(forKey: "dockdeck.projectPulseFavorites.v1")
         defaults.removeObject(forKey: githubInboxConfigurationKey)

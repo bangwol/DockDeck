@@ -147,3 +147,12 @@ while hidden it uses a coarser cadence plus a separate one-shot completion
 timer. macOS Low Power Mode further reduces display refreshes without delaying
 the completion transition. Optional completion alerts are controlled under
 **Settings → Notifications**.
+
+**Appearance → Larger text and fewer details** keeps compact labels at 10 pt or
+larger without reducing their scale to fit. Long text truncates; existing
+VoiceOver summaries and detail windows retain the full information. Custom Tile
+hides its detail line, GitHub Inbox hides its notification preview, Docker moves
+the stopped count to its detail view, and Usage moves reset times to detail and
+hover text. Increase Contrast also enables the readable layout. macOS Reduce
+Transparency and Increase Contrast make panel backgrounds opaque; Reduce Motion
+continues to disable deck transitions.

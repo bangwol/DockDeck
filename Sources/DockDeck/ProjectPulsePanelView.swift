@@ -2,6 +2,7 @@ import Foundation
 import SwiftUI
 
 struct ProjectPulsePanelView: View {
+    @Environment(\.compactReadable) private var readable
     @ObservedObject var store: ProjectPulseStore
     let theme: Theme
 
@@ -18,7 +19,7 @@ struct ProjectPulsePanelView: View {
                         ProgressView().controlSize(.small)
                         Text("Reading repository…")
                     }
-                    .font(.system(size: 10, weight: .semibold, design: .rounded))
+                    .font(.system(size: CompactReadability.size(10, enabled: readable), weight: .semibold, design: .rounded))
                     .foregroundStyle(baseColor.opacity(0.78))
                 case .failed(let message):
                     placeholder(message, symbol: "exclamationmark.triangle")
@@ -35,15 +36,16 @@ struct ProjectPulsePanelView: View {
 
     private func placeholder(_ title: String, symbol: String) -> some View {
         Label(title, systemImage: symbol)
-            .font(.system(size: 10, weight: .semibold, design: .rounded))
+            .font(.system(size: CompactReadability.size(10, enabled: readable), weight: .semibold, design: .rounded))
             .foregroundStyle(baseColor.opacity(0.72))
             .lineLimit(1)
-            .minimumScaleFactor(0.75)
+            .minimumScaleFactor(readable ? 1 : 0.75)
             .padding(.horizontal, 8)
     }
 }
 
 private struct ProjectPulseContent: View {
+    @Environment(\.compactReadable) private var readable
     let snapshot: ProjectPulseSnapshot
     let status: ProjectPulseStatus
     let baseColor: Color
@@ -56,7 +58,7 @@ private struct ProjectPulseContent: View {
                     .foregroundStyle(baseColor)
                     .lineLimit(1)
                     .truncationMode(.middle)
-                    .minimumScaleFactor(0.8)
+                    .minimumScaleFactor(readable ? 1 : 0.8)
                 Spacer(minLength: 3)
                 if case .loading = status {
                     ProgressView().controlSize(.mini)
@@ -134,7 +136,7 @@ private struct ProjectPulseContent: View {
                 }
             }
         }
-        .font(.system(size: 10, weight: .semibold, design: .rounded))
+        .font(.system(size: CompactReadability.size(10, enabled: readable), weight: .semibold, design: .rounded))
         .padding(.horizontal, 8)
         .padding(.vertical, 6)
         .help(helpText)
@@ -215,6 +217,7 @@ private struct ProjectPulseContent: View {
 }
 
 private struct ProjectActivityMetric: View {
+    @Environment(\.compactReadable) private var readable
     let label: String
     let value: Int
     let help: String
@@ -250,6 +253,7 @@ private func compactProjectValue(_ value: Int) -> String {
 }
 
 private struct WorkflowBadge: View {
+    @Environment(\.compactReadable) private var readable
     let workflow: ProjectWorkflowSnapshot
 
     var body: some View {
@@ -257,7 +261,7 @@ private struct WorkflowBadge: View {
             Image(systemName: symbolName)
             Text(label)
         }
-        .font(.system(size: 9, weight: .bold, design: .rounded))
+        .font(.system(size: CompactReadability.size(9, enabled: readable), weight: .bold, design: .rounded))
         .foregroundStyle(color)
         .lineLimit(1)
         .help(workflow.title)

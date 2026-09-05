@@ -2,6 +2,7 @@ import AppKit
 import SwiftUI
 
 struct CustomTilePanelView: View {
+    @Environment(\.compactReadable) private var readable
     @ObservedObject var store: CustomTileStore
     let theme: Theme
 
@@ -10,29 +11,29 @@ struct CustomTilePanelView: View {
             if let snapshot = store.snapshot {
                 HStack(spacing: 9) {
                     Image(nsImage: symbolImage(snapshot.content.symbolName))
-                        .font(.system(size: 18, weight: .semibold))
+                        .font(.system(size: CompactReadability.size(18, enabled: readable), weight: .semibold))
                         .foregroundStyle(.cyan)
                         .frame(width: 24)
                     VStack(alignment: .leading, spacing: 1) {
                         HStack(spacing: 4) {
                             Text(snapshot.content.title.uppercased())
-                                .font(.system(size: 10, weight: .bold, design: .rounded))
+                                .font(.system(size: CompactReadability.size(10, enabled: readable), weight: .bold, design: .rounded))
                                 .foregroundStyle(baseColor.opacity(0.68))
                                 .lineLimit(1)
                             if store.isStale {
                                 Image(systemName: "exclamationmark.triangle.fill")
-                                    .font(.system(size: 10))
+                                    .font(.system(size: CompactReadability.size(10, enabled: readable)))
                                     .foregroundStyle(.orange)
                             }
                         }
                         Text(snapshot.content.value)
-                            .font(.system(size: 14, weight: .bold, design: .rounded))
+                            .font(.system(size: CompactReadability.size(readable ? 17 : 14, enabled: readable), weight: .bold, design: .rounded))
                             .foregroundStyle(baseColor)
                             .lineLimit(1)
-                            .minimumScaleFactor(0.75)
-                        if let detail = snapshot.content.detail {
+                            .minimumScaleFactor(readable ? 1 : 0.75)
+                        if !readable, let detail = snapshot.content.detail {
                             Text(detail)
-                                .font(.system(size: 10, weight: .medium, design: .rounded))
+                                .font(.system(size: CompactReadability.size(10, enabled: readable), weight: .medium, design: .rounded))
                                 .foregroundStyle(baseColor.opacity(0.7))
                                 .lineLimit(1)
                         }
@@ -62,7 +63,7 @@ struct CustomTilePanelView: View {
             }
             Text(placeholderText).lineLimit(2)
         }
-        .font(.system(size: 9.5, weight: .semibold, design: .rounded))
+        .font(.system(size: CompactReadability.size(9.5, enabled: readable), weight: .semibold, design: .rounded))
         .foregroundStyle(baseColor.opacity(0.78))
         .padding(.horizontal, 9)
     }

@@ -3,11 +3,19 @@ import SwiftUI
 
 struct AppearanceSettingsView: View {
     @ObservedObject var model: SettingsPanelModel
+    @AppStorage(CompactReadability.preferenceKey) private var largerText = false
     @State private var isConfirmingReset = false
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
+                GroupBox("Readable Panels") {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Toggle("Larger text and fewer details", isOn: $largerText)
+                        Text("Keeps compact labels at least 10 pt and moves auxiliary details to the detail window. Increase Contrast also enables this layout. Reduce Transparency uses an opaque panel surface.")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }.frame(maxWidth: .infinity, alignment: .leading).padding(.top, 4)
+                }
                 GroupBox {
                     VStack(spacing: 14) {
                         SettingsSliderRow(

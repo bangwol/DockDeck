@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct NetworkPanelView: View {
+    @Environment(\.compactReadable) private var readable
     @ObservedObject var store: NetworkStore
     let theme: Theme
 
@@ -42,13 +43,13 @@ struct NetworkPanelView: View {
     ) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             Label(title, systemImage: symbol)
-                .font(.system(size: 7.5, weight: .bold, design: .rounded))
+                .font(.system(size: CompactReadability.size(7.5, enabled: readable), weight: .bold, design: .rounded))
                 .foregroundStyle(color)
             Text(ByteRateFormatter.string(value))
-                .font(.system(size: 11, weight: .bold, design: .monospaced))
+                .font(.system(size: CompactReadability.size(11, enabled: readable), weight: .bold, design: .monospaced))
                 .foregroundStyle(baseColor)
                 .lineLimit(1)
-                .minimumScaleFactor(0.65)
+                .minimumScaleFactor(readable ? 1 : 0.65)
             if history.samples.count >= 2 {
                 MetricSparkline(samples: history.samples, color: color)
                     .frame(height: 6)
@@ -69,7 +70,7 @@ struct NetworkPanelView: View {
             Image(systemName: symbol)
             Text(text)
         }
-        .font(.system(size: 9.5, weight: .semibold, design: .rounded))
+        .font(.system(size: CompactReadability.size(9.5, enabled: readable), weight: .semibold, design: .rounded))
         .foregroundStyle(baseColor.opacity(0.78))
         .accessibilityElement(children: .combine)
     }

@@ -164,6 +164,9 @@ enum ReadOnlyDeckSelection {
 }
 
 struct ReadOnlyDeckPanelView: View {
+    @AppStorage(CompactReadability.preferenceKey) private var largerText = false
+    @Environment(\.colorSchemeContrast) private var contrast
+    var readabilityOverride: Bool? = nil
     let services: PanelModuleServices
     @ObservedObject var presentation: ReadOnlyDeckPresentation
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -175,7 +178,7 @@ struct ReadOnlyDeckPanelView: View {
                 .transition(moduleTransition)
             if let pageIndicator = presentation.pageIndicator {
                 Text(pageIndicator)
-                    .font(.system(size: 7, weight: .semibold, design: .rounded))
+                    .font(.system(size: (readabilityOverride ?? (largerText || contrast == .increased)) ? 10 : 7, weight: .semibold, design: .rounded))
                     .monospacedDigit()
                     .foregroundStyle(Color(nsColor: presentation.theme.foregroundColor))
                     .padding(.horizontal, 5)
@@ -186,6 +189,7 @@ struct ReadOnlyDeckPanelView: View {
                     .accessibilityLabel("Module \(pageIndicator)")
             }
         }
+        .environment(\.compactReadable, readabilityOverride ?? (largerText || contrast == .increased))
         .animation(reduceMotion ? nil : .easeOut(duration: 0.18), value: presentation.activeModule)
         .animation(reduceMotion ? nil : .easeOut(duration: 0.12), value: presentation.pageIndicator)
     }
