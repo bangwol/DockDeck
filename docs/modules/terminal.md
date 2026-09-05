@@ -57,3 +57,10 @@ DockDeck writes a small zsh startup hook to:
 It preserves the user's normal zsh startup files and changes only the DockDeck
 terminal prompt. The directory uses `0700` permissions and the hook uses `0600`
 permissions.
+
+**Open Project in Terminal.app…**, in the Terminal menu and settings, opens the
+selected local Project Pulse folder using macOS's native application-opening
+API. If no valid local folder is selected, a folder chooser appears. It sends
+no shell text to the existing DockDeck session. The Terminal menu also shows
+the last shell-start reason, including exit status and repeated rapid-exit
+suppression. A failed shell still requires the existing click-to-retry action.

@@ -158,6 +158,7 @@ final class TerminalPanelController: NSObject, LocalProcessTerminalViewDelegate 
     private let onShellEvent: (String) -> Void
     private let resizeHandleView: TerminalResizeHandleView
     private var restartPolicy = ShellRestartPolicy()
+    private(set) var lastRestartReason = "Initial login shell"
     private var scheduledRestart: DispatchWorkItem?
     private var automaticallyRestartsShell = true
 
@@ -219,6 +220,7 @@ final class TerminalPanelController: NSObject, LocalProcessTerminalViewDelegate 
     }
 
     func startShell() {
+        lastRestartReason = "Terminal module enabled"
         automaticallyRestartsShell = true
         scheduledRestart?.cancel()
         restartPolicy.reset()
@@ -227,6 +229,7 @@ final class TerminalPanelController: NSObject, LocalProcessTerminalViewDelegate 
 
     func ensureShellRunning() {
         guard !terminalView.process.running else { return }
+        lastRestartReason = "Started after a stopped session"
         scheduledRestart?.cancel()
         restartPolicy.reset()
         startShellSession()
@@ -261,8 +264,10 @@ final class TerminalPanelController: NSObject, LocalProcessTerminalViewDelegate 
 
     private func handleShellTermination(exitCode: Int32?) {
         guard automaticallyRestartsShell else { return }
+        lastRestartReason = "Previous shell exited with status \(exitCode.map(String.init) ?? "unknown")"
         onShellEvent("shell exited with status \(exitCode.map(String.init) ?? "unknown")")
         guard restartPolicy.shouldRestart(afterExitAt: Date()) else {
+            lastRestartReason += "; stopped after repeated rapid exits"
             terminalView.feed(
                 text: "\r\nDockDeck shell stopped. Click the terminal to start a new session.\r\n")
             return

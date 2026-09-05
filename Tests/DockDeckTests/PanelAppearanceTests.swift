@@ -1064,6 +1064,18 @@ final class PanelAppearanceTests: XCTestCase {
         XCTAssertGreaterThan(bitmap.pixelsHigh, 0)
     }
 
+    func testProjectFolderOpeningUsesExistingDirectoriesAsNativeURLs() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("DockDeck folder \(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        XCTAssertEqual(TerminalProjectFolder.existingURL(directory.path), directory)
+        let file = directory.appendingPathComponent("file")
+        try Data().write(to: file)
+        XCTAssertNil(TerminalProjectFolder.existingURL(file.path))
+        XCTAssertNil(TerminalProjectFolder.existingURL("relative/path"))
+        XCTAssertNil(TerminalProjectFolder.existingURL(directory.path + "\0"))
+    }
+
     func testShellRestartPolicyStopsARepeatedExitLoop() {
         var policy = ShellRestartPolicy()
         let start = Date(timeIntervalSince1970: 100)

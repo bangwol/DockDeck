@@ -21,6 +21,11 @@ extension AppDelegate {
             NSMenuItem(
                 title: "Settings…",
                 action: #selector(toggleSettingsPanel(_:)), keyEquivalent: ""))
+        menu.addItem(withTitle: "Open Project in Terminal.app…",
+            action: #selector(openProjectInTerminalApp(_:)), keyEquivalent: "")
+        let restartReason = NSMenuItem(title: terminalPanelController.lastRestartReason, action: nil, keyEquivalent: "")
+        restartReason.isEnabled = false
+        menu.addItem(restartReason)
         let configuration = PanelSettings.deckConfiguration
         if let side = configuration.side(containing: .terminal) {
             let modules = configuration.enabledModules(on: side)
@@ -69,5 +74,39 @@ extension AppDelegate {
                 action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
 
         menu.popUp(positioning: nil, at: .zero, in: button)
+    }
+
+    @objc func openProjectInTerminalApp(_ sender: Any?) {
+        let configuration = PanelSettings.projectPulseConfiguration
+        var folder = configuration.source == .local
+            ? configuration.repositoryPath.flatMap(TerminalProjectFolder.existingURL) : nil
+        if folder == nil {
+            let picker = NSOpenPanel()
+            picker.title = "Open Folder in Terminal.app"
+            picker.canChooseFiles = false
+            picker.canChooseDirectories = true
+            picker.allowsMultipleSelection = false
+            guard picker.runModal() == .OK, let url = picker.url else { return }
+            folder = TerminalProjectFolder.existingURL(url.path)
+        }
+        guard let folder, let terminal = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.apple.Terminal") else { return }
+        NSWorkspace.shared.open([folder], withApplicationAt: terminal, configuration: .init()) { _, error in
+            guard error != nil else { return }
+            DispatchQueue.main.async {
+                let alert = NSAlert()
+                alert.messageText = "Could not open the folder in Terminal.app"
+                alert.informativeText = "Check that the folder and Terminal.app are available."
+                alert.runModal()
+            }
+        }
+    }
+}
+
+enum TerminalProjectFolder {
+    static func existingURL(_ path: String) -> URL? {
+        guard path.hasPrefix("/"), !path.contains("\0"), path.utf8.count <= 4_096 else { return nil }
+        var isDirectory: ObjCBool = false
+        guard FileManager.default.fileExists(atPath: path, isDirectory: &isDirectory), isDirectory.boolValue else { return nil }
+        return URL(fileURLWithPath: path, isDirectory: true)
     }
 }
