@@ -124,6 +124,9 @@ struct GitHubInboxPanelView: View {
 struct GitHubInboxDetailView: View {
     @ObservedObject var store: GitHubInboxStore
     let theme: Theme
+    @State private var repository = ""
+    @State private var reason = ""
+    @State private var visibleCount = 20
 
     var body: some View {
         Group {
@@ -140,21 +143,47 @@ struct GitHubInboxDetailView: View {
                                 : snapshot.failedRunsLastSevenDays,
                             color: snapshot.actionsRepository == nil ? .purple : .red)
                     }
-                    Divider().opacity(0.5)
-                    if snapshot.entries.isEmpty {
-                        Text("No unread notification messages")
+                    HStack {
+                        Picker("Repository", selection: $repository) {
+                            Text("All repositories").tag("")
+                            ForEach(Array(Set(snapshot.entries.map(\.repository))).sorted(), id: \.self) {
+                                Text($0).tag($0)
+                            }
+                        }
+                        Picker("Reason", selection: $reason) {
+                            Text("All reasons").tag("")
+                            Text("Mentions").tag("mention")
+                            Text("Reviews").tag("review_requested")
+                            Text("Assigned").tag("assign")
+                            Text("CI").tag("ci_activity")
+                        }
+                    }
+                    .labelsHidden()
+                    let entries = snapshot.filteredEntries(repository: repository, reason: reason)
+                    if entries.isEmpty {
+                        Text(snapshot.entries.isEmpty ? "No unread notification messages" : "No notifications match these filters")
                             .font(.callout.weight(.medium))
                             .foregroundStyle(baseColor.opacity(0.7))
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
                     } else {
                         ScrollView {
                             LazyVStack(spacing: 5) {
-                                ForEach(snapshot.entries) { entry in
+                                ForEach(entries.prefix(visibleCount)) { entry in
                                     detailRow(entry)
+                                }
+                                if entries.count > visibleCount {
+                                    Button("Show more") { visibleCount += 20 }
                                 }
                             }
                         }
+                        HStack {
+                            Text("\(entries.count) matching · up to 100 cached messages")
+                            Spacer()
+                            Link("All on GitHub", destination: URL(string: "https://github.com/notifications")!)
+                        }.font(.caption)
                     }
+                    Text("Updated \(snapshot.observedAt.formatted(date: .abbreviated, time: .shortened)) · totals include all fetched notifications")
+                        .font(.caption).foregroundStyle(.secondary)
                     if case .unavailable(let message) = store.status {
                         Label("Showing saved data — \(message)", systemImage: "exclamationmark.triangle")
                             .font(.caption)
@@ -164,6 +193,11 @@ struct GitHubInboxDetailView: View {
             } else {
                 GitHubInboxPanelView(store: store, theme: theme)
             }
+        }
+        .onChange(of: repository) { _ in visibleCount = 20 }
+        .onChange(of: reason) { _ in visibleCount = 20 }
+        .onChange(of: store.snapshot?.entries.map(\.repository)) { values in
+            if !repository.isEmpty, !(values ?? []).contains(repository) { repository = "" }
         }
         .padding(12)
         .frame(maxWidth: .infinity, maxHeight: .infinity)

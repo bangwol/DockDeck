@@ -65,3 +65,9 @@ times slower than the selected interval; macOS Low Power Mode adds another
 two-times multiplier. `⌘R` requests an immediate refresh when the module is
 enabled. A failed refresh retains the last successful snapshot and exposes the
 error in panel help.
+
+The detail window filters up to 100 cached messages by repository and reason;
+Mentions includes team mentions. It initially displays 20 matching messages and
+**Show more** reveals the next 20 without making another request. Summary counts
+continue to cover all fetched notifications. **All on GitHub** opens the full
+inbox. The last successful update remains visible after a refresh failure.
