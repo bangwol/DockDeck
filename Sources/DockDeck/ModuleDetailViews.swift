@@ -134,15 +134,36 @@ struct SystemStatsModuleDetailView: View {
             if history.samples.count >= 2 {
                 MetricSparkline(samples: history.samples, color: color(for: metric))
                     .frame(height: 22)
-            } else {
-                Capsule()
-                    .fill(color(for: metric).opacity(0.22))
-                    .frame(height: 4)
+                HStack {
+                    Text("Range \(historyValue(history.samples.map(\.value).min(), metric))–\(historyValue(history.samples.map(\.value).max(), metric))")
+                    Spacer()
+                }
+                HStack {
+                    Text(history.samples.first!.timestamp, style: .time)
+                    Spacer()
+                    Text(history.samples.last!.timestamp, style: .time)
+                }
+                .monospacedDigit()
+            } else if metric == .cpu || metric == .memory || metric == .network {
+                Text("Collecting history")
+            }
+            if metric == .memory {
+                Text("Physical memory used; this is not memory pressure.")
+            } else if metric == .network {
+                Text("Trend: download + upload · bytes/second")
+            } else if metric == .disk {
+                Text("Startup volume capacity used")
             }
         }
+        .font(.caption)
         .padding(10)
         .background(baseColor.opacity(0.065), in: RoundedRectangle(cornerRadius: 9))
         .accessibilityElement(children: .combine)
+    }
+
+    private func historyValue(_ value: Double?, _ metric: SystemStatsMetric) -> String {
+        if metric == .network { return ByteRateFormatter.compactString(value) }
+        return percent(value)
     }
 
     private func value(for metric: SystemStatsMetric) -> String {

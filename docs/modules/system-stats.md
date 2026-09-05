@@ -78,3 +78,8 @@ The built-in readings use local macOS host, file-system, routing, and
 `ProcessInfo` APIs. They require no additional permission and make no network
 requests. The optional temperature adapter launches only the validated local
 Stats SMC reader.
+
+The detail charts show their sampled time range and observed value range
+(the upper value is the peak). Each chart scales to that observed range, not
+zero. Network trends combine download and upload in bytes per second. The
+memory card labels physical usage separately from macOS memory pressure.
