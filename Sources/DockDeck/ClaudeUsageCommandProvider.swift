@@ -692,7 +692,12 @@ private final class ClaudeUsagePipeCollector {
             let source = DispatchSource.makeReadSource(
                 fileDescriptor: descriptor, queue: queue)
             cancellationGroup.enter()
-            source.setEventHandler { [weak self] in self?.drain(descriptor) }
+            source.setEventHandler { [weak self] in
+                guard let self else { return }
+                if self.drain(descriptor) {
+                    self.readers.first { $0.handle.fileDescriptor == descriptor }?.source.cancel()
+                }
+            }
             source.setCancelHandler { [cancellationGroup] in cancellationGroup.leave() }
             source.resume()
             return Reader(handle: handle, source: source)
@@ -708,7 +713,7 @@ private final class ClaudeUsagePipeCollector {
         guard shouldFinish else { return }
         queue.sync {
             for reader in readers {
-                drain(reader.handle.fileDescriptor)
+                _ = drain(reader.handle.fileDescriptor)
                 reader.source.cancel()
             }
         }
@@ -716,7 +721,7 @@ private final class ClaudeUsagePipeCollector {
         readers.forEach { try? $0.handle.close() }
     }
 
-    private func drain(_ descriptor: Int32) {
+    private func drain(_ descriptor: Int32) -> Bool {
         var bytes = [UInt8](repeating: 0, count: 16_384)
         while true {
             let count = Darwin.read(descriptor, &bytes, bytes.count)
@@ -725,7 +730,7 @@ private final class ClaudeUsagePipeCollector {
             } else if count == -1, errno == EINTR {
                 continue
             } else {
-                return
+                return count == 0 || (errno != EAGAIN && errno != EWOULDBLOCK)
             }
         }
     }
