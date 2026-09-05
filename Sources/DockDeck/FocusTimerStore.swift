@@ -33,7 +33,8 @@ struct FocusTimerSettings: Codable, Equatable {
     }
 
     private static func closest(_ value: Int, in options: [Int]) -> Int {
-        options.min { abs($0 - value) < abs($1 - value) } ?? options[0]
+        let bounded = min(max(value, options[0]), options[options.count - 1])
+        return options.min { abs($0 - bounded) < abs($1 - bounded) } ?? options[0]
     }
 }
 
@@ -54,7 +55,7 @@ struct FocusTimerSession: Codable, Equatable {
             totalSeconds: duration)
     }
 
-    func normalized(settings: FocusTimerSettings) -> Self {
+    func normalized(settings: FocusTimerSettings, now: Date = Date()) -> Self {
         let settings = settings.normalized()
         let defaultDuration = settings.durationSeconds(for: phase)
         let total = (1...(24 * 60 * 60)).contains(totalSeconds)
@@ -64,7 +65,8 @@ struct FocusTimerSession: Codable, Equatable {
             deadline.timeIntervalSinceReferenceDate.isFinite
         {
             return Self(
-                phase: phase, mode: .running, deadline: deadline,
+                phase: phase, mode: .running,
+                deadline: min(deadline, now.addingTimeInterval(TimeInterval(total))),
                 remainingSeconds: remaining, totalSeconds: total)
         }
         guard remaining > 0 else {
@@ -117,7 +119,7 @@ final class FocusTimerStore: ObservableObject {
     ) {
         let settings = settings.normalized()
         self.settings = settings
-        self.session = (session ?? .idle(settings: settings)).normalized(settings: settings)
+        self.session = (session ?? .idle(settings: settings)).normalized(settings: settings, now: now)
         self.onSessionChange = onSessionChange
         self.onCompletion = onCompletion
         snapshot = Self.makeSnapshot(session: self.session, now: now)
@@ -148,7 +150,7 @@ final class FocusTimerStore: ObservableObject {
     }
 
     func replaceSession(_ session: FocusTimerSession?, now: Date = Date()) {
-        self.session = (session ?? .idle(settings: settings)).normalized(settings: settings)
+        self.session = (session ?? .idle(settings: settings)).normalized(settings: settings, now: now)
         persistSession()
         refresh(now: now)
     }
@@ -217,7 +219,7 @@ final class FocusTimerStore: ObservableObject {
         guard session.mode == .running, let deadline = session.deadline else {
             return session.remainingSeconds
         }
-        return max(Int(ceil(deadline.timeIntervalSince(now))), 0)
+        return Int(min(max(ceil(deadline.timeIntervalSince(now)), 0), Double(session.totalSeconds)))
     }
 
     private func publish(now: Date) {
@@ -229,7 +231,8 @@ final class FocusTimerStore: ObservableObject {
     ) -> FocusTimerSnapshot {
         let remaining: Int
         if session.mode == .running, let deadline = session.deadline {
-            remaining = max(Int(ceil(deadline.timeIntervalSince(now))), 0)
+            remaining = Int(min(
+                max(ceil(deadline.timeIntervalSince(now)), 0), Double(session.totalSeconds)))
         } else {
             remaining = session.remainingSeconds
         }
