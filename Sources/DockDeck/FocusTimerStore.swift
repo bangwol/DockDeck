@@ -20,6 +20,7 @@ struct FocusTimerSettings: Codable, Equatable {
 
     var focusMinutes = 25
     var breakMinutes = 5
+    var automaticallyAdvances = false
 
     func normalized() -> Self {
         var settings = self
@@ -39,20 +40,23 @@ struct FocusTimerSettings: Codable, Equatable {
 }
 
 struct FocusTimerSession: Codable, Equatable {
+    static let maximumCompletedFocusCount = 1_000_000
     var phase: FocusTimerPhase
     var mode: FocusTimerMode
     var deadline: Date?
     var remainingSeconds: Int
     var totalSeconds: Int
+    var completedFocusCount = 0
 
-    static func idle(settings: FocusTimerSettings, phase: FocusTimerPhase = .focus) -> Self {
+    static func idle(settings: FocusTimerSettings, phase: FocusTimerPhase = .focus,
+                     completedFocusCount: Int = 0) -> Self {
         let duration = settings.normalized().durationSeconds(for: phase)
         return Self(
             phase: phase,
             mode: .idle,
             deadline: nil,
             remainingSeconds: duration,
-            totalSeconds: duration)
+            totalSeconds: duration, completedFocusCount: min(max(completedFocusCount, 0), Self.maximumCompletedFocusCount))
     }
 
     func normalized(settings: FocusTimerSettings, now: Date = Date()) -> Self {
@@ -61,23 +65,45 @@ struct FocusTimerSession: Codable, Equatable {
         let total = (1...(24 * 60 * 60)).contains(totalSeconds)
             ? totalSeconds : defaultDuration
         let remaining = min(max(remainingSeconds, 0), total)
+        let count = min(max(completedFocusCount, 0), Self.maximumCompletedFocusCount)
         if mode == .running, let deadline,
             deadline.timeIntervalSinceReferenceDate.isFinite
         {
             return Self(
                 phase: phase, mode: .running,
                 deadline: min(deadline, now.addingTimeInterval(TimeInterval(total))),
-                remainingSeconds: remaining, totalSeconds: total)
+                remainingSeconds: remaining, totalSeconds: total, completedFocusCount: count)
         }
         guard remaining > 0 else {
-            return .idle(settings: settings, phase: phase)
+            return .idle(settings: settings, phase: phase, completedFocusCount: count)
         }
         return Self(
             phase: phase,
             mode: mode == .paused ? .paused : .idle,
             deadline: nil,
             remainingSeconds: remaining,
-            totalSeconds: total)
+            totalSeconds: total, completedFocusCount: count)
+    }
+}
+
+extension FocusTimerSettings {
+    init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        focusMinutes = try values.decodeIfPresent(Int.self, forKey: .focusMinutes) ?? 25
+        breakMinutes = try values.decodeIfPresent(Int.self, forKey: .breakMinutes) ?? 5
+        automaticallyAdvances = try values.decodeIfPresent(Bool.self, forKey: .automaticallyAdvances) ?? false
+    }
+}
+
+extension FocusTimerSession {
+    init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(phase: try values.decode(FocusTimerPhase.self, forKey: .phase),
+            mode: try values.decode(FocusTimerMode.self, forKey: .mode),
+            deadline: try values.decodeIfPresent(Date.self, forKey: .deadline),
+            remainingSeconds: try values.decode(Int.self, forKey: .remainingSeconds),
+            totalSeconds: try values.decode(Int.self, forKey: .totalSeconds),
+            completedFocusCount: try values.decodeIfPresent(Int.self, forKey: .completedFocusCount) ?? 0)
     }
 }
 
@@ -125,6 +151,14 @@ final class FocusTimerStore: ObservableObject {
         snapshot = Self.makeSnapshot(session: self.session, now: now)
     }
 
+    var completedFocusCount: Int { session.completedFocusCount }
+
+    func clearCompletedCount(now: Date = Date()) {
+        session.completedFocusCount = 0
+        persistSession()
+        publish(now: now)
+    }
+
     func start() {
         guard !isRuntimeActive else { return }
         isRuntimeActive = true
@@ -142,7 +176,7 @@ final class FocusTimerStore: ObservableObject {
         guard self.settings != settings else { return }
         self.settings = settings
         if session.mode == .idle {
-            session = .idle(settings: settings, phase: session.phase)
+            session = .idle(settings: settings, phase: session.phase, completedFocusCount: session.completedFocusCount)
             persistSession()
         }
         publish(now: now)
@@ -174,7 +208,7 @@ final class FocusTimerStore: ObservableObject {
             session.remainingSeconds = remaining
         case .idle, .paused:
             if session.remainingSeconds <= 0 {
-                session = .idle(settings: settings, phase: session.phase)
+                session = .idle(settings: settings, phase: session.phase, completedFocusCount: session.completedFocusCount)
             }
             session.mode = .running
             session.deadline = now.addingTimeInterval(TimeInterval(session.remainingSeconds))
@@ -185,14 +219,14 @@ final class FocusTimerStore: ObservableObject {
     }
 
     func reset(now: Date = Date()) {
-        session = .idle(settings: settings, phase: session.phase)
+        session = .idle(settings: settings, phase: session.phase, completedFocusCount: session.completedFocusCount)
         persistSession()
         publish(now: now)
         scheduleTimers(now: now)
     }
 
     func skip(now: Date = Date()) {
-        session = .idle(settings: settings, phase: session.phase.next)
+        session = .idle(settings: settings, phase: session.phase.next, completedFocusCount: session.completedFocusCount)
         persistSession()
         publish(now: now)
         scheduleTimers(now: now)
@@ -209,7 +243,12 @@ final class FocusTimerStore: ObservableObject {
             deadline <= now
         else { return false }
         let completedPhase = session.phase
-        session = .idle(settings: settings, phase: completedPhase.next)
+        let count = min(session.completedFocusCount + (completedPhase == .focus ? 1 : 0), FocusTimerSession.maximumCompletedFocusCount)
+        session = .idle(settings: settings, phase: completedPhase.next, completedFocusCount: count)
+        if settings.automaticallyAdvances {
+            session.mode = .running
+            session.deadline = now.addingTimeInterval(TimeInterval(session.remainingSeconds))
+        }
         persistSession()
         onCompletion(completedPhase)
         return true

@@ -127,7 +127,11 @@ macOS Low Power Mode. See Docker's official
 
 Focus Timer alternates between configurable 15–60 minute focus periods and
 5–15 minute breaks. Start, pause, reset, or skip from the compact panel or its
-context menu. A running timer uses an absolute deadline, so it continues while
+context menu. Detail shows the completed focus count (retained until explicitly
+reset; skipped periods do not count). The count is saved with timer state, without
+a dated session history. Optional automatic phase advance is off by default.
+After sleep or restart, it counts one completed phase and starts the next from
+the current time, without replaying missed cycles. A running timer uses an absolute deadline, so it continues while
 another module is selected and resumes correctly after DockDeck restarts.
 
 DockDeck writes the phase, deadline, and remaining duration only when timer

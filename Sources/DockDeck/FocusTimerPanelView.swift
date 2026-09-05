@@ -71,3 +71,32 @@ struct FocusTimerPanelView: View {
         store.snapshot.phase == .focus ? baseColor : .mint
     }
 }
+
+struct FocusTimerModuleDetailView: View {
+    @ObservedObject var store: FocusTimerStore
+
+    var body: some View {
+        ScrollView {
+            VStack(spacing: 16) {
+                Text(store.snapshot.phase.title).font(.headline)
+                Text(store.snapshot.timeLabel).font(.system(size: 42, weight: .semibold, design: .rounded))
+                    .monospacedDigit().accessibilityLabel("Remaining time").accessibilityValue(store.snapshot.timeLabel)
+                ProgressView(value: store.snapshot.progress).accessibilityLabel("Phase progress")
+                HStack {
+                    Button(store.snapshot.mode == .running ? "Pause" : "Start") { store.toggle() }
+                    Button("Reset phase") { store.reset() }
+                    Button("Skip phase") { store.skip() }
+                }
+                Divider()
+                HStack {
+                    Text("Completed focus periods: \(store.completedFocusCount.formatted())")
+                    Spacer()
+                    Button("Reset count") { store.clearCompletedCount() }.disabled(store.completedFocusCount == 0)
+                }
+                Text("Count is retained until reset. Skipped periods are not counted.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+            .padding(12).frame(maxWidth: .infinity)
+        }
+    }
+}

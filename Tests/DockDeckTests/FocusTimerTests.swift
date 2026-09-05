@@ -5,6 +5,50 @@ import XCTest
 @testable import DockDeck
 
 final class FocusTimerTests: XCTestCase {
+    func testCompletionBoundsCorruptRestoredCounts() {
+        let now = Date(timeIntervalSince1970: 1000)
+        for (count, expected) in [(Int.min, 1), (Int.max, FocusTimerSession.maximumCompletedFocusCount)] {
+            let session = FocusTimerSession(phase: .focus, mode: .running,
+                deadline: now, remainingSeconds: 1500, totalSeconds: 1500, completedFocusCount: count)
+            let store = FocusTimerStore(session: session, now: now)
+            store.refresh(now: now)
+            XCTAssertEqual(store.completedFocusCount, expected)
+        }
+    }
+
+    func testOlderSettingsAndSessionsRetainDefaults() throws {
+        let settings = try JSONDecoder().decode(FocusTimerSettings.self,
+            from: Data(#"{"focusMinutes":45,"breakMinutes":10}"#.utf8))
+        XCTAssertFalse(settings.automaticallyAdvances)
+        let session = try JSONDecoder().decode(FocusTimerSession.self,
+            from: Data(#"{"phase":"focus","mode":"idle","remainingSeconds":1500,"totalSeconds":1500}"#.utf8))
+        XCTAssertEqual(session.completedFocusCount, 0)
+    }
+
+    func testAutomaticAdvanceCountsOnceAfterLongSleepAndPersistsTogether() throws {
+        var settings = FocusTimerSettings()
+        settings.automaticallyAdvances = true
+        let now = Date(timeIntervalSince1970: 1000)
+        var saved: FocusTimerSession?
+        let store = FocusTimerStore(settings: settings, now: now, onSessionChange: { saved = $0 })
+        store.toggle(now: now)
+        let wake = now.addingTimeInterval(30 * 24 * 3600)
+        store.refresh(now: wake)
+        store.refresh(now: wake)
+        XCTAssertEqual(store.completedFocusCount, 1)
+        XCTAssertEqual(store.snapshot.phase, .breakTime)
+        XCTAssertEqual(store.snapshot.mode, .running)
+        XCTAssertEqual(store.snapshot.remainingSeconds, 300)
+        let restored = try JSONDecoder().decode(FocusTimerSession.self,
+            from: JSONEncoder().encode(XCTUnwrap(saved)))
+        XCTAssertEqual(restored.completedFocusCount, 1)
+        store.skip(now: wake)
+        store.reset(now: wake)
+        XCTAssertEqual(store.completedFocusCount, 1)
+        store.clearCompletedCount(now: wake)
+        XCTAssertEqual(store.completedFocusCount, 0)
+    }
+
     func testSettingsNormalizeAndResolvePhaseDurations() {
         var settings = FocusTimerSettings()
         settings.focusMinutes = 42

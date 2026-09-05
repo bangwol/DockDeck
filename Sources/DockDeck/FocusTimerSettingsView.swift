@@ -41,6 +41,12 @@ struct FocusTimerSettingsView: View {
                         .font(.headline)
                 }
 
+                Toggle("Automatically start the next focus or break", isOn: Binding(
+                    get: { model.values.focusTimer.automaticallyAdvances },
+                    set: model.setFocusTimerAutomaticallyAdvances))
+                Text("Off by default. After sleep or restart, only one completion is counted and the next phase starts from now.")
+                    .font(.caption).foregroundStyle(.secondary)
+
                 GroupBox {
                     VStack(alignment: .leading, spacing: 9) {
                         Label("Play or pause from the compact panel", systemImage: "playpause")
@@ -56,7 +62,7 @@ struct FocusTimerSettingsView: View {
 
                 Text(
                     "A running countdown continues while another module is visible. DockDeck "
-                        + "stores only the phase, remaining time, and deadline when the timer "
+                        + "stores the phase, remaining time, deadline, and completed focus count when the timer "
                         + "changes; it does not write preferences every second. Completion alerts "
                         + "follow the global Notifications setting.")
                     .font(.caption)
