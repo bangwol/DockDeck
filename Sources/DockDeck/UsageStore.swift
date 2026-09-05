@@ -85,6 +85,7 @@ struct ProviderUsage: Identifiable, Equatable {
     let windows: [UsageWindow]
     let freshness: UsageFreshness
     let detail: String?
+    var observedAt: Date? = nil
 }
 
 enum UsageProviderError: LocalizedError {
@@ -193,6 +194,17 @@ final class UsageStore: ObservableObject {
                 requestClaudeProbe(force: true, respectsCooldown: true)
             }
         }
+    }
+
+    func refreshPlan(for providerID: UsageProviderID) -> String {
+        guard started, systemRefreshActive else { return "Automatic updates paused" }
+        if providerID == .claude {
+            if claudeRefreshMode == .statusLineOnly { return "Updates after a Claude response" }
+            if claudeProbeInFlight { return "Refreshing usage" }
+        }
+        let timer = providerID == .claude ? claudeProbeTimer : refreshTimer
+        guard let timer else { return "Waiting for next update" }
+        return "Next check about \(timer.fireDate.formatted(date: .omitted, time: .shortened))"
     }
 
     func refreshClaudeUsageIfDue() {
@@ -497,7 +509,8 @@ final class UsageStore: ObservableObject {
                 name: previous.name,
                 windows: snapshot.windows,
                 freshness: snapshot.freshness,
-                detail: snapshot.detail)
+                detail: snapshot.detail,
+                observedAt: snapshot.observedAt)
         case .failure(let error):
             let freshness: UsageFreshness
             switch error {
@@ -513,7 +526,8 @@ final class UsageStore: ObservableObject {
                 name: previous.name,
                 windows: previous.windows,
                 freshness: freshness,
-                detail: error.localizedDescription)
+                detail: error.localizedDescription,
+                observedAt: previous.observedAt)
         }
         publishProviders()
         guard let current = providerSnapshots[providerID] else { return }

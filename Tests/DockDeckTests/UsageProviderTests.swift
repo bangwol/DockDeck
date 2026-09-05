@@ -5,6 +5,16 @@ import XCTest
 @testable import DockDeck
 
 final class UsageProviderTests: XCTestCase {
+    func testQuotaWarningColorsUseRemainingCapacityBoundaries() {
+        for (remaining, expected) in [(0.0, Color.red), (19.99, .red), (20, .orange),
+                                      (30, .orange), (50, .orange), (50.01, .purple)] {
+            let window = UsageWindow(durationMinutes: 300, usedPercent: 100 - remaining,
+                                     resetsAt: nil)
+            XCTAssertEqual(usageMeterColor(for: window, normal: .purple), expected)
+        }
+        XCTAssertEqual(UsageStore().refreshPlan(for: .codex), "Automatic updates paused")
+    }
+
     func testSingleUsageWindowUsesSplitHeader() {
         XCTAssertEqual(UsageResetPlacement.forWindowCount(1), .splitHeader)
         XCTAssertEqual(UsageResetPlacement.forWindowCount(2), .below)
