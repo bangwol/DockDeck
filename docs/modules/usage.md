@@ -97,6 +97,11 @@ an `/usage`-only Fable window is retained.
 See [Configure Claude Code monitoring](../integrations/claude-code.md) for mode
 selection, optional bridge setup, privacy details, and troubleshooting.
 
+The detail window uses the same remaining-capacity warning colors as the compact
+panel in both Remaining and Used modes. It also shows the last successful
+observation, refresh errors alongside cached values, the approximate next check,
+and a manual refresh button. Manual refresh retains the existing probe cooldown.
+
 ## Provider states and colors
 
 Provider marks show data state without adding a detached status dot:

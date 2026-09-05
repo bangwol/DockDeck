@@ -13,11 +13,33 @@ struct UsageModuleDetailView: View {
                             Text(provider.name)
                                 .font(.system(size: 12, weight: .bold, design: .rounded))
                             Spacer()
+                            VStack(alignment: .trailing, spacing: 2) {
+                                Text(store.refreshPlan(for: provider.id))
+                                if let observedAt = provider.observedAt {
+                                    Text("Updated \(observedAt.formatted(date: .abbreviated, time: .shortened))")
+                                }
+                            }
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
                             if let label = provider.freshness.label {
                                 Text(label)
                                     .font(.caption2.weight(.bold))
                                     .foregroundStyle(freshnessColor(provider.freshness))
                             }
+                            Button(action: store.refresh) {
+                                Image(systemName: "arrow.clockwise")
+                            }
+                            .buttonStyle(.borderless)
+                            .help("Refresh usage")
+                            .accessibilityLabel("Refresh usage")
+                        }
+                        if let detail = provider.detail, !provider.windows.isEmpty,
+                            provider.freshness != .live
+                        {
+                            Text(detail)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .textSelection(.enabled)
                         }
                         if provider.windows.isEmpty {
                             Text(provider.detail ?? "Usage data is not available yet")
@@ -59,7 +81,7 @@ struct UsageModuleDetailView: View {
                 ZStack(alignment: .leading) {
                     Capsule().fill(baseColor.opacity(0.12))
                     Capsule()
-                        .fill(usageColor(value))
+                        .fill(usageMeterColor(for: window, normal: baseColor))
                         .frame(width: proxy.size.width * CGFloat(value / 100))
                 }
             }
@@ -76,12 +98,6 @@ struct UsageModuleDetailView: View {
         case .loading, .stale: .orange
         case .signIn, .unavailable, .setupRequired: .red
         }
-    }
-
-    private func usageColor(_ value: Double) -> Color {
-        PanelSettings.usageDisplayMode == .remaining
-            ? (value <= 10 ? .red : value <= 25 ? .orange : .cyan)
-            : (value >= 90 ? .red : value >= 75 ? .orange : .cyan)
     }
 }
 
