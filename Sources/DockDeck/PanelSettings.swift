@@ -14,8 +14,6 @@ enum PanelSettings {
     static let scheduleRefreshIntervals: [TimeInterval] = [60, 5 * 60, 15 * 60]
     static let defaultBatteryRefreshInterval: TimeInterval = 60
     static let batteryRefreshIntervals: [TimeInterval] = [30, 60, 5 * 60]
-    static let defaultNetworkRefreshInterval: TimeInterval = 2
-    static let networkRefreshIntervals: [TimeInterval] = [1, 2, 5]
 
     private static let cornerRadiusKey = "DockDeck.settings.cornerRadius"
     private static let tintOpacityKey = "DockDeck.settings.tintOpacity"
@@ -210,9 +208,9 @@ enum PanelSettings {
 
         let defaults = UserDefaults.standard
         let stored = defaults.string(forKey: activeModuleKey(for: side))
-            .map(PanelModuleID.init(rawValue:))
+            .map { PanelModuleID(rawValue: $0).current }
         let legacy = defaults.string(forKey: activeReadOnlyModuleKey)
-            .map(PanelModuleID.init(rawValue:))
+            .map { PanelModuleID(rawValue: $0).current }
         let preferred = stored
             ?? (legacy.flatMap { enabledModules.contains($0) ? $0 : nil })
             ?? (enabledModules.contains(.terminal) ? .terminal : nil)
@@ -223,7 +221,7 @@ enum PanelSettings {
     static func setActiveModule(_ module: PanelModuleID?, on side: PanelSide) {
         let defaults = UserDefaults.standard
         let key = activeModuleKey(for: side)
-        let rawValue = module.flatMap { enabledModules(on: side).contains($0) ? $0.rawValue : nil }
+        let rawValue = module.map(\.current).flatMap { enabledModules(on: side).contains($0) ? $0.rawValue : nil }
         guard defaults.string(forKey: key) != rawValue else { return }
         if let rawValue {
             defaults.set(rawValue, forKey: key)
@@ -457,25 +455,6 @@ enum PanelSettings {
                                        forKey: networkInterfaceNameKey) }
     }
 
-    static var networkRefreshInterval: TimeInterval {
-        get {
-            let defaults = UserDefaults.standard
-            guard defaults.object(forKey: networkRefreshIntervalKey) != nil else {
-                return defaultNetworkRefreshInterval
-            }
-            let value = defaults.double(forKey: networkRefreshIntervalKey)
-            return networkRefreshIntervals.min(by: {
-                abs($0 - value) < abs($1 - value)
-            }) ?? defaultNetworkRefreshInterval
-        }
-        set {
-            let value = networkRefreshIntervals.min(by: {
-                abs($0 - newValue) < abs($1 - newValue)
-            }) ?? defaultNetworkRefreshInterval
-            UserDefaults.standard.set(value, forKey: networkRefreshIntervalKey)
-        }
-    }
-
     static var notifications: DockNotificationSettings {
         get {
             guard let data = UserDefaults.standard.data(forKey: notificationsKey),
@@ -676,11 +655,15 @@ enum PanelSettings {
 
     static func migratePanelDeckIfNeeded() {
         let defaults = UserDefaults.standard
-        guard
-            defaults.data(forKey: panelDeckConfigurationKey).flatMap({
-                try? JSONDecoder().decode(PanelDeckConfiguration.self, from: $0)
-            }) == nil
-        else { return }
+        if let data = defaults.data(forKey: panelDeckConfigurationKey),
+            let old = try? JSONDecoder().decode(PanelDeckConfiguration.self, from: data) {
+            if old.enabled.contains(.network), !systemStatsMetrics.contains(.network) {
+                systemStatsMetrics = Array(systemStatsMetrics.prefix(3)) + [.network]
+            }
+            let migrated = old.normalized()
+            if migrated != old { persistDeckConfiguration(migrated, defaults: defaults) }
+            return
+        }
         persistDeckConfiguration(legacyDeckConfiguration(defaults: defaults), defaults: defaults)
     }
 

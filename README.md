@@ -33,10 +33,10 @@ without taking over the menu bar or desktop.
 | Group | Modules |
 | --- | --- |
 | Core | Terminal, Usage |
-| System | System Stats, Battery, Network, Weather, World Clock |
+| System | System Stats (CPU/GPU/network), Battery, Weather, World Clock |
 | Media | Music |
 | Work | Schedule, Focus Timer, Project Pulse, GitHub Inbox |
-| Operations | Service Monitor, Docker, Custom Tile |
+| Operations | Service Monitor, Docker, Custom Tile, Local Ports |
 
 See the [module guide index](docs/README.md#module-guides) for setup, data
 sources, refresh behavior, and privacy details.

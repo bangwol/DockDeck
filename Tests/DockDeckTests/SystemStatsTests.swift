@@ -9,6 +9,11 @@ final class SystemStatsTests: XCTestCase {
         guard ProcessInfo.processInfo.environment["DOCKDECK_MEASURE_METRICS"] == "1" else {
             throw XCTSkip("Set DOCKDECK_MEASURE_METRICS=1 to measure local sampling")
         }
+        let gpuStart = Date()
+        var gpu: Double?
+        for _ in 0..<100 { gpu = GPUUsageReader.read() }
+        if let gpu { XCTAssertTrue((0...100).contains(gpu)) }
+        print("GPU native value=\(gpu.map(String.init(describing:)) ?? "unavailable"), ms/read=\(Date().timeIntervalSince(gpuStart) * 10)")
         let start = Date()
         for _ in 0..<100 { _ = NetworkCounterReader.read() }
         let networkDuration = Date().timeIntervalSince(start)
@@ -28,6 +33,37 @@ final class SystemStatsTests: XCTestCase {
             view.cacheDisplay(in: view.bounds, to: bitmap)
         }
         print("Metric benchmark: network read ms=\(networkDuration * 10); history append ms=\(historyDuration / 10); 900-point render ms=\(Date().timeIntervalSince(renderStart) * 10)")
+    }
+
+    func testGPURejectsMissingBooleanAndOutOfRangeDriverValues() {
+        XCTAssertNil(GPUUsageReader.utilization([:]))
+        for value: Any in [true, "42", -1, 101, Double.nan, Double.infinity] {
+            XCTAssertNil(GPUUsageReader.utilization(["Device Utilization %": value]))
+        }
+        for value in [0.0, 42.5, 100.0] {
+            XCTAssertEqual(GPUUsageReader.utilization(["Device Utilization %": value]), value)
+        }
+    }
+
+    func testStatsSamplesGPUOnlyWhenSelectedAndKeepsUnknownDistinctFromZero() {
+        var reads = 0
+        var result: Double? = 0
+        let store = SystemStatsStore(metrics: [.cpu, .memory], gpuReader: { reads += 1; return result })
+        store.refresh()
+        XCTAssertEqual(reads, 0)
+        store.setMetrics([.cpu, .gpu])
+        store.refresh()
+        XCTAssertEqual(reads, 1)
+        XCTAssertEqual(store.snapshot.gpuPercent, 0)
+        XCTAssertEqual(store.history(for: .gpu).samples.count, 1)
+        result = nil
+        store.refresh()
+        XCTAssertNil(store.snapshot.gpuPercent)
+        XCTAssertEqual(store.history(for: .gpu).samples.count, 1)
+        store.setMetrics([.cpu, .memory])
+        store.refresh()
+        XCTAssertEqual(reads, 2)
+        XCTAssertTrue(store.history(for: .gpu).samples.isEmpty)
     }
 
     func testMetricHistoryCalculatesInterpolatedPercentiles() {

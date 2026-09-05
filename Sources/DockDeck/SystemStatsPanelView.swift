@@ -17,6 +17,8 @@ struct SystemStatsPanelView: View {
 
     @ViewBuilder private func metric(_ metric: SystemStatsMetric) -> some View {
         switch metric {
+        case .gpu:
+            percentMetric(metric, value: store.snapshot.gpuPercent)
         case .cpu:
             percentMetric(metric, value: store.snapshot.cpuPercent)
         case .memory:

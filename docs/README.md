@@ -20,7 +20,7 @@ front page harder to scan.
 - [Project Pulse](modules/project-pulse.md)
 - [GitHub Inbox](modules/github-inbox.md)
 - [Custom Tile](modules/custom-tile.md)
-- [Service Monitor, Weather, World Clock, Battery, Network, Docker, and Focus Timer](modules/catalog.md)
+- [Service Monitor, Weather, World Clock, Battery, Docker, and Focus Timer](modules/catalog.md)
 
 ## App behavior
 

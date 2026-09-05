@@ -524,16 +524,8 @@ final class SettingsPanelModel: ObservableObject {
 
     func setNetworkInterfaceName(_ value: String) {
         let name = NetworkCounterReader.normalizedInterfaceName(value)
-        updateValues { $0.network.interfaceName = name }
-        onChange?(.network(.interfaceName(name)))
-    }
-
-    func setNetworkRefreshInterval(_ value: TimeInterval) {
-        let selected = PanelSettings.networkRefreshIntervals.min(by: {
-            abs($0 - value) < abs($1 - value)
-        }) ?? PanelSettings.defaultNetworkRefreshInterval
-        updateValues { $0.network.refreshInterval = selected }
-        onChange?(.network(.refreshInterval(selected)))
+        updateValues { $0.systemStats.networkInterfaceName = name }
+        onChange?(.systemStats(.networkInterfaceName(name)))
     }
 
     func selectProjectPulseFavorite(_ configuration: ProjectPulseConfiguration) {

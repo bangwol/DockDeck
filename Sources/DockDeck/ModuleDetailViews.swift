@@ -107,12 +107,12 @@ struct SystemStatsModuleDetailView: View {
 
     var body: some View {
         ScrollView {
-            LazyVGrid(
-                columns: [GridItem(.flexible()), GridItem(.flexible())],
-                spacing: 8
-            ) {
-                ForEach(store.selectedMetrics) { metric in
-                    metricCard(metric)
+            VStack(spacing: 14) {
+                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
+                    ForEach(store.selectedMetrics) { metricCard($0) }
+                }
+                if store.selectedMetrics.contains(.network) {
+                    NetworkStatisticsSection(store: store.network)
                 }
             }
         }
@@ -144,10 +144,14 @@ struct SystemStatsModuleDetailView: View {
                     Text(history.samples.last!.timestamp, style: .time)
                 }
                 .monospacedDigit()
-            } else if metric == .cpu || metric == .memory || metric == .network {
+            } else if metric == .cpu || metric == .gpu || metric == .memory || metric == .network {
                 Text("Collecting history")
             }
-            if metric == .memory {
+            if metric == .gpu {
+                Text(store.snapshot.gpuPercent == nil
+                    ? "GPU utilization unavailable on this hardware or driver."
+                    : "Busiest GPU · driver-reported device utilization")
+            } else if metric == .memory {
                 Text("Physical memory used; this is not memory pressure.")
             } else if metric == .network {
                 Text("Trend: download + upload · bytes/second")
@@ -168,6 +172,8 @@ struct SystemStatsModuleDetailView: View {
 
     private func value(for metric: SystemStatsMetric) -> String {
         switch metric {
+        case .gpu:
+            return percent(store.snapshot.gpuPercent)
         case .cpu:
             return percent(store.snapshot.cpuPercent)
         case .memory:
@@ -190,7 +196,7 @@ struct SystemStatsModuleDetailView: View {
 
     private func color(for metric: SystemStatsMetric) -> Color {
         switch metric {
-        case .cpu, .memory, .disk: .cyan
+        case .cpu, .gpu, .memory, .disk: .cyan
         case .network: .mint
         case .thermal:
             switch store.snapshot.thermalPressure {

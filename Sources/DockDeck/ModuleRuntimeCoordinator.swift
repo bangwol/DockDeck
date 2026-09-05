@@ -85,7 +85,6 @@ extension ScheduleStore: PanelModuleRuntime {}
 extension ClockStore: PanelModuleRuntime {}
 extension MusicStore: PanelModuleRuntime {}
 extension BatteryStore: PanelModuleRuntime {}
-extension NetworkStore: PanelModuleRuntime {}
 extension ProjectPulseStore: PanelModuleRuntime {}
 extension GitHubInboxStore: PanelModuleRuntime {}
 extension DockerStore: PanelModuleRuntime {}

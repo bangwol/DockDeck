@@ -166,8 +166,6 @@ private struct SettingsRootView: View {
             BatterySettingsView(model: model)
         case .localPorts:
             LocalPortsSettingsView(model: model)
-        case .network:
-            NetworkSettingsView(model: model)
         case .projectPulse:
             ProjectPulseSettingsView(model: model)
         case .githubInbox:

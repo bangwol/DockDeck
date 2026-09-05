@@ -67,7 +67,6 @@ final class PanelModuleServices {
     let clock: ClockStore
     let music: MusicStore
     let battery: BatteryStore
-    let network: NetworkStore
     let localPorts: LocalPortsStore
     let projectPulse: ProjectPulseStore
     let githubInbox: GitHubInboxStore
@@ -86,7 +85,6 @@ final class PanelModuleServices {
         clock: ClockStore = ClockStore(),
         music: MusicStore = MusicStore(),
         battery: BatteryStore = BatteryStore(),
-        network: NetworkStore = NetworkStore(),
         localPorts: LocalPortsStore = LocalPortsStore(),
         projectPulse: ProjectPulseStore = ProjectPulseStore(),
         githubInbox: GitHubInboxStore = GitHubInboxStore(),
@@ -102,7 +100,6 @@ final class PanelModuleServices {
         self.clock = clock
         self.music = music
         self.battery = battery
-        self.network = network
         self.localPorts = localPorts
         self.projectPulse = projectPulse
         self.githubInbox = githubInbox
@@ -118,7 +115,6 @@ final class PanelModuleServices {
             .clock: clock,
             .music: music,
             .battery: battery,
-            .network: network,
             .localPorts: localPorts,
             .projectPulse: projectPulse,
             .githubInbox: githubInbox,
@@ -230,8 +226,6 @@ struct ReadOnlyDeckPanelView: View {
             MusicPanelView(store: services.music, theme: presentation.theme)
         case .battery:
             BatteryPanelView(store: services.battery, theme: presentation.theme)
-        case .network:
-            NetworkPanelView(store: services.network, theme: presentation.theme)
         case .localPorts:
             LocalPortsPanelView(store: services.localPorts, theme: presentation.theme)
         case .projectPulse:
@@ -302,8 +296,6 @@ struct ReadOnlyModuleDetailView: View {
 
     @ViewBuilder private var detailContent: some View {
         switch presentation.activeModule {
-        case .network:
-            NetworkModuleDetailView(store: services.network)
         case .battery:
             BatteryModuleDetailView(store: services.battery)
         case .usage:

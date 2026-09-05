@@ -50,7 +50,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     lazy var clockStore = ClockStore()
     lazy var musicStore = MusicStore()
     lazy var batteryStore = BatteryStore()
-    lazy var networkStore = NetworkStore()
     lazy var projectPulseStore = ProjectPulseStore()
     lazy var githubInboxStore = GitHubInboxStore()
     lazy var dockerStore = DockerStore()
@@ -74,7 +73,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         clock: clockStore,
         music: musicStore,
         battery: batteryStore,
-        network: networkStore,
         projectPulse: projectPulseStore,
         githubInbox: githubInboxStore,
         docker: dockerStore,

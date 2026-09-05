@@ -169,7 +169,8 @@ struct PanelModuleID: Hashable, Codable {
     static let clock = PanelModuleID(rawValue: "clock")
     static let music = PanelModuleID(rawValue: "music")
     static let battery = PanelModuleID(rawValue: "battery")
-    static let network = PanelModuleID(rawValue: "network")
+    static let network = PanelModuleID(rawValue: "network") // Legacy saved ID.
+    var current: Self { self == .network ? .systemStats : self }
     static let localPorts = PanelModuleID(rawValue: "local-ports")
     static let projectPulse = PanelModuleID(rawValue: "project-pulse")
     static let githubInbox = PanelModuleID(rawValue: "github-inbox")
@@ -185,7 +186,7 @@ struct PanelModuleID: Hashable, Codable {
 
     static let readOnlyBuiltIns: [PanelModuleID] = [
         .usage, .systemStats, .serviceMonitor, .weather, .schedule, .clock, .music,
-        .battery, .network, .localPorts,
+        .battery, .localPorts,
         .projectPulse,
         .githubInbox,
         .docker,
@@ -270,8 +271,16 @@ struct PanelDeckConfiguration: Codable, Equatable {
 
     func normalized() -> Self {
         var seen: Set<PanelModuleID> = []
-        var left = uniqueModules(self.left, seen: &seen)
-        var right = uniqueModules(self.right, seen: &seen)
+        let useNetworkPosition = enabled.contains(.network) && !enabled.contains(.systemStats)
+        func migrated(_ modules: [PanelModuleID]) -> [PanelModuleID] {
+            modules.compactMap { module in
+                if module == .network { return useNetworkPosition ? .systemStats : nil }
+                if module == .systemStats && useNetworkPosition { return nil }
+                return module
+            }
+        }
+        var left = uniqueModules(migrated(self.left), seen: &seen)
+        var right = uniqueModules(migrated(self.right), seen: &seen)
 
         if !seen.contains(.terminal) {
             left.append(.terminal)
@@ -287,7 +296,7 @@ struct PanelDeckConfiguration: Codable, Equatable {
         }
 
         var enabledSeen: Set<PanelModuleID> = []
-        var enabled = uniqueModules(self.enabled, seen: &enabledSeen)
+        var enabled = uniqueModules(self.enabled.map(\.current), seen: &enabledSeen)
         for module in enabled where !seen.contains(module) {
             right.append(module)
             seen.insert(module)
@@ -351,7 +360,7 @@ struct DeckAutoSlideSettings: Codable, Equatable {
 
     func normalized() -> Self {
         var seen: Set<PanelModuleID> = []
-        let modules = modules.filter {
+        let modules = modules.map(\.current).filter {
             !$0.rawValue.isEmpty && seen.insert($0).inserted
         }.prefix(100)
         let interval = interval.isFinite ? interval.rounded() : Self.defaultInterval

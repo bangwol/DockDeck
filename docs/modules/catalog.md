@@ -95,21 +95,9 @@ Missing estimates explicitly say that macOS has not supplied them.
 
 ## Network
 
-Network calculates download and upload rates from macOS's 64-bit byte counters
-for the current primary interface or an interface selected in Settings. A native `NWPathMonitor` supplies offline,
-Wi-Fi, wired, cellular, metered, and Low Data status without contacting a probe
-server. DockDeck does not inspect traffic, IP addresses, hostnames, or packet
-contents.
-
-Select a 1-second, 2-second, or 5-second interval under
-**Settings → Network**. Sampling and counter retention stop while the module is
-disabled. The primary interface name remains available in panel help and
-accessibility text. Download and upload trend lines retain at most 15 minutes or
-900 samples in memory and are never written to disk. Low Data Mode applies the
-same reduced sampling cadence as Low Power Mode. The detail window separates
-system route status from counter availability and shows rates, time axes, and
-recent peaks. Switching interfaces clears the baseline and history, so rates
-from different interfaces are never combined.
+Network I/O is integrated into [System Stats](system-stats.md#network-consolidation).
+Existing deck positions and the selected interface migrate automatically. The
+System Stats detail window retains download/upload charts and connection status.
 
 ## Docker
 

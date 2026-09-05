@@ -14,7 +14,6 @@ enum SettingsPaneID: String, CaseIterable, Identifiable {
     case clock
     case music
     case battery
-    case network
     case localPorts
     case projectPulse
     case githubInbox
@@ -41,7 +40,6 @@ enum SettingsPaneID: String, CaseIterable, Identifiable {
         case .clock: "World Clock"
         case .music: "Music"
         case .battery: "Battery"
-        case .network: "Network"
         case .localPorts: "Local Ports"
         case .projectPulse: "Project Pulse"
         case .githubInbox: "GitHub Inbox"
@@ -68,7 +66,6 @@ enum SettingsPaneID: String, CaseIterable, Identifiable {
         case .clock: "Show local time or another time zone."
         case .music: "Control the macOS Music app."
         case .battery: "Show charge, power state, and time left."
-        case .network: "Show local download and upload throughput."
         case .localPorts: "Check local development server TCP ports."
         case .projectPulse: "Show local Git or remote GitHub repository activity."
         case .githubInbox: "Summarize account notifications, reviews, and Actions failures."
@@ -93,7 +90,6 @@ enum SettingsPaneID: String, CaseIterable, Identifiable {
         case .clock: "clock"
         case .music: "music.note"
         case .battery: "battery.75percent"
-        case .network: "network"
         case .localPorts: "network.badge.shield.half.filled"
         case .projectPulse: "point.3.connected.trianglepath.dotted"
         case .githubInbox: "bell.badge"
@@ -156,9 +152,6 @@ enum PanelModuleRegistry {
             id: .battery, title: "Battery", subtitle: "Charge and power state",
             symbolName: "battery.75percent", settingsPane: .battery),
         PanelModuleDefinition(
-            id: .network, title: "Network", subtitle: "Download and upload rates",
-            symbolName: "network", settingsPane: .network),
-        PanelModuleDefinition(
             id: .localPorts, title: "Local Ports", subtitle: "Loopback TCP reachability",
             symbolName: "network", settingsPane: .localPorts),
         PanelModuleDefinition(
@@ -212,6 +205,7 @@ struct UsageSettingsState: Equatable {
 struct SystemStatsSettingsState: Equatable {
     var refreshInterval: TimeInterval
     var metrics: [SystemStatsMetric]
+    var networkInterfaceName: String = ""
 }
 
 struct ServiceMonitorSettingsState: Equatable {
@@ -243,11 +237,6 @@ struct BatterySettingsState: Equatable {
     var refreshInterval: TimeInterval
 }
 
-struct NetworkSettingsState: Equatable {
-    var refreshInterval: TimeInterval
-    var interfaceName: String = ""
-}
-
 struct AppearanceSettingsState: Equatable {
     var cornerRadius: CGFloat
     var tintOpacity: CGFloat
@@ -265,7 +254,6 @@ struct SettingsPanelValues: Equatable {
     var schedule: ScheduleSettingsState
     var clock: ClockSettingsState
     var battery: BatterySettingsState
-    var network: NetworkSettingsState
     var projectPulse: ProjectPulseConfiguration
     var githubInbox: GitHubInboxConfiguration
     var docker: DockerConfiguration
@@ -311,6 +299,7 @@ enum UsageSettingsChange {
 enum SystemStatsSettingsChange {
     case refreshInterval(TimeInterval)
     case metrics([SystemStatsMetric])
+    case networkInterfaceName(String)
 }
 
 enum ServiceMonitorSettingsChange {
@@ -339,11 +328,6 @@ enum ClockSettingsChange {
 }
 
 enum BatterySettingsChange {
-    case refreshInterval(TimeInterval)
-}
-
-enum NetworkSettingsChange {
-    case interfaceName(String)
     case refreshInterval(TimeInterval)
 }
 
@@ -381,7 +365,6 @@ enum SettingsPanelChange {
     case schedule(ScheduleSettingsChange)
     case clock(ClockSettingsChange)
     case battery(BatterySettingsChange)
-    case network(NetworkSettingsChange)
     case projectPulse(ProjectPulseSettingsChange)
     case githubInbox(GitHubInboxSettingsChange)
     case docker(DockerSettingsChange)

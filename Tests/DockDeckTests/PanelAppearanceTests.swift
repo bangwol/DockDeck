@@ -41,6 +41,29 @@ final class PanelAppearanceTests: XCTestCase {
         XCTAssertEqual(EnabledPanels.resolved([]), .all)
     }
 
+    func testLegacyNetworkLayoutMigratesWithoutDuplicatingSystemStats() {
+        let networkOnly = PanelDeckConfiguration(left: [.systemStats, .terminal],
+            right: [.usage, .network], enabled: [.usage, .network]).normalized()
+        XCTAssertEqual(networkOnly.side(containing: .systemStats), .right)
+        XCTAssertEqual(networkOnly.enabledModules(on: .right), [.usage, .systemStats])
+        let both = PanelDeckConfiguration(left: [.systemStats, .terminal],
+            right: [.network, .usage], enabled: [.systemStats, .network, .usage]).normalized()
+        XCTAssertEqual(both.side(containing: .systemStats), .left)
+        XCTAssertEqual(both.enabled.filter { $0 == .systemStats }.count, 1)
+        let disabled = PanelDeckConfiguration(left: [.systemStats, .terminal],
+            right: [.network, .usage], enabled: [.usage]).normalized()
+        XCTAssertEqual(disabled.side(containing: .systemStats), .left)
+        XCTAssertFalse(disabled.enabled.contains(.systemStats))
+        for configuration in [networkOnly, both, disabled] {
+            XCTAssertFalse((configuration.left + configuration.right + configuration.enabled).contains(.network))
+            XCTAssertEqual(configuration.normalized(), configuration)
+        }
+        XCTAssertEqual(DeckAutoSlideSettings(modules: [.network, .systemStats, .usage]).modules, [.systemStats, .usage])
+        XCTAssertEqual(ReadOnlyDeckSelection.resolved(preferred: PanelModuleID.network.current,
+            enabledModules: networkOnly.enabledModules(on: .right)), .systemStats)
+        XCTAssertFalse(PanelModuleID.builtIns.contains(.network))
+    }
+
     func testDeckConfigurationAdaptsExistingPlacementAndVisibility() {
         let configuration = PanelDeckConfiguration.legacy(
             order: .terminalRight, enabledPanels: .terminal)
@@ -49,7 +72,7 @@ final class PanelAppearanceTests: XCTestCase {
             configuration.left,
             [
                 .usage, .systemStats, .serviceMonitor, .weather, .schedule, .clock, .music,
-                .battery, .network, .localPorts,
+                .battery, .localPorts,
                 .projectPulse,
                 .githubInbox,
                 .docker,
@@ -76,7 +99,7 @@ final class PanelAppearanceTests: XCTestCase {
             decoded.right,
             [
                 .usage, .systemStats, .serviceMonitor, .weather, .schedule, .clock, .music,
-                .battery, .network, .localPorts,
+                .battery, .localPorts,
                 .projectPulse,
                 .githubInbox,
                 .docker,
@@ -98,7 +121,7 @@ final class PanelAppearanceTests: XCTestCase {
             configuration.right,
             [
                 .usage, .serviceMonitor, .weather, .schedule, .clock, .music, .battery,
-                .network, .localPorts,
+                .localPorts,
                 .projectPulse,
                 .githubInbox,
                 .docker,
@@ -171,7 +194,7 @@ final class PanelAppearanceTests: XCTestCase {
             model.values.deckConfiguration.left,
             [
                 .usage, .systemStats, .serviceMonitor, .weather, .schedule, .clock, .music,
-                .battery, .network, .localPorts,
+                .battery, .localPorts,
                 .projectPulse,
                 .githubInbox,
                 .docker,
@@ -282,7 +305,7 @@ final class PanelAppearanceTests: XCTestCase {
             model.moduleDefinitions.map(\.id),
             [
                 .battery, .terminal, .usage,
-                .customTile, .customTile2, .customTile3, .docker, .focusTimer, .githubInbox, .localPorts, .music, .network,
+                .customTile, .customTile2, .customTile3, .docker, .focusTimer, .githubInbox, .localPorts, .music,
                 .projectPulse, .schedule, .serviceMonitor, .systemStats, .weather, .clock,
             ])
         XCTAssertEqual(
@@ -376,7 +399,7 @@ final class PanelAppearanceTests: XCTestCase {
             model.availablePanes,
             [
                 .decks, .notifications, .diagnostics, .terminal, .usage, .battery,
-                .customTile, .customTile2, .customTile3, .docker, .focusTimer, .githubInbox, .localPorts, .music, .network,
+                .customTile, .customTile2, .customTile3, .docker, .focusTimer, .githubInbox, .localPorts, .music,
                 .projectPulse, .schedule, .serviceMonitor, .systemStats, .weather,
                 .clock, .appearance,
             ])
@@ -388,7 +411,7 @@ final class PanelAppearanceTests: XCTestCase {
         XCTAssertEqual(model.moduleDefinition(for: .clock)?.id, .clock)
         XCTAssertEqual(model.moduleDefinition(for: .music)?.id, .music)
         XCTAssertEqual(model.moduleDefinition(for: .battery)?.id, .battery)
-        XCTAssertEqual(model.moduleDefinition(for: .network)?.id, .network)
+        XCTAssertEqual(model.moduleDefinition(for: .localPorts)?.id, .localPorts)
         XCTAssertEqual(model.moduleDefinition(for: .projectPulse)?.id, .projectPulse)
         XCTAssertEqual(model.moduleDefinition(for: .githubInbox)?.id, .githubInbox)
         XCTAssertEqual(model.moduleDefinition(for: .docker)?.id, .docker)
@@ -1297,7 +1320,6 @@ final class PanelAppearanceTests: XCTestCase {
             clock: ClockSettingsState(
                 timeZoneIdentifier: ClockTimeZone.systemIdentifier, hourFormat: .system),
             battery: BatterySettingsState(refreshInterval: 60),
-            network: NetworkSettingsState(refreshInterval: 2),
             projectPulse: ProjectPulseConfiguration(),
             githubInbox: GitHubInboxConfiguration(),
             docker: DockerConfiguration(),

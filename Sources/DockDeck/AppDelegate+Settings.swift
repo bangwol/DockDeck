@@ -234,8 +234,8 @@ extension AppDelegate {
     }
 
     private var savedSettingsPane: SettingsPaneID {
-        UserDefaults.standard.string(forKey: AppPreferences.settingsPaneKey)
-            .flatMap(SettingsPaneID.init(rawValue:)) ?? .decks
+        let saved = UserDefaults.standard.string(forKey: AppPreferences.settingsPaneKey)
+        return saved == "network" ? .systemStats : saved.flatMap(SettingsPaneID.init(rawValue:)) ?? .decks
     }
 
     private func presentSettingsPanel(
@@ -280,8 +280,7 @@ extension AppDelegate {
                 includeReminders: PanelSettings.scheduleIncludesReminders,
                 refreshInterval: PanelSettings.scheduleRefreshInterval)
             self.batteryStore.setRefreshInterval(PanelSettings.batteryRefreshInterval)
-            self.networkStore.setRefreshInterval(PanelSettings.networkRefreshInterval)
-            self.networkStore.setInterfaceName(PanelSettings.networkInterfaceName)
+            self.systemStatsStore.setNetworkInterfaceName(PanelSettings.networkInterfaceName)
             self.moduleServices.localPorts.updateConfiguration(PanelSettings.localPortsConfiguration)
             self.projectPulseStore.updateConfiguration(
                 PanelSettings.projectPulseConfiguration)
@@ -353,7 +352,8 @@ extension AppDelegate {
                 showsPace: PanelSettings.usageShowsPace),
             systemStats: SystemStatsSettingsState(
                 refreshInterval: PanelSettings.systemStatsRefreshInterval,
-                metrics: PanelSettings.systemStatsMetrics),
+                metrics: PanelSettings.systemStatsMetrics,
+                networkInterfaceName: PanelSettings.networkInterfaceName),
             serviceMonitor: ServiceMonitorSettingsState(
                 endpoints: PanelSettings.serviceMonitorEndpoints,
                 refreshInterval: PanelSettings.serviceMonitorRefreshInterval),
@@ -372,9 +372,6 @@ extension AppDelegate {
                 hourFormat: PanelSettings.clockHourFormat, favorites: PanelSettings.clockFavorites),
             battery: BatterySettingsState(
                 refreshInterval: PanelSettings.batteryRefreshInterval),
-            network: NetworkSettingsState(
-                refreshInterval: PanelSettings.networkRefreshInterval,
-                interfaceName: PanelSettings.networkInterfaceName),
             projectPulse: PanelSettings.projectPulseConfiguration,
             githubInbox: PanelSettings.githubInboxConfiguration,
             docker: PanelSettings.dockerConfiguration,
@@ -500,12 +497,9 @@ extension AppDelegate {
         case .battery(.refreshInterval(let interval)):
             PanelSettings.batteryRefreshInterval = interval
             batteryStore.setRefreshInterval(interval)
-        case .network(.interfaceName(let name)):
+        case .systemStats(.networkInterfaceName(let name)):
             PanelSettings.networkInterfaceName = name
-            networkStore.setInterfaceName(name)
-        case .network(.refreshInterval(let interval)):
-            PanelSettings.networkRefreshInterval = interval
-            networkStore.setRefreshInterval(interval)
+            systemStatsStore.setNetworkInterfaceName(name)
         case .projectPulse(.configuration(let configuration)):
             PanelSettings.projectPulseConfiguration = configuration
             projectPulseStore.updateConfiguration(configuration)

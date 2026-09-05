@@ -48,6 +48,11 @@ final class ModuleGalleryTests: XCTestCase {
                     dark: theme.isDark,
                     to: outputURL.appendingPathComponent(
                         "\(themeName)-detail-\(module.rawValue).png"))
+                if module == .systemStats {
+                    try render(ReadOnlyModuleDetailView(services: services, presentation: presentation),
+                        size: NSSize(width: 560, height: 660), dark: theme.isDark,
+                        to: outputURL.appendingPathComponent("\(themeName)-system-stats-full.png"))
+                }
                 if module == .clock {
                     try render(ClockModuleDetailView(store: services.clock,
                         timeZoneIdentifier: "Asia/Seoul", hourFormat: .twentyFourHour,
@@ -111,13 +116,24 @@ final class ModuleGalleryTests: XCTestCase {
                 ],
                 freshness: .live, detail: nil),
         ])
+        var networkSample: UInt64 = 0
+        let network = NetworkStore(
+            initialConnection: NetworkConnectionSnapshot(
+                status: .online, kind: .wifi, isExpensive: false, isConstrained: false),
+            interfaceName: "en0", counterReader: { _ in
+                networkSample += 1
+                return NetworkCounters(interfaceName: "en0",
+                    receivedBytes: networkSample * networkSample * 600_000,
+                    sentBytes: networkSample * networkSample * 90_000)
+            })
+        for offset in [-2.0, -1.0, 0.0] { network.refresh(now: now.addingTimeInterval(offset)) }
         let stats = SystemStatsStore(
-            metrics: [.cpu, .memory, .network, .thermal],
+            metrics: [.cpu, .memory, .network, .gpu],
             initialSnapshot: SystemStatsSnapshot(
-                cpuPercent: 18, memoryPercent: 72,
+                gpuPercent: 37, cpuPercent: 18, memoryPercent: 72,
                 downloadBytesPerSecond: 2_400_000,
                 uploadBytesPerSecond: 360_000,
-                temperatureCelsius: 54, thermalPressure: .nominal))
+                temperatureCelsius: 54, thermalPressure: .nominal), network: network)
         let service = ServiceMonitorStore(endpoints: [
             ServiceMonitorEndpoint(name: "API", urlString: "https://example.com"),
             ServiceMonitorEndpoint(name: "Web", urlString: "https://example.org"),
@@ -168,17 +184,6 @@ final class ModuleGalleryTests: XCTestCase {
                     webURL: URL(string: "https://github.com/example/DockDeck/issues/18")),
             ],
             observedAt: now)
-        var networkSample: UInt64 = 0
-        let network = NetworkStore(
-            initialConnection: NetworkConnectionSnapshot(
-                status: .online, kind: .wifi, isExpensive: false, isConstrained: false),
-            interfaceName: "en0", counterReader: { _ in
-                networkSample += 1
-                return NetworkCounters(interfaceName: "en0",
-                    receivedBytes: networkSample * networkSample * 600_000,
-                    sentBytes: networkSample * networkSample * 90_000)
-            })
-        for offset in [-2.0, -1.0, 0.0] { network.refresh(now: now.addingTimeInterval(offset)) }
         return PanelModuleServices(
             usage: usage,
             systemStats: stats,
@@ -197,7 +202,6 @@ final class ModuleGalleryTests: XCTestCase {
             battery: BatteryStore(
                 initialSnapshot: BatterySnapshot(
                     percent: 76, state: .discharging, minutesRemaining: 310)),
-            network: network,
             localPorts: LocalPortsStore(initialItems: [
                 .init(port: 3000, state: .open), .init(port: 5173, state: .closed),
                 .init(port: 8080, state: .unavailable("Permission denied while checking the local port.")),
