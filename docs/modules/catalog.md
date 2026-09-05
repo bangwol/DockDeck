@@ -130,3 +130,13 @@ while hidden it uses a coarser cadence plus a separate one-shot completion
 timer. macOS Low Power Mode further reduces display refreshes without delaying
 the completion transition. Optional completion alerts are controlled under
 **Settings → Notifications**.
+
+## Finding modules and settings
+
+**Find Module…** in the app or a module's context menu searches enabled modules.
+The picker shows their side and which are currently displayed. Use Up/Down,
+Return, Escape, or **Open Detail**. Those keys are handled only while the picker
+window is key; Terminal input keeps its own behavior. Settings also searches
+category names and descriptions, including disabled modules. Detail headers
+provide **Module Settings…** and **Diagnostics…** for setup and connection checks.
+`⌘W` closes the active settings, picker, or detail window.
