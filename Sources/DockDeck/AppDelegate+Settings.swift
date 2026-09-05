@@ -31,6 +31,36 @@ extension AppDelegate {
         presentSettingsPanel(pane: pane, anchor: controller?.panel ?? panel, restoreTerminalFocus: false)
     }
 
+    func openSettingsPane(_ pane: SettingsPaneID) {
+        if let settingsPanel {
+            (settingsPanel.contentView as? SettingsPanelView)?.selectPane(pane)
+            focusSettingsPanel(settingsPanel)
+        } else {
+            presentSettingsPanel(pane: pane, anchor: panel, restoreTerminalFocus: false)
+        }
+    }
+
+    @objc func showModulePicker(_ sender: Any?) {
+        if let controller = modulePickerController, controller.window.isVisible {
+            NSApp.activate(ignoringOtherApps: true)
+            controller.window.makeKeyAndOrderFront(nil)
+            return
+        }
+        let controller = ModulePickerController(onClose: { [weak self] in
+            self?.synchronizeDeckAutoSlideTimer()
+        }) { [weak self] module, detail in
+            guard let self, let side = PanelSettings.deckConfiguration.side(containing: module),
+                PanelSettings.enabledModules(on: side).contains(module) else { return }
+            PanelSettings.setActiveModule(module, on: side)
+            self.deckSelectionDidChange(on: side)
+            if detail, module != .terminal { self.readOnlyDeckPanelController(on: side).showDetail() }
+        }
+        modulePickerController = controller
+        NSApp.activate(ignoringOtherApps: true)
+        controller.window.makeKeyAndOrderFront(nil)
+        synchronizeDeckAutoSlideTimer()
+    }
+
     @objc func showNextTerminalDeckModule(_ sender: Any?) {
         guard let side = PanelSettings.deckConfiguration.side(containing: .terminal),
             let next = ReadOnlyDeckSelection.next(
@@ -127,6 +157,7 @@ extension AppDelegate {
         deckAutoSlideTimer = nil
         guard case .docked = terminalPanelMode else { return }
         guard usageDisplayAwake, usageSessionActive,
+            modulePickerController?.window.isVisible != true,
             settingsPanel?.isVisible != true,
             !deckAutoSlideSteps().isEmpty
         else { return }
@@ -148,6 +179,7 @@ extension AppDelegate {
     func advanceDeckAutoSlideIfPossible() -> Bool {
         guard case .docked = terminalPanelMode else { return false }
         guard usageDisplayAwake, usageSessionActive,
+            modulePickerController?.window.isVisible != true,
             settingsPanel?.isVisible != true
         else { return false }
         let steps = deckAutoSlideSteps()

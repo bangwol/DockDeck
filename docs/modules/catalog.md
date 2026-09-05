@@ -148,6 +148,8 @@ timer. macOS Low Power Mode further reduces display refreshes without delaying
 the completion transition. Optional completion alerts are controlled under
 **Settings → Notifications**.
 
+## Compact readability
+
 **Appearance → Larger text and fewer details** keeps compact labels at 10 pt or
 larger without reducing their scale to fit. Long text truncates; existing
 VoiceOver summaries and detail windows retain the full information. Custom Tile
@@ -162,3 +164,13 @@ continues to disable deck transitions.
 Up to five configured TCP ports show Open, Closed, or Unavailable using only
 IPv4/IPv6 loopback connections. See [Local Ports](local-ports.md) for polling,
 error meanings, and the distinction between reachability and service health.
+
+## Finding modules and settings
+
+**Find Module…** in the app or a module's context menu searches enabled modules.
+The picker shows their side and which are currently displayed. Use Up/Down,
+Return, Escape, or **Open Detail**. Those keys are handled only while the picker
+window is key; Terminal input keeps its own behavior. Settings also searches
+category names and descriptions, including disabled modules. Detail headers
+provide **Module Settings…** and **Diagnostics…** for setup and connection checks.
+`⌘W` closes the active settings, picker, or detail window.

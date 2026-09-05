@@ -219,6 +219,7 @@ final class ReadOnlyDeckPanelController:
             title: "Settings…",
             action: #selector(AppDelegate.openReadOnlyModuleSettings(_:)),
             representedObject: side.rawValue)
+        addItem(to: menu, title: "Find Module…", action: #selector(AppDelegate.showModulePicker(_:)))
         let detailItem = NSMenuItem(
             title: "Open Detail…", action: #selector(showDetailFromMenu(_:)),
             keyEquivalent: "")
@@ -381,7 +382,10 @@ final class ReadOnlyDeckPanelController:
         window.setFrameAutosaveName(frameName)
         window.contentView = NSHostingView(
             rootView: ReadOnlyModuleDetailView(
-                services: services, presentation: presentation))
+                services: services, presentation: presentation,
+                onOpenSettings: { [weak self] pane in
+                    (self?.menuTarget as? AppDelegate)?.openSettingsPane(pane)
+                }))
         if !restoredFrame { window.center() }
         detailPanel = window
         NSApp.activate(ignoringOtherApps: true)
