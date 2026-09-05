@@ -8,7 +8,8 @@ requests, and subprocesses instead of merely hiding their panels.
 
 Service Monitor sends a `HEAD` request every 15–120 seconds to up to four URLs.
 If a server rejects `HEAD` with 405 or 501, DockDeck retries with a `GET` request
-containing `Range: bytes=0-0`; it still discards the body.
+containing `Range: bytes=0-0`. Probes finish when headers arrive and cancel body
+transfer, including when a server ignores Range.
 Public endpoints must use HTTPS. Plain HTTP is accepted only for local names and
 private or loopback addresses. The packaged app declares Apple's narrow
 `NSAllowsLocalNetworking` exception instead of disabling App Transport Security
