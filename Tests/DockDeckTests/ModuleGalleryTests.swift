@@ -16,11 +16,19 @@ final class ModuleGalleryTests: XCTestCase {
         try FileManager.default.createDirectory(
             at: outputURL, withIntermediateDirectories: true)
         let services = makeServices()
+        let profilesURL = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString).appendingPathComponent("profiles.json")
+        defer { try? FileManager.default.removeItem(at: profilesURL.deletingLastPathComponent()) }
+        let profiles = DeckProfileStore(url: profilesURL)
+        try profiles.save(name: "Development", configuration: .legacy(order: .terminalLeft, enabledPanels: .all), autoSlide: .init())
+        try profiles.save(name: "Focus", configuration: .init(left: [.focusTimer], right: [.clock], enabled: [.focusTimer, .clock]), autoSlide: .init())
 
         for (themeName, theme) in [
             ("dark", Theme.theme(id: "")),
             ("light", Theme.theme(id: "github-light")),
         ] {
+            try render(DeckProfileControls(store: profiles).padding(24).background(Color(nsColor: .windowBackgroundColor)),
+                size: NSSize(width: 650, height: 330), dark: theme.isDark,
+                to: outputURL.appendingPathComponent("\(themeName)-deck-profiles.png"))
             for module in PanelModuleID.readOnlyBuiltIns {
                 try render(ReadOnlyDeckPanelView(readabilityOverride: true, services: services,
                     presentation: ReadOnlyDeckPresentation(activeModule: module, theme: theme)),

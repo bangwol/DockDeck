@@ -1,6 +1,20 @@
 import Cocoa
 
 extension AppDelegate {
+    func applyDeckProfile(_ profile: DeckProfile) {
+        guard (try? DeckProfileArchive(profiles: [profile]).validated()) != nil else { return }
+        retainsTerminalForProfile = DeckProfileTerminalPolicy.retain(
+            isRunning: terminalPanelController.terminalView.process.running,
+            retained: retainsTerminalForProfile, nextEnabled: profile.configuration.contains(.terminal))
+        if profile.configuration.enabled.contains(.network), !PanelSettings.systemStatsMetrics.contains(.network) {
+            PanelSettings.systemStatsMetrics = Array(PanelSettings.systemStatsMetrics.prefix(3)) + [.network]
+            systemStatsStore.setMetrics(PanelSettings.systemStatsMetrics)
+        }
+        PanelSettings.deckAutoSlideSettings = profile.autoSlide
+        applySettingsChange(.deck(profile.configuration.normalized()))
+        (settingsPanel?.contentView as? SettingsPanelView)?.setValues(currentSettingsValues)
+    }
+
     @objc func toggleSettingsPanel(_ sender: Any?) {
         if let settingsPanel {
             focusSettingsPanel(settingsPanel)

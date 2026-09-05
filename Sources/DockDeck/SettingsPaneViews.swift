@@ -26,6 +26,9 @@ struct DecksSettingsView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
+                if let app = NSApp.delegate as? AppDelegate {
+                    DeckProfileControls(store: app.deckProfiles)
+                }
                 DeckAutoSlideControls(model: model)
 
                 HStack(alignment: .top, spacing: 14) {

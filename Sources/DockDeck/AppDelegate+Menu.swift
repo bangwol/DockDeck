@@ -22,6 +22,10 @@ extension AppDelegate {
             withTitle: "Settings…", action: #selector(toggleSettingsPanel(_:)), keyEquivalent: ","
         )
         appMenu.addItem(withTitle: "Find Module…", action: #selector(showModulePicker(_:)), keyEquivalent: "")
+        let profileItem = NSMenuItem(title: "Deck Profiles", action: nil, keyEquivalent: "")
+        profileItem.submenu = deckProfilesMenu
+        deckProfilesMenu.delegate = self
+        appMenu.addItem(profileItem)
         appMenu.addItem(
             withTitle: "Refresh Modules & Layout", action: #selector(refreshModules(_:)),
             keyEquivalent: "r"
@@ -117,4 +121,31 @@ extension AppDelegate {
         NSApp.activate(ignoringOtherApps: true)
         NSApp.orderFrontStandardAboutPanel(sender)
     }
+}
+
+extension AppDelegate: NSMenuDelegate {
+    func menuNeedsUpdate(_ menu: NSMenu) {
+        guard menu === deckProfilesMenu else { return }
+        menu.removeAllItems()
+        for profile in deckProfiles.archive.profiles {
+            let item = NSMenuItem(title: profile.name, action: #selector(selectDeckProfile(_:)), keyEquivalent: "")
+            item.target = self
+            item.representedObject = profile.id.uuidString
+            item.state = profile.configuration.normalized() == PanelSettings.deckConfiguration
+                && profile.autoSlide == PanelSettings.deckAutoSlideSettings ? .on : .off
+            menu.addItem(item)
+        }
+        if !menu.items.isEmpty { menu.addItem(.separator()) }
+        let manage = NSMenuItem(title: "Manage Profiles…", action: #selector(manageDeckProfiles(_:)), keyEquivalent: "")
+        manage.target = self
+        menu.addItem(manage)
+    }
+
+    @objc func selectDeckProfile(_ sender: NSMenuItem) {
+        guard let id = sender.representedObject as? String,
+            let profile = deckProfiles.archive.profiles.first(where: { $0.id.uuidString == id }) else { return }
+        applyDeckProfile(profile)
+    }
+
+    @objc func manageDeckProfiles(_ sender: Any?) { openSettingsPane(.decks) }
 }

@@ -105,6 +105,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     var currentTheme = Theme.theme(
         id: UserDefaults.standard.string(forKey: AppPreferences.themeIDKey) ?? "")
     var themePickerPanel: KeyablePanel?
+    lazy var deckProfiles = DeckProfileStore()
+    let deckProfilesMenu = NSMenu(title: "Deck Profiles")
+    var retainsTerminalForProfile = false
     var settingsPanel: KeyablePanel?
     var modulePickerController: ModulePickerController?
     var settingsPanelRestoresTerminalFocus = false
@@ -365,8 +368,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         let processInfo = ProcessInfo.processInfo
         let systemActive = usageDisplayAwake && usageSessionActive
+        var enabledModules = PanelSettings.deckConfiguration.enabled
+        if enabledModules.contains(.terminal) { retainsTerminalForProfile = false }
+        if retainsTerminalForProfile { enabledModules.append(.terminal) }
         moduleRuntimeCoordinator.synchronize(
-            enabledModules: PanelSettings.deckConfiguration.enabled,
+            enabledModules: enabledModules,
             visibleModules: visibleModules,
             lowPowerMode: ModuleRuntimePolicy.isConstrained(
                 lowPowerMode: processInfo.isLowPowerModeEnabled,

@@ -162,3 +162,22 @@ window is key; Terminal input keeps its own behavior. Settings also searches
 category names and descriptions, including disabled modules. Detail headers
 provide **Module Settings…** and **Diagnostics…** for setup and connection checks.
 `⌘W` closes the active settings, picker, or detail window.
+
+## Deck profiles
+
+Save up to eight named layouts under **Decks → Saved Deck Profiles**, then switch
+from the **Deck Profiles** app menu. Profiles contain left/right order, enabled
+modules and auto-slide selections/interval. Missing newer modules are added as
+disabled entries when applying an older profile. Module data sources, commands,
+credentials, and other settings stay outside profiles.
+
+A Terminal session already running when a profile hides Terminal is retained
+until the module is enabled again or the app quits. Once re-enabled, manually
+disabling Terminal stops it normally. Other disabled modules stop their runtime.
+
+**Export…** writes a versioned JSON archive. **Import…** validates IDs, duplicates,
+names and intervals before showing the replacement preview; importing replaces
+the saved library only after confirmation and leaves the current deck unchanged.
+Archives are limited to 64 KiB and eight profiles. The local library is written
+atomically at `~/Library/Application Support/DockDeck/deck-profiles.json`.
+An unreadable existing library is preserved until a valid import replaces it.
