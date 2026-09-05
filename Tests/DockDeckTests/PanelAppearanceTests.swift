@@ -398,7 +398,7 @@ final class PanelAppearanceTests: XCTestCase {
         XCTAssertEqual(
             model.availablePanes,
             [
-                .decks, .notifications, .diagnostics, .terminal, .usage, .battery,
+                .decks, .quickActions, .notifications, .diagnostics, .terminal, .usage, .battery,
                 .customTile, .customTile2, .customTile3, .docker, .focusTimer, .githubInbox, .localPorts, .music,
                 .projectPulse, .schedule, .serviceMonitor, .systemStats, .weather,
                 .clock, .appearance,
@@ -418,7 +418,7 @@ final class PanelAppearanceTests: XCTestCase {
         XCTAssertEqual(model.moduleDefinition(for: .customTile)?.id, .customTile)
         XCTAssertEqual(model.moduleDefinition(for: .focusTimer)?.id, .focusTimer)
         XCTAssertEqual(model.sidebarSections.map(\.id), [.general, .modules, .interface])
-        XCTAssertEqual(model.sidebarSections[0].panes, [.decks, .notifications, .diagnostics])
+        XCTAssertEqual(model.sidebarSections[0].panes, [.decks, .quickActions, .notifications, .diagnostics])
         XCTAssertEqual(
             model.sidebarSections[1].panes,
             model.moduleDefinitions.compactMap(\.settingsPane))

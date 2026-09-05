@@ -3,6 +3,7 @@ import Combine
 
 enum SettingsPaneID: String, CaseIterable, Identifiable {
     case decks
+    case quickActions
     case notifications
     case diagnostics
     case terminal
@@ -28,6 +29,7 @@ enum SettingsPaneID: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
+        case .quickActions: "Quick Actions"
         case .decks: "Decks"
         case .notifications: "Notifications"
         case .diagnostics: "Diagnostics"
@@ -54,6 +56,7 @@ enum SettingsPaneID: String, CaseIterable, Identifiable {
 
     var subtitle: String {
         switch self {
+        case .quickActions: "Open saved apps, folders, web pages, or Shortcuts."
         case .decks: "Choose which modules appear beside the Dock."
         case .notifications: "Choose which local events can alert you."
         case .diagnostics: "Check local tools, permissions, sensors, and connectivity."
@@ -78,6 +81,7 @@ enum SettingsPaneID: String, CaseIterable, Identifiable {
 
     var symbolName: String {
         switch self {
+        case .quickActions: "bolt"
         case .decks: "rectangle.stack"
         case .notifications: "bell.badge"
         case .diagnostics: "stethoscope"

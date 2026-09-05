@@ -18,6 +18,16 @@ final class ModuleGalleryTests: XCTestCase {
         let services = makeServices()
         let profilesURL = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString).appendingPathComponent("profiles.json")
         defer { try? FileManager.default.removeItem(at: profilesURL.deletingLastPathComponent()) }
+        let actionsSuite = "DockDeckTests.gallery.actions." + UUID().uuidString
+        let actionsDefaults = try XCTUnwrap(UserDefaults(suiteName: actionsSuite))
+        defer { actionsDefaults.removePersistentDomain(forName: actionsSuite) }
+        let actions = QuickActionStore(defaults: actionsDefaults)
+        try actions.save([
+            .init(name: "Calendar", kind: .app, target: "/System/Applications/Calendar.app"),
+            .init(name: "Work Folder", kind: .folder, target: "/tmp/work"),
+            .init(name: "Documentation", kind: .webpage, target: "https://example.com"),
+            .init(name: "Work Mode", kind: .shortcut, target: "Work mode"),
+        ])
         let profiles = DeckProfileStore(url: profilesURL)
         try profiles.save(name: "Development", configuration: .legacy(order: .terminalLeft, enabledPanels: .all), autoSlide: .init())
         try profiles.save(name: "Focus", configuration: .init(left: [.focusTimer], right: [.clock], enabled: [.focusTimer, .clock]), autoSlide: .init())
@@ -26,6 +36,9 @@ final class ModuleGalleryTests: XCTestCase {
             ("dark", Theme.theme(id: "")),
             ("light", Theme.theme(id: "github-light")),
         ] {
+            try render(QuickActionsSettingsView(store: actions).background(Color(nsColor: .windowBackgroundColor)),
+                size: NSSize(width: 650, height: 460), dark: theme.isDark,
+                to: outputURL.appendingPathComponent("\(themeName)-quick-actions.png"))
             try render(DeckProfileControls(store: profiles).padding(24).background(Color(nsColor: .windowBackgroundColor)),
                 size: NSSize(width: 650, height: 330), dark: theme.isDark,
                 to: outputURL.appendingPathComponent("\(themeName)-deck-profiles.png"))

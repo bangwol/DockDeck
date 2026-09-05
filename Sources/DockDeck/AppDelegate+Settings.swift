@@ -274,6 +274,7 @@ extension AppDelegate {
         view.onReset = { [weak self, weak view] in
             guard let self else { return }
             PanelSettings.resetToDefaults()
+            self.quickActions.clear()
             self.notificationCoordinator.updateSettings(PanelSettings.notifications)
             self.usageStore.setEnabledProviders(PanelSettings.enabledUsageProviders)
             self.usageStore.setClaudeRefreshMode(PanelSettings.claudeUsageRefreshMode)

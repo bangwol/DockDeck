@@ -22,6 +22,11 @@ extension AppDelegate {
             withTitle: "Settings…", action: #selector(toggleSettingsPanel(_:)), keyEquivalent: ","
         )
         appMenu.addItem(withTitle: "Find Module…", action: #selector(showModulePicker(_:)), keyEquivalent: "")
+        let actionsItem = NSMenuItem(title: "Quick Actions", action: nil, keyEquivalent: "")
+        actionsItem.submenu = quickActionsMenu
+        quickActionsMenu.delegate = self
+        quickActionsMenu.autoenablesItems = false
+        appMenu.addItem(actionsItem)
         let profileItem = NSMenuItem(title: "Deck Profiles", action: nil, keyEquivalent: "")
         profileItem.submenu = deckProfilesMenu
         deckProfilesMenu.delegate = self
@@ -125,6 +130,27 @@ extension AppDelegate {
 
 extension AppDelegate: NSMenuDelegate {
     func menuNeedsUpdate(_ menu: NSMenu) {
+        if menu === quickActionsMenu {
+            menu.removeAllItems()
+            for action in quickActions.actions {
+                let item = NSMenuItem(title: action.name, action: #selector(runQuickAction(_:)), keyEquivalent: "")
+                item.target = self
+                item.representedObject = action.id.uuidString
+                item.image = NSImage(systemSymbolName: action.kind.symbol, accessibilityDescription: action.kind.title)
+                item.isEnabled = !quickActions.running.contains(action.id)
+                menu.addItem(item)
+            }
+            if !menu.items.isEmpty { menu.addItem(.separator()) }
+            if let error = quickActions.error {
+                let status = NSMenuItem(title: error, action: nil, keyEquivalent: "")
+                status.isEnabled = false
+                menu.addItem(status)
+            }
+            let manage = NSMenuItem(title: "Manage Actions…", action: #selector(manageQuickActions(_:)), keyEquivalent: "")
+            manage.target = self
+            menu.addItem(manage)
+            return
+        }
         guard menu === deckProfilesMenu else { return }
         menu.removeAllItems()
         for profile in deckProfiles.archive.profiles {
@@ -140,6 +166,13 @@ extension AppDelegate: NSMenuDelegate {
         manage.target = self
         menu.addItem(manage)
     }
+
+    @objc func runQuickAction(_ sender: NSMenuItem) {
+        guard let raw = sender.representedObject as? String, let id = UUID(uuidString: raw) else { return }
+        quickActions.run(id)
+    }
+
+    @objc func manageQuickActions(_ sender: Any?) { openSettingsPane(.quickActions) }
 
     @objc func selectDeckProfile(_ sender: NSMenuItem) {
         guard let id = sender.representedObject as? String,

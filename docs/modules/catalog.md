@@ -181,3 +181,17 @@ the saved library only after confirmation and leaves the current deck unchanged.
 Archives are limited to 64 KiB and eight profiles. The local library is written
 atomically at `~/Library/Application Support/DockDeck/deck-profiles.json`.
 An unreadable existing library is preserved until a valid import replaces it.
+
+## Quick Actions
+
+Save up to four apps, folders, HTTP(S) web pages, or named Shortcuts in
+**Settings → Quick Actions**. The app menu lists the same actions. Saving an
+action never runs it; select it explicitly. Apps open through macOS, folders
+open in Finder, and web pages open in the default browser. URLs with embedded
+credentials, relative paths, and control characters are rejected.
+
+Shortcuts run with separate arguments, a 30-second limit, and a 32 KiB combined
+output limit. A running action cannot be started twice, and rapid repeats are
+ignored. Only save Shortcuts you trust. Errors appear in Settings and the menu;
+raw command output is not displayed or retained. Quick Actions have no polling
+timer and are excluded from deck-profile backups.
