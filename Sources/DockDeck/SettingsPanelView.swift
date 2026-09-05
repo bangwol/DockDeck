@@ -87,7 +87,7 @@ private struct SettingsRootView: View {
                 .padding(.horizontal, 14)
                 .frame(height: 54)
 
-                TextField("Search settings", text: $search)
+                TextField(L10n.text("Search settings"), text: $search)
                     .textFieldStyle(.roundedBorder)
                     .padding(.horizontal, 10).padding(.bottom, 8)
                     .onSubmit {
@@ -96,7 +96,7 @@ private struct SettingsRootView: View {
                         }
                     }
                 if model.sidebarSections(matching: search).isEmpty {
-                    Text("No matching settings").font(.caption).foregroundStyle(.secondary)
+                    Text(L10n.text("No matching settings")).font(.caption).foregroundStyle(.secondary)
                 }
                 List(selection: $model.selectedPane) {
                     ForEach(model.sidebarSections(matching: search)) { section in
@@ -110,7 +110,7 @@ private struct SettingsRootView: View {
                 }
                 .listStyle(.sidebar)
                 .scrollContentBackground(.hidden)
-                .accessibilityLabel("Settings categories")
+                .accessibilityLabel(L10n.text("Settings categories"))
             }
             .frame(width: SettingsPanelView.sidebarWidth)
             .background(SidebarBackdrop())
@@ -121,7 +121,7 @@ private struct SettingsRootView: View {
                 SettingsHeader(pane: model.selectedPane, model: model)
                 Divider()
                 if let definition = selectedModule, !model.isEnabled(definition.id) {
-                    DisabledModuleNotice(moduleTitle: definition.title)
+                    DisabledModuleNotice(moduleTitle: definition.displayTitle)
                     Divider()
                 }
                 selectedPane
@@ -140,6 +140,10 @@ private struct SettingsRootView: View {
 
     @ViewBuilder private var selectedPane: some View {
         switch model.selectedPane {
+        case .startup:
+            if let app = NSApp.delegate as? AppDelegate { StartupSettingsView(store: app.loginItem) }
+        case .quickActions:
+            if let app = NSApp.delegate as? AppDelegate { QuickActionsSettingsView(store: app.quickActions) }
         case .decks:
             DecksSettingsView(model: model)
         case .notifications:
@@ -164,8 +168,8 @@ private struct SettingsRootView: View {
             MusicSettingsView(store: musicStore)
         case .battery:
             BatterySettingsView(model: model)
-        case .network:
-            NetworkSettingsView(model: model)
+        case .localPorts:
+            LocalPortsSettingsView(model: model)
         case .projectPulse:
             ProjectPulseSettingsView(model: model)
         case .githubInbox:
@@ -243,7 +247,7 @@ private struct SettingsHeader: View {
                     .disabled(!model.canDisable(definition.id))
                     .help(
                         model.canDisable(definition.id)
-                            ? "Run and show \(definition.title)"
+                            ? "Run and show \(definition.displayTitle)"
                             : "DockDeck keeps one module visible so Settings remains accessible")
             }
         }

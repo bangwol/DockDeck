@@ -3,6 +3,7 @@ import SwiftUI
 
 struct ProjectPulseSettingsView: View {
     @ObservedObject var model: SettingsPanelModel
+    @State private var favorites = PanelSettings.projectPulseFavorites
     @StateObject private var githubRepositories: GitHubRepositoryCatalog
 
     init(
@@ -86,6 +87,30 @@ struct ProjectPulseSettingsView: View {
                     }
                 }
 
+                GroupBox("Saved Projects · up to 3") {
+                    VStack(alignment: .leading, spacing: 8) {
+                        ForEach(favorites, id: \.favoriteKey) { favorite in
+                            HStack {
+                                Button(favorite.favoriteTitle) { model.selectProjectPulseFavorite(favorite) }
+                                    .lineLimit(1).truncationMode(.middle)
+                                    .help(favorite.repositoryPath ?? favorite.favoriteTitle)
+                                Text(favorite.source.title).font(.caption).foregroundStyle(.secondary)
+                                Spacer()
+                                Button("Remove") {
+                                    favorites.removeAll { $0.favoriteKey == favorite.favoriteKey }
+                                    PanelSettings.projectPulseFavorites = favorites
+                                }
+                            }
+                        }
+                        Button("Save Current Project") {
+                            favorites = ProjectPulseConfiguration.favorites(favorites + [configuration])
+                            PanelSettings.projectPulseFavorites = favorites
+                        }
+                        .disabled(!configuration.isConfigured || favorites.count >= 3
+                            || favorites.contains { $0.favoriteKey == configuration.favoriteKey })
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading).padding(.top, 4)
+                }
                 GroupBox {
                     SettingsPickerRow(title: "Refresh") {
                         Picker(

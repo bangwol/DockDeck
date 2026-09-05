@@ -179,7 +179,7 @@ enum DockerBinaryLocator {
 }
 
 protocol DockerReading {
-    func read(now: Date) throws -> DockerSnapshot
+    func read(now: Date, cancellation: Progress?) throws -> DockerSnapshot
 }
 
 struct DockerClient: DockerReading {
@@ -188,7 +188,7 @@ struct DockerClient: DockerReading {
         "NO_COLOR": "1",
     ]
 
-    func read(now: Date) throws -> DockerSnapshot {
+    func read(now: Date, cancellation: Progress? = nil) throws -> DockerSnapshot {
         guard let docker = DockerBinaryLocator.locate() else {
             throw DockerError.cliUnavailable
         }
@@ -199,7 +199,7 @@ struct DockerClient: DockerReading {
                 arguments: ["ps", "-a", "--format", "{{json .}}"],
                 currentDirectoryURL: FileManager.default.homeDirectoryForCurrentUser,
                 environmentAdditions: Self.environment,
-                timeout: 5)
+                timeout: 5, cancellation: cancellation, diagnosticSource: .docker)
         } catch {
             throw DockerError.daemonUnavailable
         }
@@ -213,7 +213,7 @@ struct DockerClient: DockerReading {
                 arguments: ["stats", "--no-stream", "--format", "{{json .}}"],
                 currentDirectoryURL: FileManager.default.homeDirectoryForCurrentUser,
                 environmentAdditions: Self.environment,
-                timeout: 5),
+                timeout: 5, cancellation: cancellation, diagnosticSource: .docker),
             let stats = try? DockerOutputParser.parseStats(statsData)
         {
             cpuPercent = stats.cpuPercent
@@ -240,6 +240,7 @@ final class DockerStore: ObservableObject {
     private var timer: Timer?
     private var isRunning = false
     private var requestID: UUID?
+    private var cancellation: Progress?
     private var generation = 0
     private var refreshCadence = ModuleRefreshCadence(backgroundMultiplier: 4)
 
@@ -256,6 +257,8 @@ final class DockerStore: ObservableObject {
         status = initialSnapshot == nil ? .loading : .ready
     }
 
+    deinit { timer?.invalidate(); cancellation?.cancel() }
+
     func start() {
         guard !isRunning else { return }
         isRunning = true
@@ -267,6 +270,7 @@ final class DockerStore: ObservableObject {
         guard isRunning || timer != nil else { return }
         isRunning = false
         generation += 1
+        cancellation?.cancel()
         timer?.invalidate()
         timer = nil
     }
@@ -276,6 +280,7 @@ final class DockerStore: ObservableObject {
         guard self.configuration != configuration else { return }
         self.configuration = configuration
         generation += 1
+        cancellation?.cancel()
         guard isRunning else { return }
         scheduleTimer()
         refresh()
@@ -295,13 +300,16 @@ final class DockerStore: ObservableObject {
         let requestID = UUID()
         let generation = generation
         self.requestID = requestID
+        let cancellation = Progress(totalUnitCount: 1)
+        self.cancellation = cancellation
+        let reader = reader
         if snapshot == nil { status = .loading }
         queue.async { [weak self] in
-            guard let self else { return }
-            let result = Result { try self.reader.read(now: Date()) }
-            DispatchQueue.main.async {
-                guard self.requestID == requestID else { return }
+            let result = Result { try reader.read(now: Date(), cancellation: cancellation) }
+            DispatchQueue.main.async { [weak self] in
+                guard let self, self.requestID == requestID else { return }
                 self.requestID = nil
+                self.cancellation = nil
                 guard self.isRunning else { return }
                 guard self.generation == generation else {
                     self.refresh()

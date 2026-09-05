@@ -3,6 +3,7 @@ import PackageDescription
 
 let package = Package(
     name: "DockDeck",
+    defaultLocalization: "en",
     platforms: [.macOS(.v13)],
     products: [
         .executable(name: "DockDeck", targets: ["DockDeck"]),
@@ -17,7 +18,7 @@ let package = Package(
             name: "DockDeck",
             dependencies: ["SwiftTerm"],
             path: "Sources/DockDeck",
-            resources: [.copy("Resources/ProviderMarks")]
+            resources: [.copy("Resources/ProviderMarks"), .process("Resources/Localization")]
         ),
         .executableTarget(
             name: "DockDeckClaudeBridge",

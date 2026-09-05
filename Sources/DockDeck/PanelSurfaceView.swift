@@ -1,4 +1,18 @@
 import Cocoa
+import SwiftUI
+
+enum CompactReadability {
+    static let preferenceKey = "dockdeck.readablePanels"
+    static func size(_ value: CGFloat, enabled: Bool) -> CGFloat { enabled ? max(value, 10) : value }
+}
+
+private struct CompactReadableKey: EnvironmentKey { static let defaultValue = false }
+extension EnvironmentValues {
+    var compactReadable: Bool {
+        get { self[CompactReadableKey.self] }
+        set { self[CompactReadableKey.self] = newValue }
+    }
+}
 
 enum PanelPresentation {
     case compact
@@ -24,6 +38,9 @@ final class PanelSurfaceView: NSView {
     private let backdropView: NSView
     private let fallbackTintView: NSView?
     private let usesLiquidGlass: Bool
+    private var currentTheme: Theme
+    private var currentPresentation: PanelPresentation
+    private var accessibilityObserver: NSObjectProtocol?
 
     init(
         frame: NSRect, theme: Theme, presentation: PanelPresentation = .compact
@@ -61,6 +78,8 @@ final class PanelSurfaceView: NSView {
             usesLiquidGlass = false
         }
 
+        self.currentTheme = theme
+        self.currentPresentation = presentation
         self.contentContainer = contentContainer
         self.backdropView = backdropView
         self.fallbackTintView = fallbackTintView
@@ -77,6 +96,16 @@ final class PanelSurfaceView: NSView {
 
         applyCornerRadius()
         apply(theme: theme, presentation: presentation)
+        accessibilityObserver = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.accessibilityDisplayOptionsDidChangeNotification, object: nil, queue: .main
+        ) { [weak self] _ in
+            guard let self else { return }
+            self.apply(theme: self.currentTheme, presentation: self.currentPresentation)
+        }
+    }
+
+    deinit {
+        if let accessibilityObserver { NSWorkspace.shared.notificationCenter.removeObserver(accessibilityObserver) }
     }
 
     @available(*, unavailable)
@@ -90,6 +119,13 @@ final class PanelSurfaceView: NSView {
     }
 
     func apply(theme: Theme, presentation: PanelPresentation) {
+        currentTheme = theme
+        currentPresentation = presentation
+        let workspace = NSWorkspace.shared
+        let opaque = workspace.accessibilityDisplayShouldReduceTransparency
+            || workspace.accessibilityDisplayShouldIncreaseContrast
+        contentContainer.layer?.backgroundColor = opaque
+            ? theme.tintColor(opacity: 1).cgColor : nil
         let baseOpacity = PanelSettings.tintOpacity ?? theme.panelTintColor.alphaComponent
         let opacity = PanelAppearance.tintOpacity(
             base: baseOpacity, presentation: presentation)

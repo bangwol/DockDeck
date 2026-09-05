@@ -67,8 +67,16 @@ cat > "$APP_PATH/Contents/Info.plist" <<EOF
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+    <key>DockDeckLoginItemControlVersion</key>
+    <integer>1</integer>
     <key>CFBundleIdentifier</key>
     <string>$LABEL</string>
+    <key>CFBundleDevelopmentRegion</key>
+    <string>en</string>
+    <key>CFBundleLocalizations</key>
+    <array><string>en</string><string>ko</string></array>
+    <key>CFBundleAllowMixedLocalizations</key>
+    <true/>
     <key>CFBundleName</key>
     <string>DockDeck</string>
     <key>CFBundleExecutable</key>
@@ -109,6 +117,7 @@ cat > "$APP_PATH/Contents/Info.plist" <<EOF
 EOF
 
 plutil -lint "$APP_PATH/Contents/Info.plist" >/dev/null
+DOCKDECK_REQUIRE_APP_INTENTS=1 "$REPO_DIR/scripts/build-app-intents.sh" "$APP_PATH"
 
 if [ "$SIGNING_IDENTITY" = "-" ]; then
     echo "Ad-hoc signing $APP_PATH..."

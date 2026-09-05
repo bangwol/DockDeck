@@ -5,6 +5,12 @@ import XCTest
 @testable import DockDeck
 
 final class PanelAppearanceTests: XCTestCase {
+    func testReadableCompactTypeKeepsTenPointFloorWithoutShrinkingLargerText() {
+        XCTAssertEqual(CompactReadability.size(7.5, enabled: false), 7.5)
+        XCTAssertEqual(CompactReadability.size(7.5, enabled: true), 10)
+        XCTAssertEqual(CompactReadability.size(20, enabled: true), 20)
+    }
+
     func testTextTileExampleSurvivesArgumentEditing() throws {
         let model = makeSettingsModel(configuration: .legacy(order: .terminalLeft, enabledPanels: .all))
         model.useCustomTileExample(json: false)
@@ -25,7 +31,7 @@ final class PanelAppearanceTests: XCTestCase {
         XCTAssertEqual(model.values.extraCustomTiles[.customTile2]?.executablePath, "/usr/bin/printf")
         XCTAssertFalse(model.values.deckConfiguration.enabled.contains(.customTile2))
         model.selectedPane = .customTile3
-        XCTAssertEqual(model.customTileConfiguration.title, "Custom Tile 3")
+        XCTAssertEqual(model.customTileConfiguration.title, L10n.text("Custom Tile 3"))
         XCTAssertFalse(model.customTileConfiguration.isConfigured)
     }
 
@@ -33,6 +39,29 @@ final class PanelAppearanceTests: XCTestCase {
         XCTAssertEqual(EnabledPanels.resolved(.terminal), .terminal)
         XCTAssertEqual(EnabledPanels.resolved(.usage), .usage)
         XCTAssertEqual(EnabledPanels.resolved([]), .all)
+    }
+
+    func testLegacyNetworkLayoutMigratesWithoutDuplicatingSystemStats() {
+        let networkOnly = PanelDeckConfiguration(left: [.systemStats, .terminal],
+            right: [.usage, .network], enabled: [.usage, .network]).normalized()
+        XCTAssertEqual(networkOnly.side(containing: .systemStats), .right)
+        XCTAssertEqual(networkOnly.enabledModules(on: .right), [.usage, .systemStats])
+        let both = PanelDeckConfiguration(left: [.systemStats, .terminal],
+            right: [.network, .usage], enabled: [.systemStats, .network, .usage]).normalized()
+        XCTAssertEqual(both.side(containing: .systemStats), .left)
+        XCTAssertEqual(both.enabled.filter { $0 == .systemStats }.count, 1)
+        let disabled = PanelDeckConfiguration(left: [.systemStats, .terminal],
+            right: [.network, .usage], enabled: [.usage]).normalized()
+        XCTAssertEqual(disabled.side(containing: .systemStats), .left)
+        XCTAssertFalse(disabled.enabled.contains(.systemStats))
+        for configuration in [networkOnly, both, disabled] {
+            XCTAssertFalse((configuration.left + configuration.right + configuration.enabled).contains(.network))
+            XCTAssertEqual(configuration.normalized(), configuration)
+        }
+        XCTAssertEqual(DeckAutoSlideSettings(modules: [.network, .systemStats, .usage]).modules, [.systemStats, .usage])
+        XCTAssertEqual(ReadOnlyDeckSelection.resolved(preferred: PanelModuleID.network.current,
+            enabledModules: networkOnly.enabledModules(on: .right)), .systemStats)
+        XCTAssertFalse(PanelModuleID.builtIns.contains(.network))
     }
 
     func testDeckConfigurationAdaptsExistingPlacementAndVisibility() {
@@ -43,7 +72,7 @@ final class PanelAppearanceTests: XCTestCase {
             configuration.left,
             [
                 .usage, .systemStats, .serviceMonitor, .weather, .schedule, .clock, .music,
-                .battery, .network,
+                .battery, .localPorts,
                 .projectPulse,
                 .githubInbox,
                 .docker,
@@ -70,7 +99,7 @@ final class PanelAppearanceTests: XCTestCase {
             decoded.right,
             [
                 .usage, .systemStats, .serviceMonitor, .weather, .schedule, .clock, .music,
-                .battery, .network,
+                .battery, .localPorts,
                 .projectPulse,
                 .githubInbox,
                 .docker,
@@ -92,7 +121,7 @@ final class PanelAppearanceTests: XCTestCase {
             configuration.right,
             [
                 .usage, .serviceMonitor, .weather, .schedule, .clock, .music, .battery,
-                .network,
+                .localPorts,
                 .projectPulse,
                 .githubInbox,
                 .docker,
@@ -165,7 +194,7 @@ final class PanelAppearanceTests: XCTestCase {
             model.values.deckConfiguration.left,
             [
                 .usage, .systemStats, .serviceMonitor, .weather, .schedule, .clock, .music,
-                .battery, .network,
+                .battery, .localPorts,
                 .projectPulse,
                 .githubInbox,
                 .docker,
@@ -262,6 +291,7 @@ final class PanelAppearanceTests: XCTestCase {
         XCTAssertNil(picker.selection)
         let settings = makeSettingsModel(configuration: configuration)
         XCTAssertEqual(settings.sidebarSections(matching: "selected city").flatMap(\.panes), [.weather])
+        XCTAssertEqual(settings.sidebarSections(matching: L10n.text("Weather")).flatMap(\.panes), [.weather])
         XCTAssertTrue(settings.sidebarSections(matching: "absentword").isEmpty)
     }
 
@@ -276,7 +306,7 @@ final class PanelAppearanceTests: XCTestCase {
             model.moduleDefinitions.map(\.id),
             [
                 .battery, .terminal, .usage,
-                .customTile, .customTile2, .customTile3, .docker, .focusTimer, .githubInbox, .music, .network,
+                .customTile, .customTile2, .customTile3, .docker, .focusTimer, .githubInbox, .localPorts, .music,
                 .projectPulse, .schedule, .serviceMonitor, .systemStats, .weather, .clock,
             ])
         XCTAssertEqual(
@@ -369,8 +399,8 @@ final class PanelAppearanceTests: XCTestCase {
         XCTAssertEqual(
             model.availablePanes,
             [
-                .decks, .notifications, .diagnostics, .terminal, .usage, .battery,
-                .customTile, .customTile2, .customTile3, .docker, .focusTimer, .githubInbox, .music, .network,
+                .decks, .quickActions, .startup, .notifications, .diagnostics, .terminal, .usage, .battery,
+                .customTile, .customTile2, .customTile3, .docker, .focusTimer, .githubInbox, .localPorts, .music,
                 .projectPulse, .schedule, .serviceMonitor, .systemStats, .weather,
                 .clock, .appearance,
             ])
@@ -382,14 +412,14 @@ final class PanelAppearanceTests: XCTestCase {
         XCTAssertEqual(model.moduleDefinition(for: .clock)?.id, .clock)
         XCTAssertEqual(model.moduleDefinition(for: .music)?.id, .music)
         XCTAssertEqual(model.moduleDefinition(for: .battery)?.id, .battery)
-        XCTAssertEqual(model.moduleDefinition(for: .network)?.id, .network)
+        XCTAssertEqual(model.moduleDefinition(for: .localPorts)?.id, .localPorts)
         XCTAssertEqual(model.moduleDefinition(for: .projectPulse)?.id, .projectPulse)
         XCTAssertEqual(model.moduleDefinition(for: .githubInbox)?.id, .githubInbox)
         XCTAssertEqual(model.moduleDefinition(for: .docker)?.id, .docker)
         XCTAssertEqual(model.moduleDefinition(for: .customTile)?.id, .customTile)
         XCTAssertEqual(model.moduleDefinition(for: .focusTimer)?.id, .focusTimer)
         XCTAssertEqual(model.sidebarSections.map(\.id), [.general, .modules, .interface])
-        XCTAssertEqual(model.sidebarSections[0].panes, [.decks, .notifications, .diagnostics])
+        XCTAssertEqual(model.sidebarSections[0].panes, [.decks, .quickActions, .startup, .notifications, .diagnostics])
         XCTAssertEqual(
             model.sidebarSections[1].panes,
             model.moduleDefinitions.compactMap(\.settingsPane))
@@ -446,13 +476,13 @@ final class PanelAppearanceTests: XCTestCase {
 
     func testDiagnosticCommandRunnerReportsExitStatus() {
         XCTAssertEqual(
-            DiagnosticCommandRunner.exitsSuccessfully(
+            DiagnosticCommandRunner.run(
                 URL(fileURLWithPath: "/usr/bin/true"), arguments: []),
-            true)
+            .ready)
         XCTAssertEqual(
-            DiagnosticCommandRunner.exitsSuccessfully(
+            DiagnosticCommandRunner.run(
                 URL(fileURLWithPath: "/usr/bin/false"), arguments: []),
-            false)
+            .nonZeroExit)
     }
 
     func testDiagnosticCommandRunnerResolvesSiblingRuntime() throws {
@@ -470,9 +500,9 @@ final class PanelAppearanceTests: XCTestCase {
             [.posixPermissions: 0o700], ofItemAtPath: wrapper.path)
 
         XCTAssertEqual(
-            DiagnosticCommandRunner.exitsSuccessfully(
+            DiagnosticCommandRunner.run(
                 wrapper, arguments: [], environment: ["PATH": "/usr/bin:/bin"]),
-            true)
+            .ready)
     }
 
     func testModuleRuntimeCoordinatorStartsAndStopsOnlyChangedModules() {
@@ -1083,6 +1113,18 @@ final class PanelAppearanceTests: XCTestCase {
         XCTAssertGreaterThan(bitmap.pixelsHigh, 0)
     }
 
+    func testProjectFolderOpeningUsesExistingDirectoriesAsNativeURLs() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("DockDeck folder \(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        XCTAssertEqual(TerminalProjectFolder.existingURL(directory.path), directory)
+        let file = directory.appendingPathComponent("file")
+        try Data().write(to: file)
+        XCTAssertNil(TerminalProjectFolder.existingURL(file.path))
+        XCTAssertNil(TerminalProjectFolder.existingURL("relative/path"))
+        XCTAssertNil(TerminalProjectFolder.existingURL(directory.path + "\0"))
+    }
+
     func testShellRestartPolicyStopsARepeatedExitLoop() {
         var policy = ShellRestartPolicy()
         let start = Date(timeIntervalSince1970: 100)
@@ -1192,9 +1234,9 @@ final class PanelAppearanceTests: XCTestCase {
         let detail = try XCTUnwrap(controller.detailWindowForTesting)
 
         XCTAssertEqual(detail.contentMinSize, ReadOnlyModuleDetailLayout.minimumSize)
-        XCTAssertEqual(detail.title, "DockDeck — Usage")
+        XCTAssertEqual(detail.title, "DockDeck — " + L10n.text("Usage"))
         controller.select(.weather)
-        XCTAssertEqual(detail.title, "DockDeck — Weather")
+        XCTAssertEqual(detail.title, "DockDeck — " + L10n.text("Weather"))
         detail.close()
     }
 
@@ -1279,7 +1321,6 @@ final class PanelAppearanceTests: XCTestCase {
             clock: ClockSettingsState(
                 timeZoneIdentifier: ClockTimeZone.systemIdentifier, hourFormat: .system),
             battery: BatterySettingsState(refreshInterval: 60),
-            network: NetworkSettingsState(refreshInterval: 2),
             projectPulse: ProjectPulseConfiguration(),
             githubInbox: GitHubInboxConfiguration(),
             docker: DockerConfiguration(),

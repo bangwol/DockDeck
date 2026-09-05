@@ -50,7 +50,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     lazy var clockStore = ClockStore()
     lazy var musicStore = MusicStore()
     lazy var batteryStore = BatteryStore()
-    lazy var networkStore = NetworkStore()
     lazy var projectPulseStore = ProjectPulseStore()
     lazy var githubInboxStore = GitHubInboxStore()
     lazy var dockerStore = DockerStore()
@@ -74,7 +73,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         clock: clockStore,
         music: musicStore,
         battery: batteryStore,
-        network: networkStore,
         projectPulse: projectPulseStore,
         githubInbox: githubInboxStore,
         docker: dockerStore,
@@ -107,6 +105,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     var currentTheme = Theme.theme(
         id: UserDefaults.standard.string(forKey: AppPreferences.themeIDKey) ?? "")
     var themePickerPanel: KeyablePanel?
+    lazy var quickActions = QuickActionStore()
+    lazy var loginItem = LoginItemStore()
+    let loginMenuItem = NSMenuItem(title: L10n.text("Launch at Login"), action: #selector(toggleLoginItem(_:)), keyEquivalent: "")
+    let quickActionsMenu = NSMenu(title: L10n.text("Quick Actions"))
+    lazy var deckProfiles = DeckProfileStore()
+    let deckProfilesMenu = NSMenu(title: L10n.text("Deck Profiles"))
+    var retainsTerminalForProfile = false
     var settingsPanel: KeyablePanel?
     var modulePickerController: ModulePickerController?
     var settingsPanelRestoresTerminalFocus = false
@@ -318,6 +323,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         trackingTimer?.invalidate()
         deckAutoSlideTimer?.invalidate()
         moduleRuntimeCoordinator.stopAll()
+        BoundedProcessLifetime.shared.shutdown()
         notificationCancellables.removeAll()
     }
 
@@ -367,8 +373,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         let processInfo = ProcessInfo.processInfo
         let systemActive = usageDisplayAwake && usageSessionActive
+        var enabledModules = PanelSettings.deckConfiguration.enabled
+        if enabledModules.contains(.terminal) { retainsTerminalForProfile = false }
+        if retainsTerminalForProfile { enabledModules.append(.terminal) }
         moduleRuntimeCoordinator.synchronize(
-            enabledModules: PanelSettings.deckConfiguration.enabled,
+            enabledModules: enabledModules,
             visibleModules: visibleModules,
             lowPowerMode: ModuleRuntimePolicy.isConstrained(
                 lowPowerMode: processInfo.isLowPowerModeEnabled,

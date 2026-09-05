@@ -193,12 +193,12 @@ enum CustomTileOutputParser {
 }
 
 protocol CustomTileReading {
-    func read(configuration: CustomTileConfiguration, now: Date) throws -> CustomTileSnapshot
+    func read(configuration: CustomTileConfiguration, now: Date, cancellation: Progress?) throws -> CustomTileSnapshot
 }
 
 struct CustomTileClient: CustomTileReading {
     func read(
-        configuration: CustomTileConfiguration, now: Date
+        configuration: CustomTileConfiguration, now: Date, cancellation: Progress? = nil
     ) throws -> CustomTileSnapshot {
         let configuration = configuration.normalized()
         guard configuration.isConfigured else { throw CustomTileError.notConfigured }
@@ -232,7 +232,8 @@ struct CustomTileClient: CustomTileReading {
                 currentDirectoryURL: FileManager.default.homeDirectoryForCurrentUser,
                 environmentAdditions: ["NO_COLOR": "1", "TERM": "dumb"],
                 timeout: 5,
-                maximumOutputBytes: CustomTileOutputParser.maximumOutputBytes)
+                maximumOutputBytes: CustomTileOutputParser.maximumOutputBytes,
+                cancellation: cancellation, diagnosticSource: .customTile)
         } catch BoundedProcessError.timedOut {
             throw CustomTileError.commandTimedOut
         } catch BoundedProcessError.outputTooLarge {
@@ -258,6 +259,7 @@ final class CustomTileStore: ObservableObject {
     private var delayedRefresh: DispatchWorkItem?
     private var isRunning = false
     private var requestID: UUID?
+    private var cancellation: Progress?
     private var generation = 0
     private var refreshCadence = ModuleRefreshCadence(backgroundMultiplier: 3)
 
@@ -302,6 +304,8 @@ final class CustomTileStore: ObservableObject {
         refresh(allowsStopped: true)
     }
 
+    deinit { timer?.invalidate(); cancellation?.cancel(); delayedRefresh?.cancel() }
+
     func start() {
         guard !isRunning else { return }
         isRunning = true
@@ -313,6 +317,7 @@ final class CustomTileStore: ObservableObject {
         guard isRunning || timer != nil || delayedRefresh != nil || requestID != nil else { return }
         isRunning = false
         generation += 1
+        cancellation?.cancel()
         timer?.invalidate()
         timer = nil
         delayedRefresh?.cancel()
@@ -326,6 +331,7 @@ final class CustomTileStore: ObservableObject {
         snapshot = nil
         status = configuration.isConfigured ? .loading : .notConfigured
         generation += 1
+        cancellation?.cancel()
         guard isRunning else { return }
         scheduleTimer()
         delayedRefresh?.cancel()
@@ -357,19 +363,22 @@ final class CustomTileStore: ObservableObject {
         let generation = generation
         let configuration = configuration
         self.requestID = requestID
+        let cancellation = Progress(totalUnitCount: 1)
+        self.cancellation = cancellation
+        let reader = reader
         if snapshot == nil || allowsStopped { status = .loading }
 
         queue.async { [weak self] in
-            guard let self else { return }
             let result = Result {
-                try self.reader.read(configuration: configuration, now: Date())
+                try reader.read(configuration: configuration, now: Date(), cancellation: cancellation)
             }
-            DispatchQueue.main.async {
-                guard self.requestID == requestID else { return }
+            DispatchQueue.main.async { [weak self] in
+                guard let self, self.requestID == requestID else { return }
                 self.requestID = nil
+                self.cancellation = nil
                 guard self.isRunning || allowsStopped else { return }
                 guard self.generation == generation else {
-                    self.refresh()
+                    if self.delayedRefresh == nil { self.refresh() }
                     return
                 }
                 switch result {

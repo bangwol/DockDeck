@@ -4,6 +4,7 @@ import Foundation
 enum BoundedProcessError: Error, Equatable {
     case launchFailed
     case timedOut
+    case cancelled
     case outputTooLarge
     case nonZeroExit(Int32)
 }
@@ -19,9 +20,31 @@ enum BoundedProcessRunner {
         environmentAdditions: [String: String] = [:],
         timeout: TimeInterval = 8,
         maximumOutputBytes: Int = defaultMaximumOutputBytes,
-        allowedExitStatuses: Set<Int32> = [0]
+        allowedExitStatuses: Set<Int32> = [0],
+        cancellation: Progress? = nil,
+        diagnosticSource: ProcessDiagnosticSource = .other,
+        lifetime: BoundedProcessLifetime = .shared
     ) throws -> Data {
+        let started = ProcessInfo.processInfo.systemUptime
+        var failure: BoundedProcessError? = .launchFailed
+        defer {
+            ProcessDiagnostics.shared.record(source: diagnosticSource,
+                duration: ProcessInfo.processInfo.systemUptime - started, failure: failure)
+        }
+        guard cancellation?.isCancelled != true else {
+            failure = .cancelled
+            throw BoundedProcessError.cancelled
+        }
+        let wake = DispatchSemaphore(value: 0)
+        let terminated = DispatchSemaphore(value: 0)
+        cancellation?.cancellationHandler = { wake.signal() }
+        defer { cancellation?.cancellationHandler = nil }
         let process = Process()
+        guard lifetime.register(process) else {
+            failure = .cancelled
+            throw BoundedProcessError.cancelled
+        }
+        defer { lifetime.remove(process) }
         let outputPipe = Pipe()
         let errorPipe = Pipe()
         process.executableURL = executableURL
@@ -38,12 +61,12 @@ enum BoundedProcessRunner {
             outputHandle: outputPipe.fileHandleForReading,
             errorHandle: errorPipe.fileHandleForReading,
             capture: capture,
-            onLimitExceeded: { [weak process] in
-                if process?.isRunning == true { process?.terminate() }
-            })
+            onLimitExceeded: { wake.signal() })
 
-        let terminated = DispatchSemaphore(value: 0)
-        process.terminationHandler = { _ in terminated.signal() }
+        process.terminationHandler = { _ in
+            terminated.signal()
+            wake.signal()
+        }
         do {
             try process.run()
         } catch {
@@ -55,24 +78,74 @@ enum BoundedProcessRunner {
         outputPipe.fileHandleForWriting.closeFile()
         errorPipe.fileHandleForWriting.closeFile()
 
-        if terminated.wait(timeout: .now() + max(timeout, 0.1)) == .timedOut {
-            stop(process, terminated: terminated)
-            collector.finish()
-            throw BoundedProcessError.timedOut
+        let waitResult = cancellation?.isCancelled == true
+            ? DispatchTimeoutResult.success : wake.wait(timeout: .now() + max(timeout, 0.1))
+        if cancellation?.isCancelled == true || lifetime.isShuttingDown {
+            failure = .cancelled
+        } else if capture.exceededLimit {
+            failure = .outputTooLarge
+        } else if waitResult == .timedOut {
+            failure = .timedOut
+        } else {
+            failure = nil
         }
+        if failure != nil { stop(process, terminated: terminated) }
         collector.finish()
-        guard !capture.exceededLimit else { throw BoundedProcessError.outputTooLarge }
+        if let failure { throw failure }
+        if capture.exceededLimit {
+            failure = .outputTooLarge
+            throw BoundedProcessError.outputTooLarge
+        }
         guard allowedExitStatuses.contains(process.terminationStatus) else {
+            failure = .nonZeroExit(process.terminationStatus)
             throw BoundedProcessError.nonZeroExit(process.terminationStatus)
         }
         return capture.output
     }
 
     private static func stop(_ process: Process, terminated: DispatchSemaphore) {
+        guard process.isRunning else { return }
         process.terminate()
         if terminated.wait(timeout: .now() + 1) == .timedOut {
-            kill(process.processIdentifier, SIGKILL)
+            if process.isRunning { kill(process.processIdentifier, SIGKILL) }
             _ = terminated.wait(timeout: .now() + 1)
+        }
+    }
+}
+
+// App termination must wait for owned commands; Progress handlers are asynchronous.
+final class BoundedProcessLifetime {
+    static let shared = BoundedProcessLifetime()
+    private let lock = NSLock()
+    private var stopping = false
+    private var processes: [ObjectIdentifier: Process] = [:]
+    var isShuttingDown: Bool { lock.withLock { stopping } }
+
+    func register(_ process: Process) -> Bool {
+        lock.withLock {
+            guard !stopping else { return false }
+            processes[ObjectIdentifier(process)] = process
+            return true
+        }
+    }
+
+    func remove(_ process: Process) { _ = lock.withLock { processes.removeValue(forKey: ObjectIdentifier(process)) } }
+
+    func shutdown() {
+        lock.withLock { stopping = true }
+        var signalled: Set<ObjectIdentifier> = []
+        let started = ProcessInfo.processInfo.systemUptime
+        while ProcessInfo.processInfo.systemUptime - started < 2 {
+            let active = lock.withLock { Array(processes.values) }
+            if active.isEmpty { return }
+            for process in active where process.isRunning {
+                if ProcessInfo.processInfo.systemUptime - started >= 1 {
+                    kill(process.processIdentifier, SIGKILL)
+                } else if signalled.insert(ObjectIdentifier(process)).inserted {
+                    process.terminate()
+                }
+            }
+            Thread.sleep(forTimeInterval: 0.01)
         }
     }
 }
@@ -180,6 +253,8 @@ private final class BoundedProcessCollector {
                 let exceeded = capturesOutput
                     ? capture.appendOutput(data) : capture.appendError(data)
                 if exceeded { onLimitExceeded() }
+                // A continuous writer must not hold the collector queue past its limit.
+                if capture.exceededLimit { return true }
             } else if count == -1, errno == EINTR {
                 continue
             } else {

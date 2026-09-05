@@ -3,6 +3,8 @@ import Combine
 
 enum SettingsPaneID: String, CaseIterable, Identifiable {
     case decks
+    case quickActions
+    case startup
     case notifications
     case diagnostics
     case terminal
@@ -14,7 +16,7 @@ enum SettingsPaneID: String, CaseIterable, Identifiable {
     case clock
     case music
     case battery
-    case network
+    case localPorts
     case projectPulse
     case githubInbox
     case docker
@@ -26,8 +28,13 @@ enum SettingsPaneID: String, CaseIterable, Identifiable {
 
     var id: Self { self }
 
-    var title: String {
+    var title: String { L10n.text(titleKey) }
+    var subtitle: String { L10n.text(subtitleKey) }
+
+    var titleKey: String {
         switch self {
+        case .quickActions: "Quick Actions"
+        case .startup: "Startup"
         case .decks: "Decks"
         case .notifications: "Notifications"
         case .diagnostics: "Diagnostics"
@@ -40,7 +47,7 @@ enum SettingsPaneID: String, CaseIterable, Identifiable {
         case .clock: "World Clock"
         case .music: "Music"
         case .battery: "Battery"
-        case .network: "Network"
+        case .localPorts: "Local Ports"
         case .projectPulse: "Project Pulse"
         case .githubInbox: "GitHub Inbox"
         case .docker: "Docker"
@@ -52,8 +59,10 @@ enum SettingsPaneID: String, CaseIterable, Identifiable {
         }
     }
 
-    var subtitle: String {
+    var subtitleKey: String {
         switch self {
+        case .quickActions: "Open saved apps, folders, web pages, or Shortcuts."
+        case .startup: "Control whether DockDeck starts when you log in."
         case .decks: "Choose which modules appear beside the Dock."
         case .notifications: "Choose which local events can alert you."
         case .diagnostics: "Check local tools, permissions, sensors, and connectivity."
@@ -66,7 +75,7 @@ enum SettingsPaneID: String, CaseIterable, Identifiable {
         case .clock: "Show local time or another time zone."
         case .music: "Control the macOS Music app."
         case .battery: "Show charge, power state, and time left."
-        case .network: "Show local download and upload throughput."
+        case .localPorts: "Check local development server TCP ports."
         case .projectPulse: "Show local Git or remote GitHub repository activity."
         case .githubInbox: "Summarize account notifications, reviews, and Actions failures."
         case .docker: "Show local container health and resource use."
@@ -78,6 +87,8 @@ enum SettingsPaneID: String, CaseIterable, Identifiable {
 
     var symbolName: String {
         switch self {
+        case .quickActions: "bolt"
+        case .startup: "power"
         case .decks: "rectangle.stack"
         case .notifications: "bell.badge"
         case .diagnostics: "stethoscope"
@@ -90,7 +101,7 @@ enum SettingsPaneID: String, CaseIterable, Identifiable {
         case .clock: "clock"
         case .music: "music.note"
         case .battery: "battery.75percent"
-        case .network: "network"
+        case .localPorts: "network.badge.shield.half.filled"
         case .projectPulse: "point.3.connected.trianglepath.dotted"
         case .githubInbox: "bell.badge"
         case .docker: "shippingbox"
@@ -108,6 +119,7 @@ struct PanelModuleDefinition: Identifiable, Equatable {
     let subtitle: String
     let symbolName: String
     let settingsPane: SettingsPaneID?
+    var displayTitle: String { L10n.text(title) }
 }
 
 enum SettingsSidebarSectionID: String {
@@ -152,8 +164,8 @@ enum PanelModuleRegistry {
             id: .battery, title: "Battery", subtitle: "Charge and power state",
             symbolName: "battery.75percent", settingsPane: .battery),
         PanelModuleDefinition(
-            id: .network, title: "Network", subtitle: "Download and upload rates",
-            symbolName: "network", settingsPane: .network),
+            id: .localPorts, title: "Local Ports", subtitle: "Loopback TCP reachability",
+            symbolName: "network", settingsPane: .localPorts),
         PanelModuleDefinition(
             id: .projectPulse, title: "Project Pulse", subtitle: "Git and GitHub activity",
             symbolName: "point.3.connected.trianglepath.dotted", settingsPane: .projectPulse),
@@ -205,6 +217,7 @@ struct UsageSettingsState: Equatable {
 struct SystemStatsSettingsState: Equatable {
     var refreshInterval: TimeInterval
     var metrics: [SystemStatsMetric]
+    var networkInterfaceName: String = ""
 }
 
 struct ServiceMonitorSettingsState: Equatable {
@@ -236,11 +249,6 @@ struct BatterySettingsState: Equatable {
     var refreshInterval: TimeInterval
 }
 
-struct NetworkSettingsState: Equatable {
-    var refreshInterval: TimeInterval
-    var interfaceName: String = ""
-}
-
 struct AppearanceSettingsState: Equatable {
     var cornerRadius: CGFloat
     var tintOpacity: CGFloat
@@ -258,7 +266,6 @@ struct SettingsPanelValues: Equatable {
     var schedule: ScheduleSettingsState
     var clock: ClockSettingsState
     var battery: BatterySettingsState
-    var network: NetworkSettingsState
     var projectPulse: ProjectPulseConfiguration
     var githubInbox: GitHubInboxConfiguration
     var docker: DockerConfiguration
@@ -266,6 +273,7 @@ struct SettingsPanelValues: Equatable {
     var focusTimer: FocusTimerSettings
     var appearance: AppearanceSettingsState
     var extraCustomTiles: [PanelModuleID: CustomTileConfiguration] = [:]
+    var localPorts: LocalPortsConfiguration = .init()
 
     func normalized() -> Self {
         var values = self
@@ -279,6 +287,7 @@ struct SettingsPanelValues: Equatable {
         values.extraCustomTiles = extraCustomTiles.filter {
             PanelModuleID.extraCustomTiles.contains($0.key)
         }.mapValues { $0.normalized() }
+        values.localPorts = localPorts.normalized()
         values.focusTimer = focusTimer.normalized()
         return values
     }
@@ -302,6 +311,7 @@ enum UsageSettingsChange {
 enum SystemStatsSettingsChange {
     case refreshInterval(TimeInterval)
     case metrics([SystemStatsMetric])
+    case networkInterfaceName(String)
 }
 
 enum ServiceMonitorSettingsChange {
@@ -333,11 +343,6 @@ enum BatterySettingsChange {
     case refreshInterval(TimeInterval)
 }
 
-enum NetworkSettingsChange {
-    case interfaceName(String)
-    case refreshInterval(TimeInterval)
-}
-
 enum ProjectPulseSettingsChange {
     case configuration(ProjectPulseConfiguration)
 }
@@ -362,6 +367,7 @@ enum AppearanceSettingsChange {
 enum SettingsPanelChange {
     case deck(PanelDeckConfiguration)
     case deckAutoSlide(DeckAutoSlideSettings)
+    case localPorts(LocalPortsConfiguration)
     case notifications(DockNotificationSettings)
     case terminal(TerminalSettingsChange)
     case usage(UsageSettingsChange)
@@ -371,7 +377,6 @@ enum SettingsPanelChange {
     case schedule(ScheduleSettingsChange)
     case clock(ClockSettingsChange)
     case battery(BatterySettingsChange)
-    case network(NetworkSettingsChange)
     case projectPulse(ProjectPulseSettingsChange)
     case githubInbox(GitHubInboxSettingsChange)
     case docker(DockerSettingsChange)

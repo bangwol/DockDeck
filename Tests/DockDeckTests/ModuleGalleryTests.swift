@@ -16,11 +16,47 @@ final class ModuleGalleryTests: XCTestCase {
         try FileManager.default.createDirectory(
             at: outputURL, withIntermediateDirectories: true)
         let services = makeServices()
+        let profilesURL = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString).appendingPathComponent("profiles.json")
+        defer { try? FileManager.default.removeItem(at: profilesURL.deletingLastPathComponent()) }
+        let actionsSuite = "DockDeckTests.gallery.actions." + UUID().uuidString
+        let actionsDefaults = try XCTUnwrap(UserDefaults(suiteName: actionsSuite))
+        defer { actionsDefaults.removePersistentDomain(forName: actionsSuite) }
+        let actions = QuickActionStore(defaults: actionsDefaults)
+        try actions.save([
+            .init(name: "Calendar", kind: .app, target: "/System/Applications/Calendar.app"),
+            .init(name: "Work Folder", kind: .folder, target: "/tmp/work"),
+            .init(name: "Documentation", kind: .webpage, target: "https://example.com"),
+            .init(name: "Work Mode", kind: .shortcut, target: "Work mode"),
+        ])
+        let profiles = DeckProfileStore(url: profilesURL)
+        try profiles.save(name: "Development", configuration: .legacy(order: .terminalLeft, enabledPanels: .all), autoSlide: .init())
+        try profiles.save(name: "Focus", configuration: .init(left: [.focusTimer], right: [.clock], enabled: [.focusTimer, .clock]), autoSlide: .init())
+        let login = LoginItemStore(service: GalleryLoginItem())
+        ProcessDiagnostics.shared.record(source: .customTile, duration: 0.024, failure: .cancelled)
+        let diagnostics = DiagnosticsStore(checker: { [] })
 
         for (themeName, theme) in [
             ("dark", Theme.theme(id: "")),
             ("light", Theme.theme(id: "github-light")),
         ] {
+            try render(StartupSettingsView(store: login).background(Color(nsColor: .windowBackgroundColor)),
+                size: NSSize(width: 650, height: 460), dark: theme.isDark,
+                to: outputURL.appendingPathComponent("\(themeName)-startup.png"))
+            try render(DiagnosticsSettingsView(store: diagnostics).background(Color(nsColor: .windowBackgroundColor)),
+                size: NSSize(width: 650, height: 650), dark: theme.isDark,
+                to: outputURL.appendingPathComponent("\(themeName)-diagnostics.png"))
+            try render(QuickActionsSettingsView(store: actions).background(Color(nsColor: .windowBackgroundColor)),
+                size: NSSize(width: 650, height: 460), dark: theme.isDark,
+                to: outputURL.appendingPathComponent("\(themeName)-quick-actions.png"))
+            try render(DeckProfileControls(store: profiles).padding(24).background(Color(nsColor: .windowBackgroundColor)),
+                size: NSSize(width: 650, height: 330), dark: theme.isDark,
+                to: outputURL.appendingPathComponent("\(themeName)-deck-profiles.png"))
+            for module in PanelModuleID.readOnlyBuiltIns {
+                try render(ReadOnlyDeckPanelView(readabilityOverride: true, services: services,
+                    presentation: ReadOnlyDeckPresentation(activeModule: module, theme: theme)),
+                    size: NSSize(width: 214, height: 59), dark: theme.isDark,
+                    to: outputURL.appendingPathComponent("\(themeName)-readable-\(module.rawValue).png"))
+            }
             for module in PanelModuleID.readOnlyBuiltIns {
                 let presentation = ReadOnlyDeckPresentation(
                     activeModule: module, theme: theme)
@@ -42,6 +78,11 @@ final class ModuleGalleryTests: XCTestCase {
                     dark: theme.isDark,
                     to: outputURL.appendingPathComponent(
                         "\(themeName)-detail-\(module.rawValue).png"))
+                if module == .systemStats {
+                    try render(ReadOnlyModuleDetailView(services: services, presentation: presentation),
+                        size: NSSize(width: 560, height: 660), dark: theme.isDark,
+                        to: outputURL.appendingPathComponent("\(themeName)-system-stats-full.png"))
+                }
                 if module == .clock {
                     try render(ClockModuleDetailView(store: services.clock,
                         timeZoneIdentifier: "Asia/Seoul", hourFormat: .twentyFourHour,
@@ -105,13 +146,24 @@ final class ModuleGalleryTests: XCTestCase {
                 ],
                 freshness: .live, detail: nil),
         ])
+        var networkSample: UInt64 = 0
+        let network = NetworkStore(
+            initialConnection: NetworkConnectionSnapshot(
+                status: .online, kind: .wifi, isExpensive: false, isConstrained: false),
+            interfaceName: "en0", counterReader: { _ in
+                networkSample += 1
+                return NetworkCounters(interfaceName: "en0",
+                    receivedBytes: networkSample * networkSample * 600_000,
+                    sentBytes: networkSample * networkSample * 90_000)
+            })
+        for offset in [-2.0, -1.0, 0.0] { network.refresh(now: now.addingTimeInterval(offset)) }
         let stats = SystemStatsStore(
-            metrics: [.cpu, .memory, .network, .thermal],
+            metrics: [.cpu, .memory, .network, .gpu],
             initialSnapshot: SystemStatsSnapshot(
-                cpuPercent: 18, memoryPercent: 72,
+                gpuPercent: 37, cpuPercent: 18, memoryPercent: 72,
                 downloadBytesPerSecond: 2_400_000,
                 uploadBytesPerSecond: 360_000,
-                temperatureCelsius: 54, thermalPressure: .nominal))
+                temperatureCelsius: 54, thermalPressure: .nominal), network: network)
         let service = ServiceMonitorStore(endpoints: [
             ServiceMonitorEndpoint(name: "API", urlString: "https://example.com"),
             ServiceMonitorEndpoint(name: "Web", urlString: "https://example.org"),
@@ -162,17 +214,6 @@ final class ModuleGalleryTests: XCTestCase {
                     webURL: URL(string: "https://github.com/example/DockDeck/issues/18")),
             ],
             observedAt: now)
-        var networkSample: UInt64 = 0
-        let network = NetworkStore(
-            initialConnection: NetworkConnectionSnapshot(
-                status: .online, kind: .wifi, isExpensive: false, isConstrained: false),
-            interfaceName: "en0", counterReader: { _ in
-                networkSample += 1
-                return NetworkCounters(interfaceName: "en0",
-                    receivedBytes: networkSample * networkSample * 600_000,
-                    sentBytes: networkSample * networkSample * 90_000)
-            })
-        for offset in [-2.0, -1.0, 0.0] { network.refresh(now: now.addingTimeInterval(offset)) }
         return PanelModuleServices(
             usage: usage,
             systemStats: stats,
@@ -191,7 +232,11 @@ final class ModuleGalleryTests: XCTestCase {
             battery: BatteryStore(
                 initialSnapshot: BatterySnapshot(
                     percent: 76, state: .discharging, minutesRemaining: 310)),
-            network: network,
+            localPorts: LocalPortsStore(initialItems: [
+                .init(port: 3000, state: .open), .init(port: 5173, state: .closed),
+                .init(port: 8080, state: .unavailable("Permission denied while checking the local port.")),
+                .init(port: 5432, state: .closed), .init(port: 65535, state: .open),
+            ]),
             projectPulse: ProjectPulseStore(
                 configuration: ProjectPulseConfiguration(
                     source: .github, githubRepository: "example/DockDeck"),
@@ -267,4 +312,10 @@ private final class GalleryScheduleProvider: ScheduleEventProviding {
                     listTitle: "Tasks"),
             ]))
     }
+}
+
+private struct GalleryLoginItem: LoginItemControlling {
+    var status: LoginItemStatus { .requiresApproval }
+    func register() throws { throw CocoaError(.featureUnsupported) }
+    func unregister() throws { throw CocoaError(.featureUnsupported) }
 }

@@ -5,6 +5,36 @@ import XCTest
 @testable import DockDeck
 
 final class NetworkTests: XCTestCase {
+    func testSystemStatsOwnsSingleNetworkSampleAndObserverLifetime() {
+        let observer = FakeNetworkPathObserver(snapshot: .unknown)
+        var reads: UInt64 = 0
+        let network = NetworkStore(pathObserver: observer, interfaceName: "en0", counterReader: { name in
+            reads += 1
+            return NetworkCounters(interfaceName: name ?? "en0", receivedBytes: reads * 100, sentBytes: reads * 50)
+        })
+        let stats = SystemStatsStore(metrics: [.cpu, .network], network: network)
+        stats.start()
+        stats.start()
+        XCTAssertEqual(reads, 1)
+        XCTAssertEqual(observer.startCount, 1)
+        stats.refresh(now: Date().addingTimeInterval(1))
+        XCTAssertEqual(reads, 2)
+        XCTAssertEqual(stats.snapshot.downloadBytesPerSecond, network.snapshot?.downloadBytesPerSecond)
+        XCTAssertEqual(stats.history(for: .network).samples.count, 1)
+        stats.setNetworkInterfaceName("utun0")
+        XCTAssertEqual(reads, 3)
+        XCTAssertNil(stats.snapshot.downloadBytesPerSecond)
+        XCTAssertTrue(stats.history(for: .network).samples.isEmpty)
+        XCTAssertTrue(network.downloadHistory.samples.isEmpty)
+        stats.setMetrics([.cpu, .memory])
+        stats.refresh()
+        XCTAssertEqual(reads, 3)
+        XCTAssertEqual(observer.stopCount, 1)
+        stats.stop()
+        stats.stop()
+        XCTAssertEqual(observer.stopCount, 1)
+    }
+
     func testChangingInterfaceResetsBaselineAndHistory() {
         var bytes: UInt64 = 100
         let store = NetworkStore(interfaceName: "", counterReader: { name in
@@ -80,7 +110,7 @@ final class NetworkTests: XCTestCase {
         let connection = NetworkConnectionSnapshot(
             status: .online, kind: .wifi, isExpensive: false, isConstrained: true)
         let observer = FakeNetworkPathObserver(snapshot: connection)
-        let store = NetworkStore(refreshInterval: 2, pathObserver: observer)
+        let store = NetworkStore(pathObserver: observer)
 
         store.start()
 
@@ -92,7 +122,6 @@ final class NetworkTests: XCTestCase {
 
     func testPanelRendersAtCompactSize() throws {
         let store = NetworkStore(
-            refreshInterval: 2,
             initialSnapshot: NetworkSnapshot(
                 interfaceName: "en0",
                 downloadBytesPerSecond: 1_572_864,
@@ -102,7 +131,9 @@ final class NetworkTests: XCTestCase {
                 isExpensive: false, isConstrained: false))
         let size = NSSize(width: 214, height: 59)
         let view = NSHostingView(
-            rootView: NetworkPanelView(store: store, theme: Theme.theme(id: "")))
+            rootView: SystemStatsPanelView(store: SystemStatsStore(metrics: [.cpu, .network],
+                initialSnapshot: SystemStatsSnapshot(downloadBytesPerSecond: 1_572_864,
+                    uploadBytesPerSecond: 430_080), network: store), theme: Theme.theme(id: "")))
         view.frame = NSRect(origin: .zero, size: size)
         view.layoutSubtreeIfNeeded()
 

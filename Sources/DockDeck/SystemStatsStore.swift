@@ -7,6 +7,7 @@ enum SystemStatsMetric: String, CaseIterable, Codable, Identifiable {
     case disk
     case network
     case thermal
+    case gpu
 
     static let minimumSelectionCount = 2
     static let maximumSelectionCount = 4
@@ -17,6 +18,7 @@ enum SystemStatsMetric: String, CaseIterable, Codable, Identifiable {
     var title: String {
         switch self {
         case .cpu: "CPU"
+        case .gpu: "GPU"
         case .memory: "Memory"
         case .disk: "Disk"
         case .network: "Network I/O"
@@ -27,6 +29,7 @@ enum SystemStatsMetric: String, CaseIterable, Codable, Identifiable {
     var compactTitle: String {
         switch self {
         case .cpu: "CPU"
+        case .gpu: "GPU"
         case .memory: "MEM"
         case .disk: "DISK"
         case .network: "NET"
@@ -37,6 +40,7 @@ enum SystemStatsMetric: String, CaseIterable, Codable, Identifiable {
     var symbolName: String {
         switch self {
         case .cpu: "cpu"
+        case .gpu: "cpu"
         case .memory: "memorychip"
         case .disk: "internaldrive"
         case .network: "arrow.up.arrow.down"
@@ -103,6 +107,7 @@ enum SystemThermalPressure: String, Equatable {
 }
 
 struct SystemStatsSnapshot: Equatable {
+    var gpuPercent: Double?
     var cpuPercent: Double?
     var memoryPercent: Double?
     var diskPercent: Double?
@@ -114,6 +119,7 @@ struct SystemStatsSnapshot: Equatable {
     static let empty = SystemStatsSnapshot()
 
     init(
+        gpuPercent: Double? = nil,
         cpuPercent: Double? = nil,
         memoryPercent: Double? = nil,
         diskPercent: Double? = nil,
@@ -122,6 +128,7 @@ struct SystemStatsSnapshot: Equatable {
         temperatureCelsius: Double? = nil,
         thermalPressure: SystemThermalPressure? = nil
     ) {
+        self.gpuPercent = gpuPercent
         self.cpuPercent = cpuPercent
         self.memoryPercent = memoryPercent
         self.diskPercent = diskPercent
@@ -161,7 +168,6 @@ private struct SystemStatsReading {
     let memoryTotal: UInt64?
     let diskUsed: UInt64?
     let diskTotal: UInt64?
-    let network: NetworkCounters?
     let thermalPressure: SystemThermalPressure?
 }
 
@@ -174,7 +180,8 @@ final class SystemStatsStore: ObservableObject {
 
     private var timer: Timer?
     private var previousCPU: CPUCounters?
-    private var previousNetwork: (counters: NetworkCounters, date: Date)?
+    let network: NetworkStore
+    private let gpuReader: () -> Double?
     private var cachedTemperatureCelsius: Double?
     private var lastTemperatureAttempt: Date?
     private var temperatureReadInFlight = false
@@ -185,15 +192,22 @@ final class SystemStatsStore: ObservableObject {
     init(
         refreshInterval: TimeInterval = PanelSettings.systemStatsRefreshInterval,
         metrics: [SystemStatsMetric] = PanelSettings.systemStatsMetrics,
-        initialSnapshot: SystemStatsSnapshot = .empty
+        initialSnapshot: SystemStatsSnapshot = .empty,
+        network: NetworkStore = NetworkStore(),
+        gpuReader: @escaping () -> Double? = GPUUsageReader.read
     ) {
         self.refreshInterval = refreshInterval
         selectedMetrics = SystemStatsMetric.normalized(metrics)
         snapshot = initialSnapshot
+        self.network = network
+        self.gpuReader = gpuReader
     }
+
+    deinit { timer?.invalidate(); network.stop() }
 
     func start() {
         guard timer == nil else { return }
+        if selectedMetrics.contains(.network) { network.start() }
         refresh()
         scheduleTimer()
     }
@@ -202,7 +216,7 @@ final class SystemStatsStore: ObservableObject {
         timer?.invalidate()
         timer = nil
         previousCPU = nil
-        previousNetwork = nil
+        network.stop()
         resetTemperatureSampling()
     }
 
@@ -231,8 +245,18 @@ final class SystemStatsStore: ObservableObject {
         selectedMetrics = metrics
         histories = histories.filter { metrics.contains($0.key) }
         if !metrics.contains(.cpu) { previousCPU = nil }
-        if !metrics.contains(.network) { previousNetwork = nil }
+        if !metrics.contains(.network) { network.stop() }
+        else if timer != nil { network.start() }
         if !metrics.contains(.thermal) || !hadTemperature { resetTemperatureSampling() }
+        if timer != nil { refresh() }
+    }
+
+    func setNetworkInterfaceName(_ name: String) {
+        guard NetworkCounterReader.normalizedInterfaceName(name) != network.interfaceName else { return }
+        network.setInterfaceName(name)
+        histories[.network] = nil
+        snapshot.downloadBytesPerSecond = nil
+        snapshot.uploadBytesPerSecond = nil
         if timer != nil { refresh() }
     }
 
@@ -245,29 +269,34 @@ final class SystemStatsStore: ObservableObject {
         }
         previousCPU = reading.cpu
 
-        let networkRates = Self.networkRates(
-            previous: previousNetwork, current: reading.network, now: now)
-        previousNetwork = reading.network.map { (counters: $0, date: now) }
+        let previousInterface = network.snapshot?.interfaceName
+        if metrics.contains(.network) { network.refresh(now: now) }
+        if previousInterface != network.snapshot?.interfaceName { histories[.network] = nil }
+        let download = metrics.contains(.network) ? network.snapshot?.downloadBytesPerSecond : nil
+        let upload = metrics.contains(.network) ? network.snapshot?.uploadBytesPerSecond : nil
+        let gpu = metrics.contains(.gpu) ? gpuReader() : nil
 
         let memoryPercent = metrics.contains(.memory)
             ? Self.percent(used: reading.memoryUsed, total: reading.memoryTotal) : nil
         let nextSnapshot = SystemStatsSnapshot(
+            gpuPercent: gpu,
             cpuPercent: metrics.contains(.cpu) ? cpuPercent ?? snapshot.cpuPercent : nil,
             memoryPercent: memoryPercent,
             diskPercent: metrics.contains(.disk)
                 ? Self.percent(used: reading.diskUsed, total: reading.diskTotal) : nil,
-            downloadBytesPerSecond: metrics.contains(.network) ? networkRates.download : nil,
-            uploadBytesPerSecond: metrics.contains(.network) ? networkRates.upload : nil,
+            downloadBytesPerSecond: download,
+            uploadBytesPerSecond: upload,
             temperatureCelsius: metrics.contains(.thermal) ? cachedTemperatureCelsius : nil,
             thermalPressure: metrics.contains(.thermal) ? reading.thermalPressure : nil)
+        appendHistory(.gpu, value: gpu, at: now)
         appendHistory(.cpu, value: cpuPercent, at: now)
         appendHistory(.memory, value: memoryPercent, at: now)
-        let totalNetworkRate = [networkRates.download, networkRates.upload]
+        let totalNetworkRate = [download, upload]
             .compactMap { $0 }
             .reduce(0, +)
         appendHistory(
             .network,
-            value: networkRates.download == nil && networkRates.upload == nil
+            value: download == nil && upload == nil
                 ? nil : totalNetworkRate,
             at: now)
         snapshot = nextSnapshot
@@ -328,26 +357,6 @@ final class SystemStatsStore: ObservableObject {
         snapshot.temperatureCelsius = nil
     }
 
-    private static func networkRates(
-        previous: (counters: NetworkCounters, date: Date)?,
-        current: NetworkCounters?,
-        now: Date
-    ) -> (download: Double?, upload: Double?) {
-        guard let previous, let current,
-            previous.counters.interfaceName == current.interfaceName
-        else { return (nil, nil) }
-        let elapsed = now.timeIntervalSince(previous.date)
-        return (
-            NetworkRateCalculator.rate(
-                previous: previous.counters.receivedBytes,
-                current: current.receivedBytes,
-                elapsed: elapsed),
-            NetworkRateCalculator.rate(
-                previous: previous.counters.sentBytes,
-                current: current.sentBytes,
-                elapsed: elapsed))
-    }
-
     private static func readSystemStats(metrics: Set<SystemStatsMetric>) -> SystemStatsReading {
         let memory = metrics.contains(.memory) ? readMemory() : nil
         let disk = metrics.contains(.disk) ? readDisk() : nil
@@ -357,7 +366,6 @@ final class SystemStatsStore: ObservableObject {
             memoryTotal: memory?.total,
             diskUsed: disk?.used,
             diskTotal: disk?.total,
-            network: metrics.contains(.network) ? NetworkCounterReader.read() : nil,
             thermalPressure: metrics.contains(.thermal)
                 ? SystemThermalPressure(ProcessInfo.processInfo.thermalState) : nil)
     }

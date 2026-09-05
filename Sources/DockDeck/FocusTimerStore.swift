@@ -198,6 +198,12 @@ final class FocusTimerStore: ObservableObject {
         scheduleTimers()
     }
 
+    func startFocus(now: Date = Date()) {
+        refresh(now: now)
+        if snapshot.phase != .focus { skip(now: now) }
+        if snapshot.mode != .running { toggle(now: now) }
+    }
+
     func toggle(now: Date = Date()) {
         _ = reconcileCompletion(now: now)
         switch session.mode {

@@ -31,13 +31,27 @@ struct DiagnosticCheckItem: Identifiable, Equatable {
     let lastSuccessfulAt: Date?
 }
 
+enum DiagnosticCommandResult {
+    case ready, nonZeroExit, timedOut, outputTooLarge, cancelled, failed
+    var detail: String {
+        switch self {
+        case .ready: "Installed and signed in"
+        case .nonZeroExit: "Installed; sign-in check failed"
+        case .timedOut: "Status check timed out"
+        case .outputTooLarge: "Status command output exceeded its limit"
+        case .cancelled: "Status check cancelled"
+        case .failed: "Status command could not run"
+        }
+    }
+}
+
 enum DiagnosticCommandRunner {
-    static func exitsSuccessfully(
+    static func run(
         _ executable: URL,
         arguments: [String],
         environment: [String: String] = ProcessInfo.processInfo.environment,
         timeout: TimeInterval = 3
-    ) -> Bool? {
+    ) -> DiagnosticCommandResult {
         do {
             _ = try BoundedProcessRunner.run(
                 executableURL: executable,
@@ -45,12 +59,18 @@ enum DiagnosticCommandRunner {
                 environment: CodexBinaryLocator.launchEnvironment(
                     for: executable, environment: environment),
                 timeout: timeout,
-                maximumOutputBytes: 64 * 1_024)
-            return true
+                maximumOutputBytes: 64 * 1_024, diagnosticSource: .diagnostics)
+            return .ready
         } catch BoundedProcessError.nonZeroExit {
-            return false
+            return .nonZeroExit
+        } catch BoundedProcessError.timedOut {
+            return .timedOut
+        } catch BoundedProcessError.outputTooLarge {
+            return .outputTooLarge
+        } catch BoundedProcessError.cancelled {
+            return .cancelled
         } catch {
-            return nil
+            return .failed
         }
     }
 }
@@ -98,18 +118,16 @@ enum DiagnosticsChecker {
                 id: id, title: title, symbolName: symbolName, state: .unavailable,
                 detail: "Executable not found", checkedAt: now, lastSuccessfulAt: nil)
         }
-        let status = DiagnosticCommandRunner.exitsSuccessfully(
+        let status = DiagnosticCommandRunner.run(
             executable, arguments: arguments, environment: environment)
         return DiagnosticCheckItem(
             id: id,
             title: title,
             symbolName: symbolName,
-            state: status == true ? .ready : .warning,
-            detail: status == true
-                ? "Installed and signed in"
-                : status == false ? "Installed; sign-in required" : "Status check timed out",
+            state: status == .ready ? .ready : .warning,
+            detail: status.detail,
             checkedAt: now,
-            lastSuccessfulAt: status == true ? now : nil)
+            lastSuccessfulAt: status == .ready ? now : nil)
     }
 
     private static func item(
@@ -161,7 +179,8 @@ enum DiagnosticsReportBuilder {
         runtime: ModuleRuntimeDiagnostics,
         appVersion: String,
         operatingSystem: String,
-        architecture: String
+        architecture: String,
+        processes: [ProcessDiagnosticMetric] = []
     ) -> String {
         var lines = [
             "DockDeck diagnostics",
@@ -190,6 +209,14 @@ enum DiagnosticsReportBuilder {
                 line += "; since \(timestamp(changedAt))"
             }
             lines.append(line)
+        }
+        if !processes.isEmpty {
+            lines.append(contentsOf: ["", "Command performance (this session)"])
+            for metric in processes {
+                var line = "- \(metric.source.rawValue): \(String(format: "%.3fs", metric.lastDuration)); timeouts \(metric.timeouts); cancellations \(metric.cancellations)"
+                if let success = metric.lastSuccessfulAt { line += "; last OK \(timestamp(success))" }
+                lines.append(line)
+            }
         }
         lines.append("")
         lines.append("Details, paths, URLs, command output, and account identifiers are omitted.")
@@ -241,6 +268,7 @@ final class DiagnosticsStore: ObservableObject {
     @Published private(set) var items: [DiagnosticCheckItem]
     @Published private(set) var moduleRuntime: ModuleRuntimeDiagnostics
     @Published private(set) var isRefreshing = false
+    @Published private(set) var processes = ProcessDiagnostics.shared.snapshot()
 
     private let checker: () -> [DiagnosticCheckItem]
     private let runtimeProvider: () -> ModuleRuntimeDiagnostics
@@ -273,6 +301,7 @@ final class DiagnosticsStore: ObservableObject {
             DispatchQueue.main.async {
                 self.items = Self.merging(results, previous: previous)
                 self.moduleRuntime = self.runtimeProvider()
+                self.processes = ProcessDiagnostics.shared.snapshot()
                 self.isRefreshing = false
             }
         }
@@ -292,7 +321,8 @@ final class DiagnosticsStore: ObservableObject {
     ) -> String {
         DiagnosticsReportBuilder.build(
             items: items, runtime: runtimeProvider(), appVersion: appVersion,
-            operatingSystem: operatingSystem, architecture: architecture)
+            operatingSystem: operatingSystem, architecture: architecture,
+            processes: ProcessDiagnostics.shared.snapshot())
     }
 
     static func merging(

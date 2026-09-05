@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct WeatherPanelView: View {
+    @Environment(\.compactReadable) private var readable
     @ObservedObject var store: WeatherStore
     let theme: Theme
 
@@ -23,30 +24,30 @@ struct WeatherPanelView: View {
                     systemName: WeatherCondition.symbolName(
                         code: snapshot.weatherCode, isDay: snapshot.isDay))
                     .symbolRenderingMode(.hierarchical)
-                    .font(.system(size: 21, weight: .semibold))
+                    .font(.system(size: CompactReadability.size(21, enabled: readable), weight: .semibold))
                     .foregroundStyle(snapshot.isDay ? Color.orange : Color.cyan)
 
                 Text(temperature(snapshot.temperature, unit: snapshot.temperatureUnit))
-                    .font(.system(size: 21, weight: .bold, design: .rounded))
+                    .font(.system(size: CompactReadability.size(21, enabled: readable), weight: .bold, design: .rounded))
                     .foregroundStyle(baseColor)
                     .monospacedDigit()
                     .lineLimit(1)
 
                 Text(WeatherCondition.title(code: snapshot.weatherCode))
-                    .font(.system(size: 9, weight: .medium, design: .rounded))
+                    .font(.system(size: CompactReadability.size(9, enabled: readable), weight: .medium, design: .rounded))
                     .foregroundStyle(baseColor.opacity(0.78))
                     .lineLimit(1)
 
                 if case .failed = store.status {
                     Image(systemName: "exclamationmark.triangle.fill")
-                        .font(.system(size: 7))
+                        .font(.system(size: CompactReadability.size(7, enabled: readable)))
                         .foregroundStyle(.orange)
                 }
             }
 
             HStack(spacing: 5) {
                 Text(snapshot.location.name)
-                    .font(.system(size: 9, weight: .semibold, design: .rounded))
+                    .font(.system(size: CompactReadability.size(9, enabled: readable), weight: .semibold, design: .rounded))
                     .foregroundStyle(baseColor)
                     .lineLimit(1)
 
@@ -55,7 +56,7 @@ struct WeatherPanelView: View {
                     .frame(width: 2.5, height: 2.5)
 
                 Text(highLow(snapshot))
-                    .font(.system(size: 7.5, weight: .semibold, design: .monospaced))
+                    .font(.system(size: CompactReadability.size(7.5, enabled: readable), weight: .semibold, design: .monospaced))
                     .foregroundStyle(baseColor.opacity(0.7))
                     .lineLimit(1)
             }
@@ -77,7 +78,7 @@ struct WeatherPanelView: View {
             Text(placeholderText)
                 .lineLimit(2)
         }
-        .font(.system(size: 9.5, weight: .semibold, design: .rounded))
+        .font(.system(size: CompactReadability.size(9.5, enabled: readable), weight: .semibold, design: .rounded))
         .foregroundStyle(baseColor.opacity(0.78))
         .padding(.horizontal, 10)
         .accessibilityElement(children: .combine)

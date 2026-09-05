@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct MusicPanelView: View {
+    @Environment(\.compactReadable) private var readable
     @ObservedObject var store: MusicStore
     let theme: Theme
 
@@ -9,19 +10,19 @@ struct MusicPanelView: View {
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 4) {
                     Image(systemName: "music.note")
-                        .font(.system(size: 8, weight: .bold))
+                        .font(.system(size: CompactReadability.size(8, enabled: readable), weight: .bold))
                         .foregroundStyle(accentColor)
                     Text(primaryText)
-                        .font(.system(size: 10, weight: .semibold, design: .rounded))
+                        .font(.system(size: CompactReadability.size(10, enabled: readable), weight: .semibold, design: .rounded))
                         .foregroundStyle(baseColor)
                         .lineLimit(1)
-                        .minimumScaleFactor(0.72)
+                        .minimumScaleFactor(readable ? 1 : 0.72)
                 }
                 Text(secondaryText)
-                    .font(.system(size: 8, weight: .medium, design: .rounded))
+                    .font(.system(size: CompactReadability.size(8, enabled: readable), weight: .medium, design: .rounded))
                     .foregroundStyle(baseColor.opacity(0.66))
                     .lineLimit(1)
-                    .minimumScaleFactor(0.72)
+                    .minimumScaleFactor(readable ? 1 : 0.72)
                 progressBar
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -67,7 +68,7 @@ struct MusicPanelView: View {
     ) -> some View {
         Button(action: { store.send(command) }) {
             Image(systemName: symbol)
-                .font(.system(size: prominent ? 10 : 8, weight: .bold))
+                .font(.system(size: CompactReadability.size(prominent ? 10 : 8, enabled: readable), weight: .bold))
                 .foregroundStyle(prominent ? accentColor : baseColor.opacity(0.76))
                 .frame(width: prominent ? 25 : 20, height: 25)
                 .background {

@@ -26,8 +26,26 @@ cd DockDeck
 ./scripts/install.sh
 ```
 
-The installer builds and signs `~/Applications/DockDeck.app`, registers a
-per-user LaunchAgent, and starts DockDeck immediately. It prefers the sole Apple
+The installer builds and signs `~/Applications/DockDeck.app` and starts DockDeck
+immediately. It builds for the current Mac's native architecture and rejects a
+terminal running through Rosetta; on Apple silicon, turn off **Open using
+Rosetta** for that terminal and restart it before installing. See the
+[architecture policy](releases.md#architecture-support) for Intel compatibility.
+
+Fresh installs leave **Launch at Login** off. Change it in
+**Settings → Startup** or the app menu; macOS may require approval in
+**System Settings → General → Login Items**. Turning it off keeps the current
+app running and removes the next-login registration. Reinstalling preserves
+the choice, including a pending approval. Resetting DockDeck preferences does
+not change this macOS setting.
+
+An existing loaded DockDeck LaunchAgent is migrated to `SMAppService.mainApp`;
+an unloaded legacy agent stays off. The old plist is backed up under
+`~/Library/Application Support/DockDeck/legacy-login.*` and removed from
+LaunchAgents after successful migration, preventing duplicate launches.
+If registration fails, the installer retains the legacy configuration.
+
+The installer prefers the sole Apple
 Development identity in the login Keychain. A stable app path and signing
 identity help macOS retain Accessibility approval across rebuilds.
 
@@ -131,7 +149,7 @@ and restart the installed app.
 ./scripts/uninstall.sh
 ```
 
-The uninstall script removes the login item. It leaves the installed app, local
+The uninstall script stops DockDeck and removes its login registration. It leaves the installed app, local
 signing certificate, preferences, and build output in place. Remove those
 separately only when you intend to discard them.
 

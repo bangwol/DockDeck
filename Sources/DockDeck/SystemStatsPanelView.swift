@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct SystemStatsPanelView: View {
+    @Environment(\.compactReadable) private var readable
     @ObservedObject var store: SystemStatsStore
     let theme: Theme
 
@@ -16,6 +17,8 @@ struct SystemStatsPanelView: View {
 
     @ViewBuilder private func metric(_ metric: SystemStatsMetric) -> some View {
         switch metric {
+        case .gpu:
+            percentMetric(metric, value: store.snapshot.gpuPercent)
         case .cpu:
             percentMetric(metric, value: store.snapshot.cpuPercent)
         case .memory:
@@ -35,11 +38,11 @@ struct SystemStatsPanelView: View {
         return VStack(spacing: 3) {
             metricHeader(metric)
             Text(value.map { "\(Int($0.rounded()))%" } ?? "--")
-                .font(.system(size: valueFontSize, weight: .bold, design: .monospaced))
+                .font(.system(size: CompactReadability.size(valueFontSize, enabled: readable), weight: .bold, design: .monospaced))
                 .foregroundStyle(color)
                 .monospacedDigit()
                 .lineLimit(1)
-                .minimumScaleFactor(0.75)
+                .minimumScaleFactor(readable ? 1 : 0.75)
             if history.samples.count >= 2 {
                 MetricSparkline(samples: history.samples, color: color)
                     .frame(height: 5)
@@ -90,10 +93,10 @@ struct SystemStatsPanelView: View {
         return VStack(spacing: 3) {
             metricHeader(.thermal)
             Text(temperature.map { "\(Int($0.rounded()))°" } ?? "--°")
-                .font(.system(size: valueFontSize, weight: .bold, design: .rounded))
+                .font(.system(size: CompactReadability.size(valueFontSize, enabled: readable), weight: .bold, design: .rounded))
                 .foregroundStyle(color)
                 .lineLimit(1)
-                .minimumScaleFactor(0.65)
+                .minimumScaleFactor(readable ? 1 : 0.65)
             indicatorBar(value: pressure?.level ?? 0, color: color)
         }
         .frame(maxWidth: .infinity)
@@ -115,23 +118,23 @@ struct SystemStatsPanelView: View {
             Image(systemName: metric.symbolName)
             Text(metric.compactTitle)
         }
-        .font(.system(size: 7.5, weight: .bold, design: .rounded))
+        .font(.system(size: CompactReadability.size(7.5, enabled: readable), weight: .bold, design: .rounded))
         .foregroundStyle(baseColor.opacity(0.72))
         .lineLimit(1)
-        .minimumScaleFactor(0.7)
+        .minimumScaleFactor(readable ? 1 : 0.7)
     }
 
     private func rateRow(symbol: String, value: Double?, color: Color) -> some View {
         HStack(spacing: 2) {
             Image(systemName: symbol)
-                .font(.system(size: 6.5, weight: .bold))
+                .font(.system(size: CompactReadability.size(6.5, enabled: readable), weight: .bold))
                 .foregroundStyle(color)
             Text(ByteRateFormatter.compactString(value))
-                .font(.system(size: 8, weight: .bold, design: .monospaced))
+                .font(.system(size: CompactReadability.size(8, enabled: readable), weight: .bold, design: .monospaced))
                 .foregroundStyle(baseColor)
                 .monospacedDigit()
                 .lineLimit(1)
-                .minimumScaleFactor(0.65)
+                .minimumScaleFactor(readable ? 1 : 0.65)
         }
         .frame(maxWidth: .infinity, alignment: .center)
     }

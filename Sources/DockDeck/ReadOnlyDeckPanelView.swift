@@ -67,7 +67,7 @@ final class PanelModuleServices {
     let clock: ClockStore
     let music: MusicStore
     let battery: BatteryStore
-    let network: NetworkStore
+    let localPorts: LocalPortsStore
     let projectPulse: ProjectPulseStore
     let githubInbox: GitHubInboxStore
     let docker: DockerStore
@@ -85,7 +85,7 @@ final class PanelModuleServices {
         clock: ClockStore = ClockStore(),
         music: MusicStore = MusicStore(),
         battery: BatteryStore = BatteryStore(),
-        network: NetworkStore = NetworkStore(),
+        localPorts: LocalPortsStore = LocalPortsStore(),
         projectPulse: ProjectPulseStore = ProjectPulseStore(),
         githubInbox: GitHubInboxStore = GitHubInboxStore(),
         docker: DockerStore = DockerStore(),
@@ -100,7 +100,7 @@ final class PanelModuleServices {
         self.clock = clock
         self.music = music
         self.battery = battery
-        self.network = network
+        self.localPorts = localPorts
         self.projectPulse = projectPulse
         self.githubInbox = githubInbox
         self.docker = docker
@@ -115,7 +115,7 @@ final class PanelModuleServices {
             .clock: clock,
             .music: music,
             .battery: battery,
-            .network: network,
+            .localPorts: localPorts,
             .projectPulse: projectPulse,
             .githubInbox: githubInbox,
             .docker: docker,
@@ -164,6 +164,9 @@ enum ReadOnlyDeckSelection {
 }
 
 struct ReadOnlyDeckPanelView: View {
+    @AppStorage(CompactReadability.preferenceKey) private var largerText = false
+    @Environment(\.colorSchemeContrast) private var contrast
+    var readabilityOverride: Bool? = nil
     let services: PanelModuleServices
     @ObservedObject var presentation: ReadOnlyDeckPresentation
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -175,7 +178,7 @@ struct ReadOnlyDeckPanelView: View {
                 .transition(moduleTransition)
             if let pageIndicator = presentation.pageIndicator {
                 Text(pageIndicator)
-                    .font(.system(size: 7, weight: .semibold, design: .rounded))
+                    .font(.system(size: (readabilityOverride ?? (largerText || contrast == .increased)) ? 10 : 7, weight: .semibold, design: .rounded))
                     .monospacedDigit()
                     .foregroundStyle(Color(nsColor: presentation.theme.foregroundColor))
                     .padding(.horizontal, 5)
@@ -186,6 +189,7 @@ struct ReadOnlyDeckPanelView: View {
                     .accessibilityLabel("Module \(pageIndicator)")
             }
         }
+        .environment(\.compactReadable, readabilityOverride ?? (largerText || contrast == .increased))
         .animation(reduceMotion ? nil : .easeOut(duration: 0.18), value: presentation.activeModule)
         .animation(reduceMotion ? nil : .easeOut(duration: 0.12), value: presentation.pageIndicator)
     }
@@ -222,8 +226,8 @@ struct ReadOnlyDeckPanelView: View {
             MusicPanelView(store: services.music, theme: presentation.theme)
         case .battery:
             BatteryPanelView(store: services.battery, theme: presentation.theme)
-        case .network:
-            NetworkPanelView(store: services.network, theme: presentation.theme)
+        case .localPorts:
+            LocalPortsPanelView(store: services.localPorts, theme: presentation.theme)
         case .projectPulse:
             ProjectPulsePanelView(store: services.projectPulse, theme: presentation.theme)
         case .githubInbox:
@@ -257,7 +261,7 @@ struct ReadOnlyModuleDetailView: View {
                     .foregroundStyle(.secondary)
                     .frame(width: 26)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(definition?.title ?? "Module")
+                    Text(definition?.displayTitle ?? L10n.text("Module"))
                         .font(.headline)
                     Text(definition?.subtitle ?? "DockDeck module detail")
                         .font(.caption)
@@ -266,10 +270,10 @@ struct ReadOnlyModuleDetailView: View {
                 Spacer()
                 if let onOpenSettings {
                     Menu {
-                        Button("Module Settings…") { onOpenSettings(definition?.settingsPane ?? .decks) }
-                        Button("Diagnostics…") { onOpenSettings(.diagnostics) }
+                        Button(L10n.text("Module Settings…")) { onOpenSettings(definition?.settingsPane ?? .decks) }
+                        Button(L10n.text("Diagnostics…")) { onOpenSettings(.diagnostics) }
                     } label: {
-                        Label("Settings", systemImage: "gearshape")
+                        Label(L10n.text("Settings"), systemImage: "gearshape")
                     }
                     .fixedSize()
                 }
@@ -292,8 +296,6 @@ struct ReadOnlyModuleDetailView: View {
 
     @ViewBuilder private var detailContent: some View {
         switch presentation.activeModule {
-        case .network:
-            NetworkModuleDetailView(store: services.network)
         case .battery:
             BatteryModuleDetailView(store: services.battery)
         case .usage:
@@ -313,6 +315,8 @@ struct ReadOnlyModuleDetailView: View {
                 hourFormat: PanelSettings.clockHourFormat, favorites: PanelSettings.clockFavorites)
         case .music:
             MusicModuleDetailView(store: services.music, theme: presentation.theme)
+        case .localPorts:
+            LocalPortsDetailView(store: services.localPorts)
         case .projectPulse:
             ProjectPulseModuleDetailView(
                 store: services.projectPulse, theme: presentation.theme)

@@ -1,7 +1,6 @@
 #!/bin/bash
-# Installs DockDeck as a per-user LaunchAgent: starts it now, and arms it
-# to start at every future login. Safe to re-run (e.g. after a rebuild) —
-# it just rebuilds, repackages, and reloads it.
+# Installs and starts the signed app, preserving the native login-item state.
+# Existing loaded LaunchAgents migrate once; fresh installs start with login off.
 #
 # Packages the binary into a minimal .app bundle and code-signs it rather
 # than running the raw executable directly. This matters specifically for
@@ -15,6 +14,12 @@
 # macOS releases may require Accessibility approval again after a rebuild
 # when that fallback is used.
 set -euo pipefail
+
+# A translated terminal would build Intel-only binaries on Apple silicon.
+if [ "$(sysctl -in sysctl.proc_translated 2>/dev/null || true)" = "1" ]; then
+    echo "Run this installer from a native terminal with Open using Rosetta disabled." >&2
+    exit 1
+fi
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 LABEL="com.dockdeck.app"
@@ -110,6 +115,8 @@ fi
 
 echo "Building release binary..."
 (cd "$REPO_DIR" && swift build -c release)
+lipo "$BIN_PATH" -verify_arch "$(uname -m)"
+lipo "$BRIDGE_BIN_PATH" -verify_arch "$(uname -m)"
 
 echo "Packaging $APP_PATH..."
 rm -rf "$APP_PATH"
@@ -128,8 +135,16 @@ cat > "$APP_PATH/Contents/Info.plist" <<EOF
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+    <key>DockDeckLoginItemControlVersion</key>
+    <integer>1</integer>
     <key>CFBundleIdentifier</key>
     <string>$LABEL</string>
+    <key>CFBundleDevelopmentRegion</key>
+    <string>en</string>
+    <key>CFBundleLocalizations</key>
+    <array><string>en</string><string>ko</string></array>
+    <key>CFBundleAllowMixedLocalizations</key>
+    <true/>
     <key>CFBundleName</key>
     <string>DockDeck</string>
     <key>CFBundleExecutable</key>
@@ -170,11 +185,31 @@ cat > "$APP_PATH/Contents/Info.plist" <<EOF
 EOF
 
 plutil -lint "$APP_PATH/Contents/Info.plist" >/dev/null
+"$REPO_DIR/scripts/build-app-intents.sh" "$APP_PATH"
 codesign --force --options runtime --sign "$SIGNING_IDENTITY" "$APP_BRIDGE_PATH"
 codesign --force --options runtime --sign "$SIGNING_IDENTITY" \
     --entitlements "$REPO_DIR/DockDeck.entitlements" --identifier "$LABEL" "$APP_PATH"
 
+# Query only binaries that advertise the control interface. Older builds would
+# interpret unknown arguments as a request to launch another GUI instance.
+LOGIN_STATE="not-registered"
+CONTROL_VERSION="$(/usr/libexec/PlistBuddy -c 'Print :DockDeckLoginItemControlVersion' "$INSTALLED_APP_PATH/Contents/Info.plist" 2>/dev/null || true)"
+if [ "$CONTROL_VERSION" = "1" ] && [ -x "$INSTALLED_APP_BIN_PATH" ]; then
+    LOGIN_STATE="$("$INSTALLED_APP_BIN_PATH" --login-item-status)"
+elif launchctl print "gui/$(id -u)/$LABEL" >/dev/null 2>&1; then
+    LOGIN_STATE="enabled"
+fi
+case "$LOGIN_STATE" in
+    enabled|requires-approval|not-registered|not-found) ;;
+    *) echo "Cannot determine the existing login-item state; installation stopped." >&2; exit 1 ;;
+esac
+
 launchctl unload "$PLIST_PATH" 2>/dev/null || true
+if ! "$APP_BIN_PATH" --stop-installed-app; then
+    if [ "$LOGIN_STATE" = "enabled" ] && [ -f "$PLIST_PATH" ]; then launchctl load "$PLIST_PATH"; fi
+    echo "DockDeck did not quit. Close it before installing again." >&2
+    exit 1
+fi
 mkdir -p "$HOME/Applications"
 rm -rf "$INSTALLED_APP_PATH"
 ditto "$APP_PATH" "$INSTALLED_APP_PATH"
@@ -186,41 +221,31 @@ codesign --verify --deep --strict "$INSTALLED_APP_PATH"
 "$LSREGISTER" -u "$APP_PATH" 2>/dev/null || true
 "$LSREGISTER" -f "$INSTALLED_APP_PATH"
 
-mkdir -p "$HOME/Library/LaunchAgents"
+# SMAppService keeps login preferences with the installed application identity.
+LOGIN_ARGUMENT="--disable-login-item"
+if [ "$LOGIN_STATE" = "enabled" ] || [ "$LOGIN_STATE" = "requires-approval" ]; then
+    LOGIN_ARGUMENT="--enable-login-item"
+fi
+if ! NEW_LOGIN_STATE="$("$INSTALLED_APP_BIN_PATH" "$LOGIN_ARGUMENT")"; then
+    if [ "$LOGIN_STATE" = "enabled" ] && [ -f "$PLIST_PATH" ] \
+        && { [ "$NEW_LOGIN_STATE" = "not-registered" ] || [ "$NEW_LOGIN_STATE" = "not-found" ]; }; then
+        launchctl load "$PLIST_PATH"
+    fi
+    echo "Could not preserve the login-item setting. The legacy configuration was retained." >&2
+    exit 1
+fi
 
-cat > "$PLIST_PATH" <<EOF
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-    <key>Label</key>
-    <string>$LABEL</string>
-    <key>ProgramArguments</key>
-    <array>
-        <string>$INSTALLED_APP_BIN_PATH</string>
-    </array>
-    <key>RunAtLoad</key>
-    <true/>
-    <key>StandardOutPath</key>
-    <string>$LOG_PATH</string>
-    <key>StandardErrorPath</key>
-    <string>$LOG_PATH</string>
-</dict>
-</plist>
-EOF
-
-launchctl load "$PLIST_PATH"
-
+# Preserve the old configuration outside LaunchAgents, preventing dual launches.
+if [ -f "$PLIST_PATH" ]; then
+    BACKUP_DIR="$HOME/Library/Application Support/DockDeck"
+    mkdir -p "$BACKUP_DIR"
+    LEGACY_BACKUP="$(mktemp "$BACKUP_DIR/legacy-login.XXXXXX")"
+    cp -p "$PLIST_PATH" "$LEGACY_BACKUP"
+    rm "$PLIST_PATH"
+fi
+/usr/bin/open "$INSTALLED_APP_PATH"
 echo "Installed $INSTALLED_APP_PATH and started."
-echo
-echo "If the panel isn't tracking the Dock, check System Settings ->"
-echo "Privacy & Security -> Accessibility for a \"DockDeck\" entry and"
-echo "make sure it's enabled."
-echo
-echo "Turn off (stops it now, and skips it at future logins):"
-echo "  launchctl unload $PLIST_PATH"
-echo
-echo "Turn back on:"
-echo "  launchctl load $PLIST_PATH"
-echo
-echo "Remove the login item: scripts/uninstall.sh"
+echo "Launch at Login: $NEW_LOGIN_STATE"
+echo "Change it in DockDeck Settings -> Startup. Pending approval is managed in System Settings -> General -> Login Items."
+echo "For precise Dock tracking, enable DockDeck in System Settings -> Privacy & Security -> Accessibility."
+echo "Stop and remove the login item: scripts/uninstall.sh"

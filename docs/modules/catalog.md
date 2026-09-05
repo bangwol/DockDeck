@@ -95,21 +95,9 @@ Missing estimates explicitly say that macOS has not supplied them.
 
 ## Network
 
-Network calculates download and upload rates from macOS's 64-bit byte counters
-for the current primary interface or an interface selected in Settings. A native `NWPathMonitor` supplies offline,
-Wi-Fi, wired, cellular, metered, and Low Data status without contacting a probe
-server. DockDeck does not inspect traffic, IP addresses, hostnames, or packet
-contents.
-
-Select a 1-second, 2-second, or 5-second interval under
-**Settings → Network**. Sampling and counter retention stop while the module is
-disabled. The primary interface name remains available in panel help and
-accessibility text. Download and upload trend lines retain at most 15 minutes or
-900 samples in memory and are never written to disk. Low Data Mode applies the
-same reduced sampling cadence as Low Power Mode. The detail window separates
-system route status from counter availability and shows rates, time axes, and
-recent peaks. Switching interfaces clears the baseline and history, so rates
-from different interfaces are never combined.
+Network I/O is integrated into [System Stats](system-stats.md#network-consolidation).
+Existing deck positions and the selected interface migrate automatically. The
+System Stats detail window retains download/upload charts and connection status.
 
 ## Docker
 
@@ -148,6 +136,23 @@ timer. macOS Low Power Mode further reduces display refreshes without delaying
 the completion transition. Optional completion alerts are controlled under
 **Settings → Notifications**.
 
+## Compact readability
+
+**Appearance → Larger text and fewer details** keeps compact labels at 10 pt or
+larger without reducing their scale to fit. Long text truncates; existing
+VoiceOver summaries and detail windows retain the full information. Custom Tile
+hides its detail line, GitHub Inbox hides its notification preview, Docker moves
+the stopped count to its detail view, and Usage moves reset times to detail and
+hover text. Increase Contrast also enables the readable layout. macOS Reduce
+Transparency and Increase Contrast make panel backgrounds opaque; Reduce Motion
+continues to disable deck transitions.
+
+## Local Ports
+
+Up to five configured TCP ports show Open, Closed, or Unavailable using only
+IPv4/IPv6 loopback connections. See [Local Ports](local-ports.md) for polling,
+error meanings, and the distinction between reachability and service health.
+
 ## Finding modules and settings
 
 **Find Module…** in the app or a module's context menu searches enabled modules.
@@ -157,3 +162,46 @@ window is key; Terminal input keeps its own behavior. Settings also searches
 category names and descriptions, including disabled modules. Detail headers
 provide **Module Settings…** and **Diagnostics…** for setup and connection checks.
 `⌘W` closes the active settings, picker, or detail window.
+
+## Deck profiles
+
+Save up to eight named layouts under **Decks → Saved Deck Profiles**, then switch
+from the **Deck Profiles** app menu. Profiles contain left/right order, enabled
+modules and auto-slide selections/interval. Missing newer modules are added as
+disabled entries when applying an older profile. Module data sources, commands,
+credentials, and other settings stay outside profiles.
+
+A Terminal session already running when a profile hides Terminal is retained
+until the module is enabled again or the app quits. Once re-enabled, manually
+disabling Terminal stops it normally. Other disabled modules stop their runtime.
+
+**Export…** writes a versioned JSON archive. **Import…** validates IDs, duplicates,
+names and intervals before showing the replacement preview; importing replaces
+the saved library only after confirmation and leaves the current deck unchanged.
+Archives are limited to 64 KiB and eight profiles. The local library is written
+atomically at `~/Library/Application Support/DockDeck/deck-profiles.json`.
+An unreadable existing library is preserved until a valid import replaces it.
+
+## Quick Actions
+
+Save up to four apps, folders, HTTP(S) web pages, or named Shortcuts in
+**Settings → Quick Actions**. The app menu lists the same actions. Saving an
+action never runs it; select it explicitly. Apps open through macOS, folders
+open in Finder, and web pages open in the default browser. URLs with embedded
+credentials, relative paths, and control characters are rejected.
+
+Shortcuts run with separate arguments, a 30-second limit, and a 32 KiB combined
+output limit. A running action cannot be started twice, and rapid repeats are
+ignored. Only save Shortcuts you trust. Errors appear in Settings and the menu;
+raw command output is not displayed or retained. Quick Actions have no polling
+timer and are excluded from deck-profile backups.
+
+## Language
+
+DockDeck follows the macOS preferred language for core app menus, settings
+categories, profile controls, and quick-action controls. Korean and English are
+bundled; unsupported languages fall back to English. Module names keep stable
+internal IDs and ordering. Provider output and module-specific detail prose are
+not fully translated in this preview. macOS date and number formatting continues
+to use the user's locale. The app's packaged resource bundle contains both
+translations and provider marks; a source checkout is not required to load them.

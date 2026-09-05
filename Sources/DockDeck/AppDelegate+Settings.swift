@@ -1,6 +1,20 @@
 import Cocoa
 
 extension AppDelegate {
+    func applyDeckProfile(_ profile: DeckProfile) {
+        guard (try? DeckProfileArchive(profiles: [profile]).validated()) != nil else { return }
+        retainsTerminalForProfile = DeckProfileTerminalPolicy.retain(
+            isRunning: terminalPanelController.terminalView.process.running,
+            retained: retainsTerminalForProfile, nextEnabled: profile.configuration.contains(.terminal))
+        if profile.configuration.enabled.contains(.network), !PanelSettings.systemStatsMetrics.contains(.network) {
+            PanelSettings.systemStatsMetrics = Array(PanelSettings.systemStatsMetrics.prefix(3)) + [.network]
+            systemStatsStore.setMetrics(PanelSettings.systemStatsMetrics)
+        }
+        PanelSettings.deckAutoSlideSettings = profile.autoSlide
+        applySettingsChange(.deck(profile.configuration.normalized()))
+        (settingsPanel?.contentView as? SettingsPanelView)?.setValues(currentSettingsValues)
+    }
+
     @objc func toggleSettingsPanel(_ sender: Any?) {
         if let settingsPanel {
             focusSettingsPanel(settingsPanel)
@@ -221,6 +235,7 @@ extension AppDelegate {
     /// The accessory app may be inactive while its floating panel stays visible, in which
     /// case ordering front alone leaves keyboard focus in the previous application.
     private func focusSettingsPanel(_ settingsPanel: NSWindow) {
+        (settingsPanel.contentView as? SettingsPanelView)?.setValues(currentSettingsValues)
         NSApp.activate(ignoringOtherApps: true)
         settingsPanel.makeKeyAndOrderFront(nil)
     }
@@ -233,8 +248,8 @@ extension AppDelegate {
     }
 
     private var savedSettingsPane: SettingsPaneID {
-        UserDefaults.standard.string(forKey: AppPreferences.settingsPaneKey)
-            .flatMap(SettingsPaneID.init(rawValue:)) ?? .decks
+        let saved = UserDefaults.standard.string(forKey: AppPreferences.settingsPaneKey)
+        return saved == "network" ? .systemStats : saved.flatMap(SettingsPaneID.init(rawValue:)) ?? .decks
     }
 
     private func presentSettingsPanel(
@@ -259,6 +274,7 @@ extension AppDelegate {
         view.onReset = { [weak self, weak view] in
             guard let self else { return }
             PanelSettings.resetToDefaults()
+            self.quickActions.clear()
             self.notificationCoordinator.updateSettings(PanelSettings.notifications)
             self.usageStore.setEnabledProviders(PanelSettings.enabledUsageProviders)
             self.usageStore.setClaudeRefreshMode(PanelSettings.claudeUsageRefreshMode)
@@ -279,8 +295,8 @@ extension AppDelegate {
                 includeReminders: PanelSettings.scheduleIncludesReminders,
                 refreshInterval: PanelSettings.scheduleRefreshInterval)
             self.batteryStore.setRefreshInterval(PanelSettings.batteryRefreshInterval)
-            self.networkStore.setRefreshInterval(PanelSettings.networkRefreshInterval)
-            self.networkStore.setInterfaceName(PanelSettings.networkInterfaceName)
+            self.systemStatsStore.setNetworkInterfaceName(PanelSettings.networkInterfaceName)
+            self.moduleServices.localPorts.updateConfiguration(PanelSettings.localPortsConfiguration)
             self.projectPulseStore.updateConfiguration(
                 PanelSettings.projectPulseConfiguration)
             self.githubInboxStore.updateConfiguration(
@@ -351,7 +367,8 @@ extension AppDelegate {
                 showsPace: PanelSettings.usageShowsPace),
             systemStats: SystemStatsSettingsState(
                 refreshInterval: PanelSettings.systemStatsRefreshInterval,
-                metrics: PanelSettings.systemStatsMetrics),
+                metrics: PanelSettings.systemStatsMetrics,
+                networkInterfaceName: PanelSettings.networkInterfaceName),
             serviceMonitor: ServiceMonitorSettingsState(
                 endpoints: PanelSettings.serviceMonitorEndpoints,
                 refreshInterval: PanelSettings.serviceMonitorRefreshInterval),
@@ -370,9 +387,6 @@ extension AppDelegate {
                 hourFormat: PanelSettings.clockHourFormat, favorites: PanelSettings.clockFavorites),
             battery: BatterySettingsState(
                 refreshInterval: PanelSettings.batteryRefreshInterval),
-            network: NetworkSettingsState(
-                refreshInterval: PanelSettings.networkRefreshInterval,
-                interfaceName: PanelSettings.networkInterfaceName),
             projectPulse: PanelSettings.projectPulseConfiguration,
             githubInbox: PanelSettings.githubInboxConfiguration,
             docker: PanelSettings.dockerConfiguration,
@@ -382,7 +396,8 @@ extension AppDelegate {
                 cornerRadius: PanelSettings.cornerRadius,
                 tintOpacity: PanelSettings.tintOpacity
                     ?? currentTheme.panelTintColor.alphaComponent),
-            extraCustomTiles: PanelSettings.extraCustomTileConfigurations)
+            extraCustomTiles: PanelSettings.extraCustomTileConfigurations,
+            localPorts: PanelSettings.localPortsConfiguration)
     }
 
     private func applySettingsChange(_ change: SettingsPanelChange) {
@@ -402,6 +417,9 @@ extension AppDelegate {
             PanelSettings.deckAutoSlideSettings = settings
             for controller in readOnlyDeckPanelControllers { controller.applySettings() }
             synchronizeDeckAutoSlideTimer()
+        case .localPorts(let configuration):
+            PanelSettings.localPortsConfiguration = configuration
+            moduleServices.localPorts.updateConfiguration(configuration)
         case .notifications(let settings):
             let wasEnabled = PanelSettings.notifications.enabled
             PanelSettings.notifications = settings
@@ -494,12 +512,9 @@ extension AppDelegate {
         case .battery(.refreshInterval(let interval)):
             PanelSettings.batteryRefreshInterval = interval
             batteryStore.setRefreshInterval(interval)
-        case .network(.interfaceName(let name)):
+        case .systemStats(.networkInterfaceName(let name)):
             PanelSettings.networkInterfaceName = name
-            networkStore.setInterfaceName(name)
-        case .network(.refreshInterval(let interval)):
-            PanelSettings.networkRefreshInterval = interval
-            networkStore.setRefreshInterval(interval)
+            systemStatsStore.setNetworkInterfaceName(name)
         case .projectPulse(.configuration(let configuration)):
             PanelSettings.projectPulseConfiguration = configuration
             projectPulseStore.updateConfiguration(configuration)

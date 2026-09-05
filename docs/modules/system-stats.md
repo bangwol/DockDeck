@@ -7,21 +7,21 @@ the module stops all sampling.
 
 | Metric | Reading |
 | --- | --- |
+| GPU | Busiest device utilization reported by the local GPU driver, when available |
 | CPU | Processor utilization calculated from consecutive macOS host tick counters |
 | Memory | Activity Monitor-style physical memory in use |
 | Disk | Used capacity on the startup volume |
-| Network I/O | Download and upload rates on the current primary interface |
+| Network I/O | Download and upload rates on the selected or current primary interface |
 | Temperature | Numeric sensor value when the validated optional reader is available, plus macOS thermal pressure |
 
-Percentage metrics use progress bars until enough samples exist, then CPU and
+Percentage metrics use progress bars until enough samples exist, then CPU, GPU, and
 memory use compact trend lines. Network I/O uses compact down/up rates and a
 combined-transfer trend. Temperature combines a numeric value with a
 color-coded thermal-pressure bar.
 
-CPU, memory, and network histories cover only the latest 15 minutes and at most
+CPU, GPU, memory, and network histories cover only the latest 15 minutes and at most
 900 samples. They stay in memory, reset when DockDeck exits, and are discarded
-if the system clock moves backwards. The separate Network module keeps distinct
-download and upload histories under the same limits.
+if the system clock moves backwards. System Stats detail keeps distinct download and upload histories under the same limits.
 
 ## Memory semantics on macOS
 
@@ -50,7 +50,7 @@ to judge whether macOS is actually constrained. Cached and purgeable memory can
 be reclaimed when another workload needs it. See Apple's
 [Activity Monitor memory guide](https://support.apple.com/guide/activity-monitor/view-memory-usage-actmntr1004/mac).
 
-## Temperature and GPU limitations
+## Temperature source
 
 Apple exposes nominal, fair, serious, and critical thermal pressure to ordinary
 apps, not sensor degrees. When the separately installed
@@ -69,12 +69,37 @@ transition into macOS's serious or critical pressure state. It fires once per
 high-pressure episode rather than once per sample. Serious or critical pressure
 also enables DockDeck's reduced timer cadence until the system recovers.
 
-DockDeck does not report system-wide GPU utilization because macOS does not
-provide a supported public source suitable for this module.
+## GPU availability
+
+Select **GPU** in Settings (two to four metrics can be selected). DockDeck reads
+`IOAccelerator` driver statistics through IOKit and displays the maximum valid
+`Device Utilization %` across available GPUs. Values must be numeric, finite,
+and within 0–100; missing or unsupported counters show `--`, never 0%.
+
+The registry API is public, but the driver statistic is not a stable Apple API
+contract. Hardware and macOS updates can change availability or semantics.
+This requires no root access or helper command and does not estimate utilization
+from memory use. The detail card identifies the driver source.
+
+## Network consolidation
+
+The former Network module is part of System Stats. **Network I/O** keeps interface
+selection, separate download/upload charts, system route status, metered and
+Low Data indicators. It shares the System Stats sampling interval, so enabling
+both old modules no longer creates two counter readers or timers. It reads byte
+counters and connection metadata, without inspecting traffic or destinations.
+
+Saved Network-only decks move System Stats to the former Network position. When
+both were enabled, the existing System Stats position is kept. Active and
+auto-slide selections migrate without duplicate entries. An enabled legacy
+Network module also selects Network I/O (replacing the fourth metric if needed).
+The selected interface is preserved; the System Stats refresh interval is used.
+If a VPN interface disappears, unavailable counters remain distinct from an
+offline system route. Changing interfaces clears the baseline and trends.
 
 ## Data and permissions
 
-The built-in readings use local macOS host, file-system, routing, and
+The built-in readings use local macOS host, file-system, routing, IOKit, Network, and
 `ProcessInfo` APIs. They require no additional permission and make no network
 requests. The optional temperature adapter launches only the validated local
 Stats SMC reader.

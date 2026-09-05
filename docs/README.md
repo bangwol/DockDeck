@@ -14,12 +14,13 @@ front page harder to scan.
 - [Terminal](modules/terminal.md)
 - [Usage](modules/usage.md)
 - [System Stats](modules/system-stats.md)
+- [Local Ports](modules/local-ports.md)
 - [Schedule and Reminders](modules/schedule.md)
 - [Music](modules/music.md)
 - [Project Pulse](modules/project-pulse.md)
 - [GitHub Inbox](modules/github-inbox.md)
 - [Custom Tile](modules/custom-tile.md)
-- [Service Monitor, Weather, World Clock, Battery, Network, Docker, and Focus Timer](modules/catalog.md)
+- [Service Monitor, Weather, World Clock, Battery, Docker, and Focus Timer](modules/catalog.md)
 
 ## App behavior
 
@@ -31,6 +32,8 @@ front page harder to scan.
 - [Branch, PR, release, and version workflow](releases.md)
 
 ## Integrations
+
+- [macOS Shortcuts actions](integrations/shortcuts.md)
 
 - [Claude Code monitoring and optional bridge](integrations/claude-code.md)
 

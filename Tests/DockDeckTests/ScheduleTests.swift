@@ -351,7 +351,6 @@ final class ScheduleTests: XCTestCase {
             clock: ClockSettingsState(
                 timeZoneIdentifier: ClockTimeZone.systemIdentifier, hourFormat: .system),
             battery: BatterySettingsState(refreshInterval: 60),
-            network: NetworkSettingsState(refreshInterval: 2),
             projectPulse: ProjectPulseConfiguration(),
             githubInbox: GitHubInboxConfiguration(),
             docker: DockerConfiguration(),

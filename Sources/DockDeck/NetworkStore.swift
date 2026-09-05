@@ -60,19 +60,28 @@ final class SystemNetworkPathObserver: NetworkPathObserving {
 
     private let queue = DispatchQueue(label: "DockDeck.NetworkPath", qos: .utility)
     private var monitor: NWPathMonitor?
+    private var generation = 0
+
+    deinit { monitor?.cancel() }
 
     func start() {
         guard monitor == nil else { return }
+        generation += 1
+        let token = generation
         let monitor = NWPathMonitor()
         monitor.pathUpdateHandler = { [weak self] path in
             let snapshot = Self.snapshot(path)
-            DispatchQueue.main.async { self?.onUpdate?(snapshot) }
+            DispatchQueue.main.async {
+                guard let self, self.generation == token else { return }
+                self.onUpdate?(snapshot)
+            }
         }
         self.monitor = monitor
         monitor.start(queue: queue)
     }
 
     func stop() {
+        generation += 1
         monitor?.cancel()
         monitor = nil
     }
@@ -233,21 +242,16 @@ final class NetworkStore: ObservableObject {
     private let counterReader: (String?) -> NetworkCounters?
     private var historyInterfaceName: String?
     private var previous: (counters: NetworkCounters, date: Date)?
-    private var timer: Timer?
-    private var refreshInterval: TimeInterval
-    private var refreshCadence = ModuleRefreshCadence(backgroundMultiplier: 4)
-    private var runtimeLowPowerMode = false
+    private var isActive = false
     private let pathObserver: NetworkPathObserving
 
     init(
-        refreshInterval: TimeInterval = PanelSettings.networkRefreshInterval,
         initialSnapshot: NetworkSnapshot? = nil,
         initialConnection: NetworkConnectionSnapshot = .unknown,
         pathObserver: NetworkPathObserving = SystemNetworkPathObserver(),
         interfaceName: String = PanelSettings.networkInterfaceName,
         counterReader: @escaping (String?) -> NetworkCounters? = NetworkCounterReader.read(interfaceName:)
     ) {
-        self.refreshInterval = Self.resolvedRefreshInterval(refreshInterval)
         snapshot = initialSnapshot
         connection = initialConnection
         self.pathObserver = pathObserver
@@ -257,16 +261,15 @@ final class NetworkStore: ObservableObject {
     }
 
     func start() {
-        guard timer == nil else { return }
+        guard !isActive else { return }
+        isActive = true
         pathObserver.start()
-        refresh()
-        scheduleTimer()
     }
 
     func stop() {
-        timer?.invalidate()
-        timer = nil
         previous = nil
+        guard isActive else { return }
+        isActive = false
         pathObserver.stop()
     }
 
@@ -287,29 +290,6 @@ final class NetworkStore: ObservableObject {
         uploadHistory = MetricHistory()
         observedAt = nil
         snapshot = nil
-        if timer != nil { refresh() }
-    }
-
-    func setRefreshInterval(_ interval: TimeInterval) {
-        let interval = Self.resolvedRefreshInterval(interval)
-        guard refreshInterval != interval else { return }
-        refreshInterval = interval
-        guard timer != nil else { return }
-        timer?.invalidate()
-        scheduleTimer()
-    }
-
-    func setRuntimeActivity(
-        _ activity: ModuleRuntimeActivity, lowPowerMode: Bool
-    ) {
-        runtimeLowPowerMode = lowPowerMode
-        guard refreshCadence.update(
-            activity: activity,
-            lowPowerMode: lowPowerMode || connection.isConstrained),
-            timer != nil
-        else { return }
-        timer?.invalidate()
-        scheduleTimer()
     }
 
     func refresh(now: Date = Date()) {
@@ -349,26 +329,7 @@ final class NetworkStore: ObservableObject {
     }
 
     private func receiveConnection(_ connection: NetworkConnectionSnapshot) {
-        guard self.connection != connection else { return }
+        guard isActive, self.connection != connection else { return }
         self.connection = connection
-        guard refreshCadence.update(
-            activity: refreshCadence.activity,
-            lowPowerMode: runtimeLowPowerMode || connection.isConstrained),
-            timer != nil
-        else { return }
-        timer?.invalidate()
-        scheduleTimer()
-    }
-
-    private func scheduleTimer() {
-        let interval = refreshCadence.effectiveInterval(
-            configuredInterval: refreshInterval)
-        timer = .moduleRefreshTimer(interval: interval) { [weak self] in self?.refresh() }
-    }
-
-    private static func resolvedRefreshInterval(_ interval: TimeInterval) -> TimeInterval {
-        PanelSettings.networkRefreshIntervals.min(by: {
-            abs($0 - interval) < abs($1 - interval)
-        }) ?? PanelSettings.defaultNetworkRefreshInterval
     }
 }

@@ -106,3 +106,10 @@ five; macOS Low Power Mode applies an additional two-times multiplier. This
 makes My Activity refresh every 25 minutes in the background, 10 minutes while
 visible in Low Power Mode, or 50 minutes when both conditions apply. `⌘R`
 always requests an immediate refresh.
+
+Save up to three configured projects under **Saved Projects**. Choose one there
+or from the detail window to restore its source, repository and polling options.
+Only the selected project is refreshed. Switching discards late responses from
+the previous selection and reuses the existing GitHub request broker/cache.
+Saved local paths and GitHub repository names remain in local preferences;
+removing a favorite does not remove a repository or alter the current selection.

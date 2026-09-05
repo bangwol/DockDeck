@@ -12,16 +12,27 @@ versioning are separate:
 | Change | Version action |
 | --- | --- |
 | Documentation, tests, or internal refactoring only | No version change |
-| Feature or fix PR | No version change; merge it independently after review |
+| Goal PR (features, fixes, UI, tests, and docs for one goal) | No version change; review and merge the accumulated goal together |
 | Release integration PR | Increment the patch version exactly once (`0.1.0` → `0.1.1`) for all selected changes already on `main` |
 | Another build of the same base version | Keep `VERSION`; increment only the preview sequence |
 
-Keep one logical change in each feature or fix PR. If combined testing is
-needed, use a temporary integration branch without replacing those focused
-reviews with one oversized PR. When the selected work is ready to distribute,
-create a release integration branch from the latest `main`; update `VERSION`
-and release-facing documentation there, then run the release and package
-checks. Do not reserve versions on unfinished feature branches.
+Use one branch and one PR per user-visible goal. Related features, module
+updates, UI work, and fixes stay on that branch as separately tested local
+commits. Do not create a branch or PR for every module or commit. Start a new
+goal from synchronized `main`; use `codex/<goal>` for Codex-created branches.
+Split only for a requested or independently deliverable scope.
+
+Before pushing, review the accumulated diff and prepare a single Conventional
+Commit PR title and description covering the final goal and validation. Once a
+push is authorized, push the tested commits together and update that same PR
+for review fixes. Do not push after every local commit. Feature work reaches
+`main` through the goal PR, preferably by squash merge.
+
+When the selected work is ready to distribute, create a release integration
+branch from the latest `main`; update `VERSION` and release-facing documentation
+there, then run the release and package checks. This is one release checkpoint,
+not a reason to split the goal into feature-by-feature PRs. Do not reserve
+versions on unfinished feature branches.
 
 Preview sequence numbers belong to Git tags, not `VERSION`. For example,
 `VERSION` remains `0.1.1` for `v0.1.1-preview.1` and
@@ -34,6 +45,30 @@ when the accumulated `main` state is ready for a tested preview release.
 
 `1.0.0` is reserved for a stable feature and settings contract plus a
 Developer ID-signed, notarized distribution path.
+
+## Architecture support
+
+Apple silicon is the primary development and runtime validation target. Keep
+native Intel compatibility in the 0.1.3 universal preview: both DockDeck and its
+bundled Claude bridge contain `arm64` and `x86_64` slices. The package check
+rejects a missing slice. Source installation builds for the current Mac and
+rejects a translated terminal to avoid installing an Intel-only app on Apple
+silicon. Neither bundled executable needs Rosetta on Apple silicon.
+
+Apple's [Rosetta transition notice](https://developer.apple.com/news/?id=w5ngl9k2)
+states that macOS 27 is the last release with general Rosetta support and that
+macOS 26.4 and later may warn when translated apps run. A universal binary runs
+natively on either processor; carrying an Intel slice does not itself require
+Rosetta. Forcing that slice to run on Apple silicon can trigger the warning.
+Use the native app for normal installation and runtime checks.
+
+Intel support currently shares the same implementation and needs no extra
+dependencies. Retain it while the supported toolchain can build both slices;
+reassess at a release checkpoint if that requires separate architecture-specific
+maintenance. Intel cross-compilation is checked, but does not replace testing
+on a physical Intel Mac. Hardware-dependent GPU readings remain optional on
+both architectures. User-installed CLIs are separate integrations; choose their
+native versions on Apple silicon.
 
 ## Preview artifacts
 

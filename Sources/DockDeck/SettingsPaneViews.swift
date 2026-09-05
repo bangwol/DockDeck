@@ -26,6 +26,9 @@ struct DecksSettingsView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
+                if let app = NSApp.delegate as? AppDelegate {
+                    DeckProfileControls(store: app.deckProfiles)
+                }
                 DeckAutoSlideControls(model: model)
 
                 HStack(alignment: .top, spacing: 14) {
@@ -39,7 +42,7 @@ struct DecksSettingsView: View {
 
                 HStack {
                     Button(action: model.swapDecks) {
-                        Label("Swap Left and Right Decks", systemImage: "arrow.left.arrow.right")
+                        Label(L10n.text("Swap Left and Right Decks"), systemImage: "arrow.left.arrow.right")
                     }
                     .buttonStyle(.bordered)
                     Spacer()
@@ -297,11 +300,11 @@ private struct InactiveDeckModuleCard: View {
                 } preview: {
                     DeckModuleDragPreview(definition: definition, isEnabled: false)
                 }
-                .accessibilityLabel("Drag \(definition.title)")
+                .accessibilityLabel("Drag \(definition.displayTitle)")
             Image(systemName: definition.symbolName)
                 .frame(width: 18)
             VStack(alignment: .leading, spacing: 1) {
-                Text(definition.title)
+                Text(definition.displayTitle)
                     .fontWeight(.medium)
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
@@ -313,7 +316,7 @@ private struct InactiveDeckModuleCard: View {
             }
             Spacer()
             Toggle(
-                "Show \(definition.title)",
+                "Show \(definition.displayTitle)",
                 isOn: Binding(
                     get: { false },
                     set: { enabled in
@@ -341,7 +344,7 @@ private struct InactiveDeckModuleCard: View {
         .contentShape(Rectangle())
         .contextMenu {
             if let pane = definition.settingsPane {
-                Button("Configure \(definition.title)…") { model.selectPane(pane) }
+                Button("Configure \(definition.displayTitle)…") { model.selectPane(pane) }
                 Divider()
             }
             Button("Show in Left Deck") {
@@ -393,11 +396,11 @@ private struct DeckModuleCard: View {
                 } preview: {
                     DeckModuleDragPreview(definition: definition, isEnabled: isEnabled)
                 }
-                .accessibilityLabel("Drag \(definition.title)")
+                .accessibilityLabel("Drag \(definition.displayTitle)")
             Image(systemName: definition.symbolName)
                 .frame(width: 18)
             VStack(alignment: .leading, spacing: 1) {
-                Text(definition.title)
+                Text(definition.displayTitle)
                     .fontWeight(.medium)
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
@@ -409,7 +412,7 @@ private struct DeckModuleCard: View {
             }
             Spacer()
             Toggle(
-                "Automatically slide \(definition.title)",
+                "Automatically slide \(definition.displayTitle)",
                 isOn: Binding(
                     get: { model.isAutoSliding(definition.id) },
                     set: { model.setAutoSlideEnabled($0, for: definition.id) }))
@@ -419,7 +422,7 @@ private struct DeckModuleCard: View {
                 .disabled(!isEnabled)
                 .help(autoSlideHelp)
             Toggle(
-                "Show \(definition.title)",
+                "Show \(definition.displayTitle)",
                 isOn: Binding(
                     get: { model.isEnabled(definition.id) },
                     set: { enabled in
@@ -433,7 +436,7 @@ private struct DeckModuleCard: View {
                 .disabled(!model.canDisable(definition.id))
                 .help(
                     model.canDisable(definition.id)
-                        ? "Run and show \(definition.title)"
+                        ? "Run and show \(definition.displayTitle)"
                         : "DockDeck keeps one module enabled so Settings remains accessible")
         }
         .padding(.horizontal, 8)
@@ -473,7 +476,7 @@ private struct DeckModuleCard: View {
                 isTargeted: $isDropTarget))
         .contextMenu {
             if let pane = definition.settingsPane {
-                Button("Configure \(definition.title)…") { model.selectPane(pane) }
+                Button("Configure \(definition.displayTitle)…") { model.selectPane(pane) }
                 Divider()
             }
             let destination = side.opposite
@@ -507,7 +510,7 @@ private struct DeckModuleCard: View {
                 model.setEnabled(false, for: definition.id)
             }
         }
-        .help("Drag the ≡ handle to move or reorder \(definition.title)")
+        .help("Drag the ≡ handle to move or reorder \(definition.displayTitle)")
     }
 
     private var isEnabled: Bool { model.isEnabled(definition.id) }
@@ -515,7 +518,7 @@ private struct DeckModuleCard: View {
         if definition.id == .terminal {
             return "Include Terminal while compact and idle; focusing it pauses automatic slides"
         }
-        return "Include \(definition.title) in automatic slides"
+        return "Include \(definition.displayTitle) in automatic slides"
     }
     private var isRecentlyActivated: Bool {
         !reduceMotion && model.recentlyActivatedModule == definition.id
@@ -545,7 +548,7 @@ private struct DeckModuleDragPreview: View {
             Image(systemName: definition.symbolName)
                 .frame(width: 18)
             VStack(alignment: .leading, spacing: 1) {
-                Text(definition.title)
+                Text(definition.displayTitle)
                     .fontWeight(.semibold)
                 Text(definition.subtitle)
                     .font(.caption)

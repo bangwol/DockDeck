@@ -33,10 +33,10 @@ without taking over the menu bar or desktop.
 | Group | Modules |
 | --- | --- |
 | Core | Terminal, Usage |
-| System | System Stats, Battery, Network, Weather, World Clock |
+| System | System Stats (CPU/GPU/network), Battery, Weather, World Clock |
 | Media | Music |
 | Work | Schedule, Focus Timer, Project Pulse, GitHub Inbox |
-| Operations | Service Monitor, Docker, Custom Tile |
+| Operations | Service Monitor, Docker, Custom Tile, Local Ports |
 
 See the [module guide index](docs/README.md#module-guides) for setup, data
 sources, refresh behavior, and privacy details.
@@ -44,6 +44,8 @@ sources, refresh behavior, and privacy details.
 ## Install
 
 DockDeck currently ships as a source-installed preview for macOS 13 or later.
+Apple silicon is the primary target; Intel compatibility remains in the
+universal preview. See the [architecture policy](docs/releases.md#architecture-support).
 Install Xcode Command Line Tools, then run:
 
 ```bash
@@ -52,8 +54,9 @@ cd DockDeck
 ./scripts/install.sh
 ```
 
-The script builds `~/Applications/DockDeck.app`, starts it, and registers it for
-future logins. Grant Accessibility access when macOS asks so DockDeck can follow
+The script builds `~/Applications/DockDeck.app` and starts it. Enable **Launch at
+Login** in **Settings → Startup** when wanted; updates preserve that choice.
+Grant Accessibility access when macOS asks so DockDeck can follow
 the Dock precisely. Without that permission, the panels use fixed fallback
 positions.
 
