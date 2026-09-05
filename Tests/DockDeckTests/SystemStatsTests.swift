@@ -5,6 +5,31 @@ import XCTest
 @testable import DockDeck
 
 final class SystemStatsTests: XCTestCase {
+    func testMeasureNativeSamplingAndBoundedHistoryWhenRequested() throws {
+        guard ProcessInfo.processInfo.environment["DOCKDECK_MEASURE_METRICS"] == "1" else {
+            throw XCTSkip("Set DOCKDECK_MEASURE_METRICS=1 to measure local sampling")
+        }
+        let start = Date()
+        for _ in 0..<100 { _ = NetworkCounterReader.read() }
+        let networkDuration = Date().timeIntervalSince(start)
+        var history = MetricHistory()
+        let historyStart = Date()
+        for index in 0..<10_000 {
+            history.append(Double(index % 100), at: start.addingTimeInterval(Double(index)))
+        }
+        let historyDuration = Date().timeIntervalSince(historyStart)
+        XCTAssertEqual(history.samples.count, MetricHistory.maximumSampleCount)
+        let view = NSHostingView(rootView: MetricSparkline(samples: history.samples, color: .cyan))
+        view.frame = NSRect(x: 0, y: 0, width: 250, height: 40)
+        let renderStart = Date()
+        for _ in 0..<100 {
+            view.layoutSubtreeIfNeeded()
+            let bitmap = try XCTUnwrap(view.bitmapImageRepForCachingDisplay(in: view.bounds))
+            view.cacheDisplay(in: view.bounds, to: bitmap)
+        }
+        print("Metric benchmark: network read ms=\(networkDuration * 10); history append ms=\(historyDuration / 10); 900-point render ms=\(Date().timeIntervalSince(renderStart) * 10)")
+    }
+
     func testMetricHistoryCalculatesInterpolatedPercentiles() {
         var history = MetricHistory()
         for value in [10.0, 40.0, 20.0, 30.0] { history.append(value) }
