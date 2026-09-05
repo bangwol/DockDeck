@@ -112,5 +112,5 @@ final class DockerTests: XCTestCase {
 private struct FakeDockerReader: DockerReading {
     let snapshot: DockerSnapshot
 
-    func read(now: Date) throws -> DockerSnapshot { snapshot }
+    func read(now: Date, cancellation: Progress?) throws -> DockerSnapshot { snapshot }
 }

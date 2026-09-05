@@ -129,7 +129,7 @@ final class QuickActionStore: ObservableObject {
                 DispatchQueue.global(qos: .userInitiated).async { [weak self] in
                     let result = Result {
                         _ = try BoundedProcessRunner.run(executableURL: URL(fileURLWithPath: "/usr/bin/shortcuts"),
-                            arguments: ["run", action.target], timeout: 30, maximumOutputBytes: 32 * 1_024)
+                            arguments: ["run", action.target], timeout: 30, maximumOutputBytes: 32 * 1_024, diagnosticSource: .quickAction)
                     }
                     DispatchQueue.main.async { [weak self] in
                         guard let self else { return }

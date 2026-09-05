@@ -476,13 +476,13 @@ final class PanelAppearanceTests: XCTestCase {
 
     func testDiagnosticCommandRunnerReportsExitStatus() {
         XCTAssertEqual(
-            DiagnosticCommandRunner.exitsSuccessfully(
+            DiagnosticCommandRunner.run(
                 URL(fileURLWithPath: "/usr/bin/true"), arguments: []),
-            true)
+            .ready)
         XCTAssertEqual(
-            DiagnosticCommandRunner.exitsSuccessfully(
+            DiagnosticCommandRunner.run(
                 URL(fileURLWithPath: "/usr/bin/false"), arguments: []),
-            false)
+            .nonZeroExit)
     }
 
     func testDiagnosticCommandRunnerResolvesSiblingRuntime() throws {
@@ -500,9 +500,9 @@ final class PanelAppearanceTests: XCTestCase {
             [.posixPermissions: 0o700], ofItemAtPath: wrapper.path)
 
         XCTAssertEqual(
-            DiagnosticCommandRunner.exitsSuccessfully(
+            DiagnosticCommandRunner.run(
                 wrapper, arguments: [], environment: ["PATH": "/usr/bin:/bin"]),
-            true)
+            .ready)
     }
 
     func testModuleRuntimeCoordinatorStartsAndStopsOnlyChangedModules() {

@@ -38,6 +38,24 @@ struct DiagnosticsSettingsView: View {
                         .font(.headline)
                 }
 
+                if !store.processes.isEmpty {
+                    GroupBox("Command performance (this session)") {
+                        VStack(alignment: .leading, spacing: 10) {
+                            ForEach(store.processes, id: \.source) { metric in
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text(metric.source.rawValue).fontWeight(.medium)
+                                    Text("Last duration: \(metric.lastDuration, specifier: "%.3f")s · Timeouts: \(metric.timeouts) · Cancellations: \(metric.cancellations)")
+                                        .font(.caption).foregroundStyle(.secondary)
+                                    if let success = metric.lastSuccessfulAt {
+                                        Text("Last OK \(success.formatted(date: .abbreviated, time: .shortened))")
+                                            .font(.caption2).foregroundStyle(.secondary)
+                                    }
+                                }.accessibilityElement(children: .combine)
+                            }
+                        }.frame(maxWidth: .infinity, alignment: .leading).padding(4)
+                    }
+                }
+
                 if !store.moduleRuntime.states.isEmpty {
                     ModuleRuntimeDiagnosticsView(snapshot: store.moduleRuntime)
                 }

@@ -151,7 +151,7 @@ private struct FakeCustomTileReader: CustomTileReading {
     let snapshot: CustomTileSnapshot
 
     func read(
-        configuration: CustomTileConfiguration, now: Date
+        configuration: CustomTileConfiguration, now: Date, cancellation: Progress?
     ) throws -> CustomTileSnapshot {
         snapshot
     }
@@ -159,7 +159,7 @@ private struct FakeCustomTileReader: CustomTileReading {
 
 private final class SequenceTileReader: CustomTileReading {
     private var count = 0
-    func read(configuration: CustomTileConfiguration, now: Date) throws -> CustomTileSnapshot {
+    func read(configuration: CustomTileConfiguration, now: Date, cancellation: Progress?) throws -> CustomTileSnapshot {
         count += 1
         if count == 2 { throw CustomTileError.commandFailed }
         return CustomTileSnapshot(
