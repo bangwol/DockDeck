@@ -400,6 +400,16 @@ struct ProjectPulseModuleDetailView: View {
                                     .foregroundStyle(baseColor.opacity(0.62))
                             }
                             Spacer()
+                            if !PanelSettings.projectPulseFavorites.isEmpty {
+                                Menu("Saved Projects") {
+                                    ForEach(PanelSettings.projectPulseFavorites, id: \.favoriteKey) { favorite in
+                                        Button(favorite.favoriteTitle) {
+                                            PanelSettings.projectPulseConfiguration = favorite
+                                            store.updateConfiguration(favorite)
+                                        }
+                                    }
+                                }.fixedSize()
+                            }
                             if let workflow = snapshot.workflow {
                                 Text(workflow.title)
                                     .font(.caption.weight(.semibold))

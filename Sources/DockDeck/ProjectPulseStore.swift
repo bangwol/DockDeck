@@ -95,15 +95,7 @@ struct ProjectPulseConfiguration: Codable, Equatable {
 
     func normalized() -> Self {
         var configuration = self
-        if let path = repositoryPath?.trimmingCharacters(in: .whitespacesAndNewlines),
-            !path.isEmpty, path.count <= Self.maximumPathLength, !path.contains("\0")
-        {
-            let normalized = ((path as NSString).expandingTildeInPath as NSString)
-                .standardizingPath
-            configuration.repositoryPath = normalized.hasPrefix("/") ? normalized : nil
-        } else {
-            configuration.repositoryPath = nil
-        }
+        configuration.repositoryPath = Self.normalizedRepositoryPath(repositoryPath)
         configuration.githubRepository = Self.normalizedGitHubRepository(githubRepository)
         configuration.refreshInterval = Self.refreshIntervals.min {
             abs($0 - refreshInterval) < abs($1 - refreshInterval)
@@ -112,6 +104,21 @@ struct ProjectPulseConfiguration: Codable, Equatable {
             configuration.refreshInterval = max(configuration.refreshInterval, 5 * 60)
         }
         return configuration
+    }
+
+    private static func normalizedRepositoryPath(_ value: String?) -> String? {
+        guard var path = value?.trimmingCharacters(in: .whitespacesAndNewlines),
+            !path.isEmpty, !path.contains("\0"), path.utf8.count <= maximumPathLength else { return nil }
+        if path.hasPrefix("~") {
+            let prefix = path.prefix(while: { $0 != "/" })
+            let home = prefix == "~" ? FileManager.default.homeDirectoryForCurrentUser.path
+                : NSHomeDirectoryForUser(String(prefix.dropFirst()))
+            guard let home else { return nil }
+            path = home + path.dropFirst(prefix.count)
+        }
+        guard path.hasPrefix("/"), path.utf8.count <= maximumPathLength else { return nil }
+        // NSString path expansion can silently truncate long input; URL keeps it intact.
+        return URL(fileURLWithPath: path).standardizedFileURL.path
     }
 
     var isConfigured: Bool {
@@ -136,6 +143,30 @@ struct ProjectPulseConfiguration: Codable, Equatable {
             part.unicodeScalars.allSatisfy(allowed.contains)
         }) else { return nil }
         return parts.joined(separator: "/")
+    }
+}
+
+extension ProjectPulseConfiguration {
+    var favoriteKey: String {
+        switch source {
+        case .local: "local:\(repositoryPath ?? "")"
+        case .github: "github:\(githubScope.rawValue):\(githubScope == .activity ? "" : githubRepository?.lowercased() ?? "")"
+        }
+    }
+
+    var favoriteTitle: String {
+        switch source {
+        case .local: repositoryPath.map { URL(fileURLWithPath: $0).lastPathComponent } ?? "Local repository"
+        case .github: githubScope == .activity ? "My GitHub activity" : githubRepository ?? "GitHub repository"
+        }
+    }
+
+    static func favorites(_ configurations: [Self]) -> [Self] {
+        var seen: Set<String> = []
+        return Array(configurations.map { $0.normalized() }.filter {
+            $0.isConfigured && ($0.repositoryPath?.utf8.count ?? 0) <= Self.maximumPathLength
+                && seen.insert($0.favoriteKey).inserted
+        }.prefix(3))
     }
 }
 

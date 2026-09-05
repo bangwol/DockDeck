@@ -527,6 +527,10 @@ final class SettingsPanelModel: ObservableObject {
         onChange?(.network(.refreshInterval(selected)))
     }
 
+    func selectProjectPulseFavorite(_ configuration: ProjectPulseConfiguration) {
+        updateProjectPulseConfiguration { $0 = configuration }
+    }
+
     func setProjectPulseRepositoryPath(_ path: String?) {
         updateProjectPulseConfiguration { $0.repositoryPath = path }
     }

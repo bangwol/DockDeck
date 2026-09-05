@@ -189,6 +189,7 @@ extension AppDelegate {
     /// The accessory app may be inactive while its floating panel stays visible, in which
     /// case ordering front alone leaves keyboard focus in the previous application.
     private func focusSettingsPanel(_ settingsPanel: NSWindow) {
+        (settingsPanel.contentView as? SettingsPanelView)?.setValues(currentSettingsValues)
         NSApp.activate(ignoringOtherApps: true)
         settingsPanel.makeKeyAndOrderFront(nil)
     }

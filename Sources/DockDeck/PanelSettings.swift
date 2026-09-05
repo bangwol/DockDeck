@@ -504,6 +504,19 @@ enum PanelSettings {
         }
     }
 
+    static var projectPulseFavorites: [ProjectPulseConfiguration] {
+        get {
+            guard let data = UserDefaults.standard.data(forKey: "dockdeck.projectPulseFavorites.v1"),
+                data.count <= 32 * 1_024,
+                let values = try? JSONDecoder().decode([ProjectPulseConfiguration].self, from: data) else { return [] }
+            return ProjectPulseConfiguration.favorites(values)
+        }
+        set {
+            guard let data = try? JSONEncoder().encode(ProjectPulseConfiguration.favorites(newValue)) else { return }
+            UserDefaults.standard.set(data, forKey: "dockdeck.projectPulseFavorites.v1")
+        }
+    }
+
     static var githubInboxConfiguration: GitHubInboxConfiguration {
         get {
             guard let data = UserDefaults.standard.data(forKey: githubInboxConfigurationKey),
@@ -732,6 +745,7 @@ enum PanelSettings {
         defaults.removeObject(forKey: networkInterfaceNameKey)
         defaults.removeObject(forKey: notificationsKey)
         defaults.removeObject(forKey: projectPulseConfigurationKey)
+        defaults.removeObject(forKey: "dockdeck.projectPulseFavorites.v1")
         defaults.removeObject(forKey: githubInboxConfigurationKey)
         defaults.removeObject(forKey: dockerConfigurationKey)
         defaults.removeObject(forKey: customTileConfigurationKey)

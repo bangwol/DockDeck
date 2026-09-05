@@ -5,6 +5,23 @@ import XCTest
 @testable import DockDeck
 
 final class ProjectPulseTests: XCTestCase {
+    func testFavoritesValidateDeduplicateAndLimitWithoutChangingOptions() {
+        let local = ProjectPulseConfiguration(repositoryPath: "/tmp/project", includesGitHubActions: true)
+        let github = ProjectPulseConfiguration(source: .github, githubRepository: "owner/repo")
+        let duplicate = ProjectPulseConfiguration(source: .github, githubRepository: "Owner/Repo")
+        let activity = ProjectPulseConfiguration(source: .github, githubScope: .activity)
+        let favorites = ProjectPulseConfiguration.favorites([.init(), local, local, github, duplicate, activity,
+            .init(repositoryPath: "/tmp/fourth")])
+        XCTAssertEqual(favorites, [local, github, activity])
+        XCTAssertEqual(favorites.first?.favoriteTitle, "project")
+        XCTAssertTrue(favorites.first?.includesGitHubActions == true)
+        let longPath = "/" + String(repeating: "a", count: 1500)
+        XCTAssertEqual(ProjectPulseConfiguration(repositoryPath: longPath).repositoryPath, longPath)
+        XCTAssertEqual(ProjectPulseConfiguration(repositoryPath: "~/repo/../project").repositoryPath,
+            FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("project").path)
+        XCTAssertTrue(ProjectPulseConfiguration.favorites([.init(repositoryPath: "/" + String(repeating: "한", count: 2000))]).isEmpty)
+    }
+
     func testConfigurationNormalizesAbsolutePathAndRefreshInterval() {
         let configuration = ProjectPulseConfiguration(
             repositoryPath: "/tmp/../tmp/example",
