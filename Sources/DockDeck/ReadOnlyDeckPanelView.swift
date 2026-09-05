@@ -282,9 +282,8 @@ struct ReadOnlyModuleDetailView: View {
 
     @ViewBuilder private var detailContent: some View {
         switch presentation.activeModule {
-        case .clock:
-            ClockModuleDetailView(store: services.clock, timeZoneIdentifier: PanelSettings.clockTimeZoneIdentifier,
-                hourFormat: PanelSettings.clockHourFormat, favorites: PanelSettings.clockFavorites)
+        case .battery:
+            BatteryModuleDetailView(store: services.battery)
         case .usage:
             UsageModuleDetailView(store: services.usage, theme: presentation.theme)
         case .systemStats:
@@ -295,6 +294,9 @@ struct ReadOnlyModuleDetailView: View {
                 store: services.serviceMonitor, theme: presentation.theme)
         case .schedule:
             ScheduleModuleDetailView(store: services.schedule, theme: presentation.theme)
+        case .clock:
+            ClockModuleDetailView(store: services.clock, timeZoneIdentifier: PanelSettings.clockTimeZoneIdentifier,
+                hourFormat: PanelSettings.clockHourFormat, favorites: PanelSettings.clockFavorites)
         case .music:
             MusicModuleDetailView(store: services.music, theme: presentation.theme)
         case .projectPulse:

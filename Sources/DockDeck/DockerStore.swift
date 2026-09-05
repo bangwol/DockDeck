@@ -15,6 +15,13 @@ struct DockerConfiguration: Codable, Equatable {
 
     func normalized() -> Self { Self(refreshInterval: refreshInterval) }
 }
+struct DockerContainerMetric: Equatable, Identifiable {
+    let id: String
+    let name: String
+    let cpuPercent: Double
+    let memoryBytes: Double
+}
+
 struct DockerSnapshot: Equatable {
     let runningCount: Int
     let stoppedCount: Int
@@ -22,6 +29,7 @@ struct DockerSnapshot: Equatable {
     let cpuPercent: Double?
     let memoryBytes: Double?
     let observedAt: Date
+    var containers: [DockerContainerMetric] = []
 }
 
 enum DockerStatus: Equatable {
@@ -56,10 +64,14 @@ enum DockerOutputParser {
     }
 
     private struct Stats: Decodable {
+        let id: String?
+        let name: String?
         let cpuPercent: String
         let memoryUsage: String
 
         private enum CodingKeys: String, CodingKey {
+            case id = "ID"
+            case name = "Name"
             case cpuPercent = "CPUPerc"
             case memoryUsage = "MemUsage"
         }
@@ -72,23 +84,37 @@ enum DockerOutputParser {
         return (running, max(containers.count - running, 0), unhealthy)
     }
 
-    static func parseStats(_ data: Data) throws -> (cpuPercent: Double, memoryBytes: Double) {
+    static func parseStats(_ data: Data) throws -> (
+        cpuPercent: Double, memoryBytes: Double, containers: [DockerContainerMetric]
+    ) {
         let stats: [Stats] = try decodeLines(data)
         var cpu = 0.0
         var memory = 0.0
-        for item in stats {
+        var containers: [DockerContainerMetric] = []
+        var seen: Set<String> = []
+        for (index, item) in stats.enumerated() {
             guard let cpuValue = percent(item.cpuPercent),
                 let memoryValue = bytes(String(item.memoryUsage.split(separator: "/").first ?? ""))
             else { throw DockerError.invalidOutput }
             let nextCPU = cpu + cpuValue
             let nextMemory = memory + memoryValue
-            guard nextCPU.isFinite, nextMemory.isFinite,
+            guard nextCPU.isFinite, nextCPU < Double(Int.max), nextMemory.isFinite,
                 nextMemory < Double(Int64.max)
             else { throw DockerError.invalidOutput }
             cpu = nextCPU
             memory = nextMemory
+            let id = String((item.id ?? item.name ?? "container-\(index)").prefix(128))
+            if seen.insert(id).inserted {
+                let name = String((item.name ?? item.id ?? "Container \(index + 1)")
+                    .replacingOccurrences(of: "\n", with: " ").prefix(128))
+                containers.append(DockerContainerMetric(
+                    id: id, name: name, cpuPercent: cpuValue, memoryBytes: memoryValue))
+            }
         }
-        return (cpu, memory)
+        containers.sort {
+            $0.cpuPercent == $1.cpuPercent ? $0.name < $1.name : $0.cpuPercent > $1.cpuPercent
+        }
+        return (cpu, memory, Array(containers.prefix(50)))
     }
 
     private static func decodeLines<Value: Decodable>(_ data: Data) throws -> [Value] {
@@ -180,6 +206,7 @@ struct DockerClient: DockerReading {
         let counts = try DockerOutputParser.parseContainers(containersData)
         var cpuPercent: Double? = counts.running == 0 ? 0 : nil
         var memoryBytes: Double? = counts.running == 0 ? 0 : nil
+        var containers: [DockerContainerMetric] = []
         if counts.running > 0,
             let statsData = try? BoundedProcessRunner.run(
                 executableURL: docker,
@@ -191,6 +218,7 @@ struct DockerClient: DockerReading {
         {
             cpuPercent = stats.cpuPercent
             memoryBytes = stats.memoryBytes
+            containers = stats.containers
         }
         return DockerSnapshot(
             runningCount: counts.running,
@@ -198,7 +226,7 @@ struct DockerClient: DockerReading {
             unhealthyCount: counts.unhealthy,
             cpuPercent: cpuPercent,
             memoryBytes: memoryBytes,
-            observedAt: now)
+            observedAt: now, containers: containers)
     }
 }
 
