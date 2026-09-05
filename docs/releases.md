@@ -4,6 +4,33 @@ DockDeck is a pre-1.0 project. Public binaries are technical previews until a
 Developer ID-signed and notarized build is available. The root `VERSION` file is
 the single source of truth for the app's three-part version.
 
+## 0.1.3 integration
+
+This patch combines the completed stability review and module/workflow updates.
+Network is now part of [System Stats](modules/system-stats.md), with automatic
+migration of existing decks and selectable GPU utilization. Existing modules
+add detailed readings, hourly weather, container metrics, favorites, filters,
+and clearer refresh/error states.
+
+The release adds [Local Ports](modules/local-ports.md), saved deck profiles and
+validated backups, explicit Quick Actions, three Custom Tiles, searchable
+modules/settings, readable compact layouts, core Korean/English controls, and
+[native Shortcuts actions](integrations/shortcuts.md). It also fixes packaged
+resource lookup, input/output bounds, ambiguous profile names, and cancellation
+and bounded app-exit cleanup of owned background commands.
+
+[Launch at Login](getting-started.md#install-and-start-at-login) now uses the
+native macOS registration and preserves the existing choice across updates.
+The legacy LaunchAgent is backed up and removed after migration. New installs
+leave login launch off; pending macOS approval remains visible to the user.
+
+Apple silicon remains the primary target. The universal app retains native
+Intel compatibility and includes localized resources and App Intents metadata.
+Source installation rejects translated terminals to prevent an Intel-only
+installation on Apple silicon. GPU readings remain driver-dependent.
+Preview signing and notarization limitations below continue to apply; this
+version integration does not itself create a tag or publish a GitHub Release.
+
 ## Version policy
 
 DockDeck uses patch-only preview increments for now. Feature work and release
