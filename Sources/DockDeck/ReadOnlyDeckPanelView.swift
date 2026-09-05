@@ -106,7 +106,7 @@ final class PanelModuleServices {
         self.docker = docker
         self.customTile = customTile
         self.focusTimer = focusTimer
-        runtimes = [
+        var runtimes: [PanelModuleID: any PanelModuleRuntime] = [
             .usage: usage,
             .systemStats: systemStats,
             .serviceMonitor: serviceMonitor,
@@ -122,6 +122,11 @@ final class PanelModuleServices {
             .customTile: customTile,
             .focusTimer: focusTimer,
         ]
+        for module in PanelModuleID.extraCustomTiles {
+            runtimes[module] = CustomTileStore(
+                configuration: PanelSettings.customTileConfiguration(for: module))
+        }
+        self.runtimes = runtimes
     }
 
     func runtime(for module: PanelModuleID) -> (any PanelModuleRuntime)? {
@@ -225,8 +230,12 @@ struct ReadOnlyDeckPanelView: View {
             GitHubInboxPanelView(store: services.githubInbox, theme: presentation.theme)
         case .docker:
             DockerPanelView(store: services.docker, theme: presentation.theme)
-        case .customTile:
-            CustomTilePanelView(store: services.customTile, theme: presentation.theme)
+        case .customTile, .customTile2, .customTile3:
+            if let module = presentation.activeModule,
+                let store = services.runtime(for: module) as? CustomTileStore
+            {
+                CustomTilePanelView(store: store, theme: presentation.theme)
+            }
         case .focusTimer:
             FocusTimerPanelView(store: services.focusTimer, theme: presentation.theme)
         default:
@@ -275,6 +284,8 @@ struct ReadOnlyModuleDetailView: View {
         switch presentation.activeModule {
         case .network:
             NetworkModuleDetailView(store: services.network)
+        case .battery:
+            BatteryModuleDetailView(store: services.battery)
         case .usage:
             UsageModuleDetailView(store: services.usage, theme: presentation.theme)
         case .systemStats:
@@ -294,6 +305,12 @@ struct ReadOnlyModuleDetailView: View {
             GitHubInboxDetailView(store: services.githubInbox, theme: presentation.theme)
         case .docker:
             DockerModuleDetailView(store: services.docker, theme: presentation.theme)
+        case .customTile, .customTile2, .customTile3:
+            if let module = presentation.activeModule,
+                let store = services.runtime(for: module) as? CustomTileStore
+            {
+                CustomTileModuleDetailView(store: store)
+            }
         default:
             ReadOnlyDeckPanelView(services: services, presentation: presentation)
                 .padding(14)

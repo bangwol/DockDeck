@@ -61,6 +61,7 @@ enum PanelSettings {
     private static let githubInboxConfigurationKey =
         "DockDeck.settings.githubInboxConfiguration.v1"
     private static let dockerConfigurationKey = "DockDeck.settings.dockerConfiguration.v1"
+    private static let extraCustomTilesKey = "DockDeck.settings.extraCustomTiles.v1"
     private static let customTileConfigurationKey =
         "DockDeck.settings.customTileConfiguration.v1"
     private static let focusTimerSettingsKey = "DockDeck.settings.focusTimer.v1"
@@ -538,6 +539,38 @@ enum PanelSettings {
         }
     }
 
+    static var extraCustomTileConfigurations: [PanelModuleID: CustomTileConfiguration] {
+        get {
+            guard let data = UserDefaults.standard.data(forKey: extraCustomTilesKey),
+                let values = try? JSONDecoder().decode(
+                    [PanelModuleID: CustomTileConfiguration].self, from: data)
+            else { return [:] }
+            return values.filter { PanelModuleID.extraCustomTiles.contains($0.key) }
+                .mapValues { $0.normalized() }
+        }
+        set {
+            let values = newValue.filter { PanelModuleID.extraCustomTiles.contains($0.key) }
+                .mapValues { $0.normalized() }
+            guard let data = try? JSONEncoder().encode(values) else { return }
+            UserDefaults.standard.set(data, forKey: extraCustomTilesKey)
+        }
+    }
+
+    static func customTileConfiguration(for module: PanelModuleID) -> CustomTileConfiguration {
+        if module == .customTile { return customTileConfiguration }
+        return extraCustomTileConfigurations[module] ?? CustomTileConfiguration(
+            title: PanelModuleRegistry.definition(for: module)?.title ?? "Custom Tile")
+    }
+
+    static func setCustomTileConfiguration(
+        _ configuration: CustomTileConfiguration, for module: PanelModuleID
+    ) {
+        if module == .customTile { customTileConfiguration = configuration }
+        else if PanelModuleID.extraCustomTiles.contains(module) {
+            extraCustomTileConfigurations[module] = configuration
+        }
+    }
+
     static var focusTimerSettings: FocusTimerSettings {
         get {
             guard let data = UserDefaults.standard.data(forKey: focusTimerSettingsKey),
@@ -695,6 +728,7 @@ enum PanelSettings {
         defaults.removeObject(forKey: githubInboxConfigurationKey)
         defaults.removeObject(forKey: dockerConfigurationKey)
         defaults.removeObject(forKey: customTileConfigurationKey)
+        defaults.removeObject(forKey: extraCustomTilesKey)
         defaults.removeObject(forKey: focusTimerSettingsKey)
         defaults.removeObject(forKey: focusTimerSessionKey)
         defaults.removeObject(forKey: panelOrderKey)

@@ -116,3 +116,37 @@ struct BatteryPanelView: View {
             + snapshot.state.title + ", " + estimateText(snapshot)
     }
 }
+
+struct BatteryModuleDetailView: View {
+    @ObservedObject var store: BatteryStore
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                if let snapshot = store.snapshot {
+                    Label(snapshot.percent.formatted(.number.precision(.fractionLength(0))) + "%",
+                          systemImage: "battery.100percent")
+                        .font(.largeTitle.bold()).monospacedDigit()
+                    Grid(alignment: .leading, horizontalSpacing: 24, verticalSpacing: 14) {
+                        GridRow { Text("Power source").foregroundStyle(.secondary)
+                            Text(snapshot.state == .discharging ? "Internal battery" : "External power") }
+                        GridRow { Text("Charge state").foregroundStyle(.secondary)
+                            Text(snapshot.state.title) }
+                        GridRow { Text(snapshot.state == .charging ? "Estimated time to full" : "Estimated time remaining")
+                                .foregroundStyle(.secondary)
+                            Text(snapshot.minutesRemaining.map { "\($0 / 60)h \($0 % 60)m" } ?? "Not provided by macOS") }
+                    }
+                    Text("macOS provides these estimates. Values can change with workload and charging conditions.")
+                        .font(.caption).foregroundStyle(.secondary)
+                } else {
+                    Label("Internal battery information unavailable", systemImage: "battery.0percent")
+                        .font(.headline)
+                    Text("This Mac may not have an internal battery, or macOS has not supplied its information.")
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(12)
+        }
+    }
+}

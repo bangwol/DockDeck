@@ -105,7 +105,8 @@ struct DockNotificationSettings: Codable, Equatable {
     }
 
     private static func closest(_ value: Int, in options: [Int]) -> Int {
-        options.min { abs($0 - value) < abs($1 - value) } ?? options[0]
+        let bounded = min(max(value, options[0]), options[options.count - 1])
+        return options.min { abs($0 - bounded) < abs($1 - bounded) } ?? options[0]
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -173,6 +174,12 @@ struct PanelModuleID: Hashable, Codable {
     static let githubInbox = PanelModuleID(rawValue: "github-inbox")
     static let docker = PanelModuleID(rawValue: "docker")
     static let customTile = PanelModuleID(rawValue: "custom-tile")
+    static let customTile2 = PanelModuleID(rawValue: "custom-tile-2")
+    static let customTile3 = PanelModuleID(rawValue: "custom-tile-3")
+    // ponytail: three stable slots preserve saved deck IDs. Use UUID-backed entries
+    // if configurable slot counts are needed later.
+    static let extraCustomTiles: [PanelModuleID] = [.customTile2, .customTile3]
+    static let customTiles: [PanelModuleID] = [.customTile] + extraCustomTiles
     static let focusTimer = PanelModuleID(rawValue: "focus-timer")
 
     static let readOnlyBuiltIns: [PanelModuleID] = [
@@ -181,7 +188,7 @@ struct PanelModuleID: Hashable, Codable {
         .projectPulse,
         .githubInbox,
         .docker,
-        .customTile,
+        .customTile, .customTile2, .customTile3,
         .focusTimer,
     ]
     static let builtIns: [PanelModuleID] = [.terminal] + readOnlyBuiltIns

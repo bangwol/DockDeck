@@ -19,6 +19,8 @@ enum SettingsPaneID: String, CaseIterable, Identifiable {
     case githubInbox
     case docker
     case customTile
+    case customTile2
+    case customTile3
     case focusTimer
     case appearance
 
@@ -43,6 +45,8 @@ enum SettingsPaneID: String, CaseIterable, Identifiable {
         case .githubInbox: "GitHub Inbox"
         case .docker: "Docker"
         case .customTile: "Custom Tile"
+        case .customTile2: "Custom Tile 2"
+        case .customTile3: "Custom Tile 3"
         case .focusTimer: "Focus Timer"
         case .appearance: "Appearance"
         }
@@ -66,7 +70,7 @@ enum SettingsPaneID: String, CaseIterable, Identifiable {
         case .projectPulse: "Show local Git or remote GitHub repository activity."
         case .githubInbox: "Summarize account notifications, reviews, and Actions failures."
         case .docker: "Show local container health and resource use."
-        case .customTile: "Show bounded output from a trusted executable or Shortcut."
+        case .customTile, .customTile2, .customTile3: "Show bounded output from a trusted executable or Shortcut."
         case .focusTimer: "Run persistent focus and break countdowns."
         case .appearance: "Adjust the shared panel surface."
         }
@@ -90,7 +94,7 @@ enum SettingsPaneID: String, CaseIterable, Identifiable {
         case .projectPulse: "point.3.connected.trianglepath.dotted"
         case .githubInbox: "bell.badge"
         case .docker: "shippingbox"
-        case .customTile: "command"
+        case .customTile, .customTile2, .customTile3: "command"
         case .focusTimer: "timer"
         case .appearance: "paintbrush"
         }
@@ -162,6 +166,12 @@ enum PanelModuleRegistry {
         PanelModuleDefinition(
             id: .customTile, title: "Custom Tile", subtitle: "Command or Shortcut output",
             symbolName: "command", settingsPane: .customTile),
+        PanelModuleDefinition(
+            id: .customTile2, title: "Custom Tile 2", subtitle: "Command or Shortcut output",
+            symbolName: "command", settingsPane: .customTile2),
+        PanelModuleDefinition(
+            id: .customTile3, title: "Custom Tile 3", subtitle: "Command or Shortcut output",
+            symbolName: "command", settingsPane: .customTile3),
         PanelModuleDefinition(
             id: .focusTimer, title: "Focus Timer", subtitle: "Focus and break countdowns",
             symbolName: "timer", settingsPane: .focusTimer),
@@ -254,6 +264,7 @@ struct SettingsPanelValues: Equatable {
     var customTile: CustomTileConfiguration
     var focusTimer: FocusTimerSettings
     var appearance: AppearanceSettingsState
+    var extraCustomTiles: [PanelModuleID: CustomTileConfiguration] = [:]
 
     func normalized() -> Self {
         var values = self
@@ -264,6 +275,9 @@ struct SettingsPanelValues: Equatable {
         values.githubInbox = githubInbox.normalized()
         values.docker = docker.normalized()
         values.customTile = customTile.normalized()
+        values.extraCustomTiles = extraCustomTiles.filter {
+            PanelModuleID.extraCustomTiles.contains($0.key)
+        }.mapValues { $0.normalized() }
         values.focusTimer = focusTimer.normalized()
         return values
     }
@@ -359,7 +373,7 @@ enum SettingsPanelChange {
     case projectPulse(ProjectPulseSettingsChange)
     case githubInbox(GitHubInboxSettingsChange)
     case docker(DockerSettingsChange)
-    case customTile(CustomTileConfiguration)
+    case customTile(PanelModuleID, CustomTileConfiguration)
     case focusTimer(FocusTimerSettingsChange)
     case appearance(AppearanceSettingsChange)
 }

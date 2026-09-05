@@ -6,6 +6,27 @@ import XCTest
 @testable import DockDeck
 
 final class CustomTileTests: XCTestCase {
+    func testManualPreviewRetainsLastSuccessAndReportsFailureThenRecovery() {
+        let configuration = CustomTileConfiguration(executablePath: "/usr/bin/printf")
+        let store = CustomTileStore(configuration: configuration, reader: SequenceTileReader())
+        defer { store.stop() }
+        for run in 1...3 {
+            let finished = expectation(description: "Manual run \(run)")
+            let subscription = store.$status.dropFirst().sink { status in
+                if status == .ready || status == .unavailable("Tile command failed") {
+                    finished.fulfill()
+                }
+            }
+            store.runOnce(configuration: configuration)
+            wait(for: [finished], timeout: 2)
+            subscription.cancel()
+            XCTAssertEqual(store.snapshot?.content.value, "Passing")
+            XCTAssertEqual(store.isStale, run == 2)
+            XCTAssertEqual(store.accessibilitySummary.contains("Refresh failed"), run == 2)
+            XCTAssertTrue(store.accessibilitySummary.contains("Last success:"))
+        }
+    }
+
     func testConfigurationBoundsStoredInputs() {
         let configuration = CustomTileConfiguration(
             title: String(repeating: "T", count: 40) + "\nsecret",
@@ -133,5 +154,16 @@ private struct FakeCustomTileReader: CustomTileReading {
         configuration: CustomTileConfiguration, now: Date
     ) throws -> CustomTileSnapshot {
         snapshot
+    }
+}
+
+private final class SequenceTileReader: CustomTileReading {
+    private var count = 0
+    func read(configuration: CustomTileConfiguration, now: Date) throws -> CustomTileSnapshot {
+        count += 1
+        if count == 2 { throw CustomTileError.commandFailed }
+        return CustomTileSnapshot(
+            content: CustomTileContent(title: "Build", value: "Passing", detail: nil, symbolName: nil),
+            observedAt: now)
     }
 }
