@@ -50,6 +50,18 @@ final class DeckProfileTests: XCTestCase {
         XCTAssertEqual(old.autoSlide.modules, [.systemStats])
     }
 
+    func testProfileNamesUseTheSameUnicodeComparisonAsShortcutsLookup() throws {
+        var first = profile
+        var second = profile
+        first.name = "Straße"
+        second.id = UUID()
+        second.name = "STRASSE"
+        XCTAssertEqual(first.name.caseInsensitiveCompare(second.name), .orderedSame)
+        XCTAssertThrowsError(try DeckProfileArchive(profiles: [first, second]).validated())
+        second.name = "Other"
+        XCTAssertNoThrow(try DeckProfileArchive(profiles: [first, second]).validated())
+    }
+
     func testLibraryPreservesDataOnInvalidImportOrWriteFailure() throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: directory) }

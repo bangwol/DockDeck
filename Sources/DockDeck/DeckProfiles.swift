@@ -22,10 +22,11 @@ struct DeckProfileArchive: Codable, Equatable {
     func validated() throws -> Self {
         guard schemaVersion == 1 else { throw ProfileError.version }
         guard profiles.count <= 8, Set(profiles.map(\.id)).count == profiles.count else { throw ProfileError.profiles }
-        let names = profiles.map { $0.name.lowercased() }
-        guard Set(names).count == names.count else { throw ProfileError.names }
         let known = Set(PanelModuleID.builtIns + [.network])
-        for profile in profiles {
+        for (index, profile) in profiles.enumerated() {
+            guard !profiles.prefix(index).contains(where: {
+                $0.name.caseInsensitiveCompare(profile.name) == .orderedSame
+            }) else { throw ProfileError.names }
             guard !profile.name.isEmpty, profile.name.count <= 48,
                 profile.name == profile.name.trimmingCharacters(in: .whitespacesAndNewlines),
                 profile.name.unicodeScalars.allSatisfy({ !CharacterSet.controlCharacters.contains($0) }) else { throw ProfileError.names }
