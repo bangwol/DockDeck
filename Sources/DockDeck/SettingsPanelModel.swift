@@ -488,6 +488,18 @@ final class SettingsPanelModel: ObservableObject {
         onChange?(.clock(.timeZoneIdentifier(identifier)))
     }
 
+    func addClockFavorite() {
+        let favorites = ClockTimeZone.favorites(values.clock.favorites + [values.clock.timeZoneIdentifier])
+        updateValues { $0.clock.favorites = favorites }
+        onChange?(.clock(.favorites(favorites)))
+    }
+
+    func removeClockFavorite(_ identifier: String) {
+        let favorites = values.clock.favorites.filter { $0 != identifier }
+        updateValues { $0.clock.favorites = favorites }
+        onChange?(.clock(.favorites(favorites)))
+    }
+
     func setClockHourFormat(_ value: ClockHourFormat) {
         updateValues { $0.clock.hourFormat = value }
         onChange?(.clock(.hourFormat(value)))

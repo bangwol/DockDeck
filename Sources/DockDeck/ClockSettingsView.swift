@@ -51,6 +51,23 @@ struct ClockSettingsView: View {
                         .font(.headline)
                 }
 
+                GroupBox("Favorite time zones · up to 3") {
+                    VStack(alignment: .leading, spacing: 10) {
+                        ForEach(model.values.clock.favorites, id: \.self) { identifier in
+                            HStack {
+                                Button(ClockTimeZone.title(identifier: identifier)) {
+                                    model.setClockTimeZoneIdentifier(identifier)
+                                }.buttonStyle(.link)
+                                Spacer()
+                                Button("Remove") { model.removeClockFavorite(identifier) }
+                            }
+                        }
+                        Button("Save current time zone", action: model.addClockFavorite)
+                            .disabled(model.values.clock.favorites.count >= 3
+                                || model.values.clock.favorites.contains(model.values.clock.timeZoneIdentifier))
+                    }.frame(maxWidth: .infinity, alignment: .leading).padding(6)
+                }
+
                 Text(
                     "Time is calculated locally with the macOS time-zone database. "
                         + "The clock updates once per minute and stops while disabled.")

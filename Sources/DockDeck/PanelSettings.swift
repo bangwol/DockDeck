@@ -51,6 +51,7 @@ enum PanelSettings {
     private static let scheduleRefreshIntervalKey = "DockDeck.settings.scheduleRefreshInterval"
     private static let clockTimeZoneIdentifierKey =
         "DockDeck.settings.clockTimeZoneIdentifier"
+    private static let clockFavoritesKey = "DockDeck.settings.clockFavorites"
     private static let clockHourFormatKey = "DockDeck.settings.clockHourFormat"
     private static let batteryRefreshIntervalKey = "DockDeck.settings.batteryRefreshInterval"
     private static let networkInterfaceNameKey = "DockDeck.settings.networkInterfaceName"
@@ -417,6 +418,11 @@ enum PanelSettings {
         }
     }
 
+    static var clockFavorites: [String] {
+        get { ClockTimeZone.favorites(UserDefaults.standard.stringArray(forKey: clockFavoritesKey) ?? []) }
+        set { UserDefaults.standard.set(ClockTimeZone.favorites(newValue), forKey: clockFavoritesKey) }
+    }
+
     static var clockHourFormat: ClockHourFormat {
         get {
             UserDefaults.standard.string(forKey: clockHourFormatKey)
@@ -720,6 +726,7 @@ enum PanelSettings {
         defaults.removeObject(forKey: scheduleRefreshIntervalKey)
         defaults.removeObject(forKey: clockTimeZoneIdentifierKey)
         defaults.removeObject(forKey: clockHourFormatKey)
+        defaults.removeObject(forKey: clockFavoritesKey)
         defaults.removeObject(forKey: batteryRefreshIntervalKey)
         defaults.removeObject(forKey: networkRefreshIntervalKey)
         defaults.removeObject(forKey: networkInterfaceNameKey)

@@ -298,6 +298,9 @@ struct ReadOnlyModuleDetailView: View {
             WeatherModuleDetailView(store: services.weather)
         case .schedule:
             ScheduleModuleDetailView(store: services.schedule, theme: presentation.theme)
+        case .clock:
+            ClockModuleDetailView(store: services.clock, timeZoneIdentifier: PanelSettings.clockTimeZoneIdentifier,
+                hourFormat: PanelSettings.clockHourFormat, favorites: PanelSettings.clockFavorites)
         case .music:
             MusicModuleDetailView(store: services.music, theme: presentation.theme)
         case .projectPulse:

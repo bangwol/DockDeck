@@ -17,6 +17,21 @@ enum ClockHourFormat: String, CaseIterable, Codable {
 enum ClockTimeZone {
     static let systemIdentifier = "system"
 
+    static func favorites(_ identifiers: [String]) -> [String] {
+        var seen: Set<String> = []
+        return Array(identifiers.filter {
+            ($0 == systemIdentifier || TimeZone(identifier: $0) != nil) && seen.insert($0).inserted
+        }.prefix(3))
+    }
+
+    static func differenceLabel(identifier: String, at date: Date,
+                                local: TimeZone = .autoupdatingCurrent) -> String {
+        let difference = resolved(identifier: identifier).secondsFromGMT(for: date)
+            - local.secondsFromGMT(for: date)
+        let minutes = abs(difference) / 60
+        return "\(difference < 0 ? "-" : "+")\(minutes / 60)h \(minutes % 60)m"
+    }
+
     static func resolved(identifier: String) -> TimeZone {
         guard identifier != systemIdentifier, let timeZone = TimeZone(identifier: identifier)
         else { return .autoupdatingCurrent }
