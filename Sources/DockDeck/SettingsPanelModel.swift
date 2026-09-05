@@ -501,6 +501,12 @@ final class SettingsPanelModel: ObservableObject {
         onChange?(.battery(.refreshInterval(selected)))
     }
 
+    func setNetworkInterfaceName(_ value: String) {
+        let name = NetworkCounterReader.normalizedInterfaceName(value)
+        updateValues { $0.network.interfaceName = name }
+        onChange?(.network(.interfaceName(name)))
+    }
+
     func setNetworkRefreshInterval(_ value: TimeInterval) {
         let selected = PanelSettings.networkRefreshIntervals.min(by: {
             abs($0 - value) < abs($1 - value)

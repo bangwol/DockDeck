@@ -6,6 +6,13 @@ struct NetworkSettingsView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
+                Picker("Interface", selection: Binding(
+                    get: { model.values.network.interfaceName }, set: model.setNetworkInterfaceName)) {
+                    Text("Automatic (primary)").tag("")
+                    ForEach(availableInterfaces, id: \.self) { name in Text(name).tag(name) }
+                }
+                Text("A selected interface may disappear when a VPN disconnects. Internet route status refers to the system connection.")
+                    .font(.caption).foregroundStyle(.secondary)
                 GroupBox {
                     SettingsPickerRow(title: "Refresh") {
                         Picker(
@@ -50,4 +57,11 @@ struct NetworkSettingsView: View {
             .padding(24)
         }
     }
+    private var availableInterfaces: [String] {
+        var names = NetworkCounterReader.availableInterfaces()
+        let selected = model.values.network.interfaceName
+        if !selected.isEmpty, !names.contains(selected) { names.append(selected) }
+        return names
+    }
+
 }

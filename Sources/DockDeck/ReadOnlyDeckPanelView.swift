@@ -282,6 +282,8 @@ struct ReadOnlyModuleDetailView: View {
 
     @ViewBuilder private var detailContent: some View {
         switch presentation.activeModule {
+        case .network:
+            NetworkModuleDetailView(store: services.network)
         case .battery:
             BatteryModuleDetailView(store: services.battery)
         case .usage:

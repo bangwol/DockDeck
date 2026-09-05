@@ -32,10 +32,7 @@ final class ModuleGalleryTests: XCTestCase {
                     to: outputURL.appendingPathComponent(
                         "\(themeName)-compact-\(module.rawValue).png"))
             }
-            for module in [
-                PanelModuleID.usage, .battery, .systemStats, .serviceMonitor, .schedule,
-                .music, .projectPulse, .githubInbox, .docker, .customTile,
-            ] {
+            for module in PanelModuleID.readOnlyBuiltIns {
                 let presentation = ReadOnlyDeckPresentation(
                     activeModule: module, theme: theme)
                 try render(
@@ -149,6 +146,17 @@ final class ModuleGalleryTests: XCTestCase {
                     webURL: URL(string: "https://github.com/example/DockDeck/issues/18")),
             ],
             observedAt: now)
+        var networkSample: UInt64 = 0
+        let network = NetworkStore(
+            initialConnection: NetworkConnectionSnapshot(
+                status: .online, kind: .wifi, isExpensive: false, isConstrained: false),
+            interfaceName: "en0", counterReader: { _ in
+                networkSample += 1
+                return NetworkCounters(interfaceName: "en0",
+                    receivedBytes: networkSample * networkSample * 600_000,
+                    sentBytes: networkSample * networkSample * 90_000)
+            })
+        for offset in [-2.0, -1.0, 0.0] { network.refresh(now: now.addingTimeInterval(offset)) }
         return PanelModuleServices(
             usage: usage,
             systemStats: stats,
@@ -167,13 +175,7 @@ final class ModuleGalleryTests: XCTestCase {
             battery: BatteryStore(
                 initialSnapshot: BatterySnapshot(
                     percent: 76, state: .discharging, minutesRemaining: 310)),
-            network: NetworkStore(
-                initialSnapshot: NetworkSnapshot(
-                    interfaceName: "en0", downloadBytesPerSecond: 2_400_000,
-                    uploadBytesPerSecond: 360_000),
-                initialConnection: NetworkConnectionSnapshot(
-                    status: .online, kind: .wifi, isExpensive: false,
-                    isConstrained: false)),
+            network: network,
             projectPulse: ProjectPulseStore(
                 configuration: ProjectPulseConfiguration(
                     source: .github, githubRepository: "example/DockDeck"),

@@ -138,8 +138,28 @@ enum ByteRateFormatter {
 }
 
 enum NetworkCounterReader {
-    static func read() -> NetworkCounters? {
-        guard let interfaceName = primaryInterfaceName() else { return nil }
+    static func normalizedInterfaceName(_ value: String) -> String {
+        guard value.utf8.count < Int(IFNAMSIZ),
+            value.utf8.allSatisfy({ (48...57).contains($0) || (65...90).contains($0)
+                || (97...122).contains($0) || [45, 46, 95].contains($0) })
+        else { return "" }
+        return value
+    }
+
+    static func availableInterfaces() -> [String] {
+        guard let interfaces = if_nameindex() else { return [] }
+        defer { if_freenameindex(interfaces) }
+        var names: [String] = []
+        var index = 0
+        while interfaces[index].if_index != 0, let name = interfaces[index].if_name {
+            names.append(String(cString: name))
+            index += 1
+        }
+        return names.sorted()
+    }
+
+    static func read(interfaceName selectedInterface: String? = nil) -> NetworkCounters? {
+        guard let interfaceName = selectedInterface ?? primaryInterfaceName() else { return nil }
         let index = if_nametoindex(interfaceName)
         guard index != 0 else { return nil }
 
@@ -208,6 +228,10 @@ final class NetworkStore: ObservableObject {
     private(set) var downloadHistory = MetricHistory()
     private(set) var uploadHistory = MetricHistory()
 
+    private(set) var observedAt: Date?
+    private(set) var interfaceName: String
+    private let counterReader: (String?) -> NetworkCounters?
+    private var historyInterfaceName: String?
     private var previous: (counters: NetworkCounters, date: Date)?
     private var timer: Timer?
     private var refreshInterval: TimeInterval
@@ -219,12 +243,16 @@ final class NetworkStore: ObservableObject {
         refreshInterval: TimeInterval = PanelSettings.networkRefreshInterval,
         initialSnapshot: NetworkSnapshot? = nil,
         initialConnection: NetworkConnectionSnapshot = .unknown,
-        pathObserver: NetworkPathObserving = SystemNetworkPathObserver()
+        pathObserver: NetworkPathObserving = SystemNetworkPathObserver(),
+        interfaceName: String = PanelSettings.networkInterfaceName,
+        counterReader: @escaping (String?) -> NetworkCounters? = NetworkCounterReader.read(interfaceName:)
     ) {
         self.refreshInterval = Self.resolvedRefreshInterval(refreshInterval)
         snapshot = initialSnapshot
         connection = initialConnection
         self.pathObserver = pathObserver
+        self.interfaceName = NetworkCounterReader.normalizedInterfaceName(interfaceName)
+        self.counterReader = counterReader
         pathObserver.onUpdate = { [weak self] in self?.receiveConnection($0) }
     }
 
@@ -240,6 +268,26 @@ final class NetworkStore: ObservableObject {
         timer = nil
         previous = nil
         pathObserver.stop()
+    }
+
+    var measurementStatus: String {
+        if snapshot == nil {
+            return interfaceName.isEmpty && connection.status == .offline
+                ? "Network offline" : "Counters unavailable"
+        }
+        return snapshot?.downloadBytesPerSecond == nil ? "Measuring rate" : "Live counters"
+    }
+
+    func setInterfaceName(_ value: String) {
+        let value = NetworkCounterReader.normalizedInterfaceName(value)
+        guard interfaceName != value else { return }
+        interfaceName = value
+        previous = nil
+        downloadHistory = MetricHistory()
+        uploadHistory = MetricHistory()
+        observedAt = nil
+        snapshot = nil
+        if timer != nil { refresh() }
     }
 
     func setRefreshInterval(_ interval: TimeInterval) {
@@ -265,10 +313,15 @@ final class NetworkStore: ObservableObject {
     }
 
     func refresh(now: Date = Date()) {
-        guard let counters = NetworkCounterReader.read() else {
+        guard let counters = counterReader(interfaceName.isEmpty ? nil : interfaceName) else {
             previous = nil
             snapshot = nil
             return
+        }
+        if historyInterfaceName != counters.interfaceName {
+            downloadHistory = MetricHistory()
+            uploadHistory = MetricHistory()
+            historyInterfaceName = counters.interfaceName
         }
         let rates: (download: Double?, upload: Double?)
         if let previous, previous.counters.interfaceName == counters.interfaceName {
@@ -288,6 +341,7 @@ final class NetworkStore: ObservableObject {
         previous = (counters, now)
         downloadHistory.append(rates.download, at: now)
         uploadHistory.append(rates.upload, at: now)
+        observedAt = now
         snapshot = NetworkSnapshot(
             interfaceName: counters.interfaceName,
             downloadBytesPerSecond: rates.download,
