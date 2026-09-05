@@ -458,14 +458,15 @@ final class UsageProviderTests: XCTestCase {
             homeDirectory: homeDirectory,
             probeDirectory: root.appendingPathComponent("probe", isDirectory: true))
 
-        let startedAt = Date()
         for _ in 0..<3 {
+            let startedAt = Date()
             guard case .success = provider.read(now: Date(timeIntervalSince1970: 2_000)) else {
                 return XCTFail("Expected direct Claude usage output to parse repeatedly")
             }
+            // Each inherited writer remains open for four seconds. Check each read
+            // independently so unrelated process-launch overhead does not accumulate.
+            XCTAssertLessThan(Date().timeIntervalSince(startedAt), 3)
         }
-
-        XCTAssertLessThan(Date().timeIntervalSince(startedAt), 3)
     }
 
     func testClaudeProviderCancellationReturnsPromptly() throws {
