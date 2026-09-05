@@ -176,6 +176,7 @@ cat > "$APP_PATH/Contents/Info.plist" <<EOF
 EOF
 
 plutil -lint "$APP_PATH/Contents/Info.plist" >/dev/null
+"$REPO_DIR/scripts/build-app-intents.sh" "$APP_PATH"
 codesign --force --options runtime --sign "$SIGNING_IDENTITY" "$APP_BRIDGE_PATH"
 codesign --force --options runtime --sign "$SIGNING_IDENTITY" \
     --entitlements "$REPO_DIR/DockDeck.entitlements" --identifier "$LABEL" "$APP_PATH"

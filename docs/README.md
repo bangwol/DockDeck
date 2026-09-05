@@ -33,6 +33,8 @@ front page harder to scan.
 
 ## Integrations
 
+- [macOS Shortcuts actions](integrations/shortcuts.md)
+
 - [Claude Code monitoring and optional bridge](integrations/claude-code.md)
 
 Short modules remain together in the catalog. Move a module into its own guide

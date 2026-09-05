@@ -182,3 +182,20 @@ extension AppDelegate: NSMenuDelegate {
 
     @objc func manageDeckProfiles(_ sender: Any?) { openSettingsPane(.decks) }
 }
+
+extension AppDelegate: DockDeckIntentHandling {
+    func performDockDeckCommand(_ command: DockDeckIntentCommand) throws {
+        switch try command.validated() {
+        case .refresh:
+            refreshModules(nil)
+        case .startFocus:
+            guard PanelSettings.deckConfiguration.contains(.focusTimer) else { throw DockDeckIntentError.focusDisabled }
+            focusTimerStore.startFocus()
+        case .switchProfile(let name):
+            guard let profile = deckProfiles.archive.profiles.first(where: {
+                $0.name.caseInsensitiveCompare(name) == .orderedSame
+            }) else { throw DockDeckIntentError.profileNotFound }
+            applyDeckProfile(profile)
+        }
+    }
+}

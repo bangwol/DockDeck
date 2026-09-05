@@ -115,6 +115,7 @@ cat > "$APP_PATH/Contents/Info.plist" <<EOF
 EOF
 
 plutil -lint "$APP_PATH/Contents/Info.plist" >/dev/null
+DOCKDECK_REQUIRE_APP_INTENTS=1 "$REPO_DIR/scripts/build-app-intents.sh" "$APP_PATH"
 
 if [ "$SIGNING_IDENTITY" = "-" ]; then
     echo "Ad-hoc signing $APP_PATH..."
