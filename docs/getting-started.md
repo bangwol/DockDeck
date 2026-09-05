@@ -27,7 +27,12 @@ cd DockDeck
 ```
 
 The installer builds and signs `~/Applications/DockDeck.app` and starts DockDeck
-immediately. Fresh installs leave **Launch at Login** off. Change it in
+immediately. It builds for the current Mac's native architecture and rejects a
+terminal running through Rosetta; on Apple silicon, turn off **Open using
+Rosetta** for that terminal and restart it before installing. See the
+[architecture policy](releases.md#architecture-support) for Intel compatibility.
+
+Fresh installs leave **Launch at Login** off. Change it in
 **Settings → Startup** or the app menu; macOS may require approval in
 **System Settings → General → Login Items**. Turning it off keeps the current
 app running and removes the next-login registration. Reinstalling preserves

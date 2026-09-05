@@ -44,6 +44,8 @@ sources, refresh behavior, and privacy details.
 ## Install
 
 DockDeck currently ships as a source-installed preview for macOS 13 or later.
+Apple silicon is the primary target; Intel compatibility remains in the
+universal preview. See the [architecture policy](docs/releases.md#architecture-support).
 Install Xcode Command Line Tools, then run:
 
 ```bash

@@ -15,6 +15,12 @@
 # when that fallback is used.
 set -euo pipefail
 
+# A translated terminal would build Intel-only binaries on Apple silicon.
+if [ "$(sysctl -in sysctl.proc_translated 2>/dev/null || true)" = "1" ]; then
+    echo "Run this installer from a native terminal with Open using Rosetta disabled." >&2
+    exit 1
+fi
+
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 LABEL="com.dockdeck.app"
 LOCAL_CERT_NAME="DockDeck Local Signing"
@@ -109,6 +115,8 @@ fi
 
 echo "Building release binary..."
 (cd "$REPO_DIR" && swift build -c release)
+lipo "$BIN_PATH" -verify_arch "$(uname -m)"
+lipo "$BRIDGE_BIN_PATH" -verify_arch "$(uname -m)"
 
 echo "Packaging $APP_PATH..."
 rm -rf "$APP_PATH"

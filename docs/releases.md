@@ -46,6 +46,30 @@ when the accumulated `main` state is ready for a tested preview release.
 `1.0.0` is reserved for a stable feature and settings contract plus a
 Developer ID-signed, notarized distribution path.
 
+## Architecture support
+
+Apple silicon is the primary development and runtime validation target. Keep
+native Intel compatibility in the 0.1.3 universal preview: both DockDeck and its
+bundled Claude bridge contain `arm64` and `x86_64` slices. The package check
+rejects a missing slice. Source installation builds for the current Mac and
+rejects a translated terminal to avoid installing an Intel-only app on Apple
+silicon. Neither bundled executable needs Rosetta on Apple silicon.
+
+Apple's [Rosetta transition notice](https://developer.apple.com/news/?id=w5ngl9k2)
+states that macOS 27 is the last release with general Rosetta support and that
+macOS 26.4 and later may warn when translated apps run. A universal binary runs
+natively on either processor; carrying an Intel slice does not itself require
+Rosetta. Forcing that slice to run on Apple silicon can trigger the warning.
+Use the native app for normal installation and runtime checks.
+
+Intel support currently shares the same implementation and needs no extra
+dependencies. Retain it while the supported toolchain can build both slices;
+reassess at a release checkpoint if that requires separate architecture-specific
+maintenance. Intel cross-compilation is checked, but does not replace testing
+on a physical Intel Mac. Hardware-dependent GPU readings remain optional on
+both architectures. User-installed CLIs are separate integrations; choose their
+native versions on Apple silicon.
+
 ## Preview artifacts
 
 A tagged preview publishes:
