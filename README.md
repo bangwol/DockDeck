@@ -52,8 +52,9 @@ cd DockDeck
 ./scripts/install.sh
 ```
 
-The script builds `~/Applications/DockDeck.app`, starts it, and registers it for
-future logins. Grant Accessibility access when macOS asks so DockDeck can follow
+The script builds `~/Applications/DockDeck.app` and starts it. Enable **Launch at
+Login** in **Settings → Startup** when wanted; updates preserve that choice.
+Grant Accessibility access when macOS asks so DockDeck can follow
 the Dock precisely. Without that permission, the panels use fixed fallback
 positions.
 

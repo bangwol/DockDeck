@@ -67,6 +67,8 @@ cat > "$APP_PATH/Contents/Info.plist" <<EOF
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+    <key>DockDeckLoginItemControlVersion</key>
+    <integer>1</integer>
     <key>CFBundleIdentifier</key>
     <string>$LABEL</string>
     <key>CFBundleDevelopmentRegion</key>

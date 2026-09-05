@@ -140,6 +140,8 @@ private struct SettingsRootView: View {
 
     @ViewBuilder private var selectedPane: some View {
         switch model.selectedPane {
+        case .startup:
+            if let app = NSApp.delegate as? AppDelegate { StartupSettingsView(store: app.loginItem) }
         case .quickActions:
             if let app = NSApp.delegate as? AppDelegate { QuickActionsSettingsView(store: app.quickActions) }
         case .decks:

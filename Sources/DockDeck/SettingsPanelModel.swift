@@ -53,7 +53,7 @@ final class SettingsPanelModel: ObservableObject {
         let modulePanes = moduleDefinitions.compactMap(\.settingsPane)
         return [
             SettingsSidebarSection(
-                id: .general, title: L10n.text("General"), panes: [.decks, .quickActions, .notifications, .diagnostics]),
+                id: .general, title: L10n.text("General"), panes: [.decks, .quickActions, .startup, .notifications, .diagnostics]),
             SettingsSidebarSection(
                 id: .modules, title: L10n.text("Modules"), panes: modulePanes),
             SettingsSidebarSection(

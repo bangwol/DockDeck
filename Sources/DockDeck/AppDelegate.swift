@@ -106,6 +106,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         id: UserDefaults.standard.string(forKey: AppPreferences.themeIDKey) ?? "")
     var themePickerPanel: KeyablePanel?
     lazy var quickActions = QuickActionStore()
+    lazy var loginItem = LoginItemStore()
+    let loginMenuItem = NSMenuItem(title: L10n.text("Launch at Login"), action: #selector(toggleLoginItem(_:)), keyEquivalent: "")
     let quickActionsMenu = NSMenu(title: L10n.text("Quick Actions"))
     lazy var deckProfiles = DeckProfileStore()
     let deckProfilesMenu = NSMenu(title: L10n.text("Deck Profiles"))

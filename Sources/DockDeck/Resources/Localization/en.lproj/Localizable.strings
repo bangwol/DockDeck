@@ -125,3 +125,10 @@
 "↑ ↓ Select · Return Open · Esc Close" = "↑ ↓ Select · Return Open · Esc Close";
 "Settings" = "Settings";
 "Module" = "Module";
+"Startup" = "Startup";
+"Control whether DockDeck starts when you log in." = "Control whether DockDeck starts when you log in.";
+"Launch at Login" = "Launch at Login";
+"Approval required in System Settings" = "Approval required in System Settings";
+"Install DockDeck in Applications first" = "Install DockDeck in Applications first";
+"Changing this setting affects future logins. DockDeck keeps running now." = "Changing this setting affects future logins. DockDeck keeps running now.";
+"Open Login Items Settings" = "Open Login Items Settings";

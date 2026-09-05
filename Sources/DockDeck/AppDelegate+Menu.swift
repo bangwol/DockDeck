@@ -7,6 +7,7 @@ extension AppDelegate {
         let appMenuItem = NSMenuItem()
         mainMenu.addItem(appMenuItem)
         let appMenu = NSMenu(title: "DockDeck")
+        appMenu.delegate = self
         appMenuItem.submenu = appMenu
         appMenu.addItem(
             withTitle: L10n.text("About DockDeck"), action: #selector(showAbout(_:)), keyEquivalent: "")
@@ -31,6 +32,8 @@ extension AppDelegate {
         profileItem.submenu = deckProfilesMenu
         deckProfilesMenu.delegate = self
         appMenu.addItem(profileItem)
+        loginMenuItem.target = self
+        appMenu.addItem(loginMenuItem)
         appMenu.addItem(
             withTitle: L10n.text("Refresh Modules & Layout"), action: #selector(refreshModules(_:)),
             keyEquivalent: "r"
@@ -130,6 +133,11 @@ extension AppDelegate {
 
 extension AppDelegate: NSMenuDelegate {
     func menuNeedsUpdate(_ menu: NSMenu) {
+        if menu.items.contains(loginMenuItem) {
+            loginItem.refresh()
+            loginMenuItem.state = loginItem.status == .requiresApproval ? .mixed : (loginItem.status == .enabled ? .on : .off)
+            return
+        }
         if menu === quickActionsMenu {
             menu.removeAllItems()
             for action in quickActions.actions {
@@ -181,6 +189,12 @@ extension AppDelegate: NSMenuDelegate {
     }
 
     @objc func manageDeckProfiles(_ sender: Any?) { openSettingsPane(.decks) }
+
+    @objc func toggleLoginItem(_ sender: Any?) {
+        loginItem.refresh()
+        loginItem.setEnabled(!loginItem.status.isRequested)
+        if loginItem.error != nil || loginItem.status == .requiresApproval { openSettingsPane(.startup) }
+    }
 }
 
 extension AppDelegate: DockDeckIntentHandling {
