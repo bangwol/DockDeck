@@ -281,20 +281,46 @@ struct ScheduleModuleDetailView: View {
                     systemImage: "calendar.badge.exclamationmark")
                     .foregroundStyle(baseColor.opacity(0.7))
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else if store.events.isEmpty && store.reminders.isEmpty {
+            } else if store.events.allSatisfy({ $0.endDate <= Date() }) && store.reminders.isEmpty {
                 Label("No upcoming items", systemImage: "calendar")
                     .foregroundStyle(baseColor.opacity(0.7))
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                ScrollView {
-                    LazyVStack(spacing: 6) {
-                        ForEach(store.events.prefix(6)) { event in eventRow(event) }
-                        ForEach(store.reminders.prefix(6)) { reminder in reminderRow(reminder) }
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Button("Open Calendar") { openSource("com.apple.iCal") }
+                        Button("Open Reminders") { openSource("com.apple.reminders") }
+                    }
+                    TimelineView(.everyMinute) { context in
+                        ScrollView {
+                            LazyVStack(alignment: .leading, spacing: 6) {
+                                ForEach(ScheduleAgendaSection.allCases) { section in
+                                    let events = store.events.filter {
+                                        ScheduleAgendaSection.event($0, now: context.date) == section
+                                    }
+                                    let reminders = store.reminders.filter {
+                                        ScheduleAgendaSection.reminder($0, now: context.date) == section
+                                    }
+                                    if !events.isEmpty || !reminders.isEmpty {
+                                        Text(section.rawValue).font(.caption.weight(.bold))
+                                            .foregroundStyle(section == .overdue ? .orange : baseColor)
+                                            .padding(.top, 4)
+                                        ForEach(events) { event in eventRow(event) }
+                                        ForEach(reminders) { reminder in reminderRow(reminder) }
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
         }
         .moduleDetailSurface()
+    }
+
+    private func openSource(_ bundleID: String) {
+        guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) else { return }
+        NSWorkspace.shared.openApplication(at: url, configuration: .init())
     }
 
     private func eventRow(_ event: ScheduleEventItem) -> some View {
@@ -326,7 +352,7 @@ struct ScheduleModuleDetailView: View {
     private func reminderRow(_ reminder: ScheduleReminderItem) -> some View {
         HStack(spacing: 9) {
             Image(systemName: "checklist")
-                .foregroundStyle(reminder.dueDate <= Date() ? .orange : .mint)
+                .foregroundStyle(ScheduleAgendaSection.isOverdue(reminder, now: Date()) ? .orange : .mint)
                 .frame(width: 18)
             VStack(alignment: .leading, spacing: 2) {
                 Text(reminder.title)

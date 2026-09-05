@@ -132,7 +132,7 @@ final class ModuleGalleryTests: XCTestCase {
                 hourly: weatherHours))
         let schedule = ScheduleStore(
             includeReminders: true,
-            provider: GalleryScheduleProvider(now: now))
+            provider: GalleryScheduleProvider(now: Date()))
         schedule.start()
         let projectSnapshot = ProjectPulseSnapshot(
             git: ProjectGitSnapshot(
