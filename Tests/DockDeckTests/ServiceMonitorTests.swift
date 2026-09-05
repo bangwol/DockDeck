@@ -18,6 +18,65 @@ final class ServiceMonitorTests: XCTestCase {
         XCTAssertNil(ServiceMonitorURLValidator.validatedURL("ftp://example.com/health"))
     }
 
+    func testProbeRejectsUnsafeRedirects() throws {
+        let session = URLSession(configuration: .ephemeral)
+        defer { session.invalidateAndCancel() }
+        let source = try XCTUnwrap(URL(string: "https://example.com/health"))
+        let task = session.dataTask(with: source)
+        let response = try XCTUnwrap(HTTPURLResponse(
+            url: source, statusCode: 302, httpVersion: nil, headerFields: nil))
+        let delegate = ServiceMonitorProbeDelegate()
+        for destination in ["http://localhost/health", "https://user:password@example.com",
+                            "https://example.com?token=secret"] {
+            let request = URLRequest(url: try XCTUnwrap(URL(string: destination)))
+            delegate.urlSession(session, task: task, willPerformHTTPRedirection: response,
+                                newRequest: request) { redirected in
+                XCTAssertNil(redirected, destination)
+            }
+        }
+        let safe = URLRequest(url: try XCTUnwrap(URL(string: "https://example.org/health")))
+        delegate.urlSession(session, task: task, willPerformHTTPRedirection: response,
+                            newRequest: safe) { redirected in
+            XCTAssertEqual(redirected?.url, safe.url)
+        }
+    }
+
+    func testGetFallbackCompletesAtHeadersWithoutWaitingForBody() throws {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [ServiceMonitorURLProtocol.self]
+        defer {
+            ServiceMonitorURLProtocol.handler = nil
+            ServiceMonitorURLProtocol.holdsBody = false
+        }
+        ServiceMonitorURLProtocol.holdsBody = true
+        var methods: [String] = []
+        ServiceMonitorURLProtocol.handler = { request in
+            methods.append(request.httpMethod ?? "")
+            if request.httpMethod == "GET" {
+                XCTAssertEqual(request.value(forHTTPHeaderField: "Range"), "bytes=0-0")
+            }
+            return try XCTUnwrap(HTTPURLResponse(
+                url: try XCTUnwrap(request.url),
+                statusCode: request.httpMethod == "HEAD" ? 405 : 200,
+                httpVersion: "HTTP/1.1", headerFields: ["Content-Length": "1073741824", "Content-Type": "application/json"]))
+        }
+        let store = ServiceMonitorStore(
+            endpoints: [ServiceMonitorEndpoint(name: "API", urlString: "https://example.com")],
+            refreshInterval: 120, sessionConfiguration: configuration)
+        let completed = expectation(description: "Headers are enough for health check")
+        var fulfilled = false
+        let cancellable = store.$items.sink { items in
+            guard !fulfilled, case .up(200, _) = items.first?.state else { return }
+            fulfilled = true
+            completed.fulfill()
+        }
+        store.start()
+        wait(for: [completed], timeout: 2)
+        XCTAssertEqual(methods, ["HEAD", "GET"])
+        cancellable.cancel()
+        store.stop()
+    }
+
     func testURLValidationRejectsPublicNumericHostsOverHTTP() {
         let hosts = [
             "[2001:4860:4860::8888]", "[2001:4860:4860::8888%25en0]",
@@ -116,7 +175,6 @@ final class ServiceMonitorTests: XCTestCase {
     func testStoreUsesHeadAndPublishesSuccessfulProbe() throws {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [ServiceMonitorURLProtocol.self]
-        let session = URLSession(configuration: configuration)
         let endpoint = ServiceMonitorEndpoint(
             name: "API", urlString: "https://status.example.com/health")
         ServiceMonitorURLProtocol.handler = { request in
@@ -128,7 +186,7 @@ final class ServiceMonitorTests: XCTestCase {
                 headerFields: nil)!
         }
         let store = ServiceMonitorStore(
-            endpoints: [endpoint], refreshInterval: 120, session: session)
+            endpoints: [endpoint], refreshInterval: 120, sessionConfiguration: configuration)
         let completed = expectation(description: "Probe completed")
         var fulfilled = false
         let cancellable = store.$items.sink { items in
@@ -145,14 +203,12 @@ final class ServiceMonitorTests: XCTestCase {
 
         cancellable.cancel()
         store.stop()
-        session.invalidateAndCancel()
         ServiceMonitorURLProtocol.handler = nil
     }
 
     func testStoreFallsBackToBoundedGetWhenHeadIsUnsupported() throws {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [ServiceMonitorURLProtocol.self]
-        let session = URLSession(configuration: configuration)
         let endpoint = ServiceMonitorEndpoint(
             name: "API", urlString: "https://status.example.com/health")
         var methods: [String] = []
@@ -167,7 +223,7 @@ final class ServiceMonitorTests: XCTestCase {
                 httpVersion: "HTTP/1.1", headerFields: nil)!
         }
         let store = ServiceMonitorStore(
-            endpoints: [endpoint], refreshInterval: 120, session: session)
+            endpoints: [endpoint], refreshInterval: 120, sessionConfiguration: configuration)
         let completed = expectation(description: "Fallback probe completed")
         let cancellable = store.$items.sink { items in
             guard case .up(let code, _) = items.first?.state else { return }
@@ -181,14 +237,12 @@ final class ServiceMonitorTests: XCTestCase {
         XCTAssertEqual(methods, ["HEAD", "GET"])
         cancellable.cancel()
         store.stop()
-        session.invalidateAndCancel()
         ServiceMonitorURLProtocol.handler = nil
     }
 
     func testStoreRequiresTwoFailuresBeforePublishingDown() throws {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [ServiceMonitorURLProtocol.self]
-        let session = URLSession(configuration: configuration)
         let endpoint = ServiceMonitorEndpoint(
             name: "API", urlString: "https://status.example.com/health")
         ServiceMonitorURLProtocol.handler = { request in
@@ -197,7 +251,7 @@ final class ServiceMonitorTests: XCTestCase {
                 httpVersion: "HTTP/1.1", headerFields: nil)!
         }
         let store = ServiceMonitorStore(
-            endpoints: [endpoint], refreshInterval: 120, session: session)
+            endpoints: [endpoint], refreshInterval: 120, sessionConfiguration: configuration)
         let firstFailure = expectation(description: "Transient failure")
         let confirmedFailure = expectation(description: "Confirmed failure")
         var requestedSecondProbe = false
@@ -220,19 +274,17 @@ final class ServiceMonitorTests: XCTestCase {
 
         cancellable.cancel()
         store.stop()
-        session.invalidateAndCancel()
         ServiceMonitorURLProtocol.handler = nil
     }
 
     func testConnectionLostCountsAsEndpointFailure() {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [ServiceMonitorURLProtocol.self]
-        let session = URLSession(configuration: configuration)
         let endpoint = ServiceMonitorEndpoint(
             name: "API", urlString: "https://status.example.com/health")
         ServiceMonitorURLProtocol.handler = { _ in throw URLError(.networkConnectionLost) }
         let store = ServiceMonitorStore(
-            endpoints: [endpoint], refreshInterval: 120, session: session)
+            endpoints: [endpoint], refreshInterval: 120, sessionConfiguration: configuration)
         let completed = expectation(description: "Connection loss recorded")
         let cancellable = store.$items.sink { items in
             guard case .degraded(let reason) = items.first?.state else { return }
@@ -245,7 +297,6 @@ final class ServiceMonitorTests: XCTestCase {
 
         cancellable.cancel()
         store.stop()
-        session.invalidateAndCancel()
         ServiceMonitorURLProtocol.handler = nil
     }
 
@@ -271,6 +322,7 @@ final class ServiceMonitorTests: XCTestCase {
 }
 
 private final class ServiceMonitorURLProtocol: URLProtocol {
+    static var holdsBody = false
     static var handler: ((URLRequest) throws -> HTTPURLResponse)?
 
     override class func canInit(with request: URLRequest) -> Bool { true }
@@ -285,7 +337,9 @@ private final class ServiceMonitorURLProtocol: URLProtocol {
         do {
             let response = try handler(request)
             client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
-            client?.urlProtocolDidFinishLoading(self)
+            if !Self.holdsBody || request.httpMethod == "HEAD" {
+                client?.urlProtocolDidFinishLoading(self)
+            }
         } catch {
             client?.urlProtocol(self, didFailWithError: error)
         }

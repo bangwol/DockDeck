@@ -160,7 +160,35 @@ enum ServiceMonitorState: Equatable {
     }
 }
 
-private final class ServiceMonitorSessionDelegate: NSObject, URLSessionTaskDelegate {
+final class ServiceMonitorProbeDelegate: NSObject, URLSessionDataDelegate, @unchecked Sendable {
+    private let lock = NSLock()
+    private var completions: [Int: (URLResponse?, Error?) -> Void] = [:]
+
+    func register(_ task: URLSessionTask, completion: @escaping (URLResponse?, Error?) -> Void) {
+        lock.withLock { completions[task.taskIdentifier] = completion }
+    }
+
+    func urlSession(
+        _ session: URLSession, dataTask: URLSessionDataTask,
+        didReceive response: URLResponse,
+        completionHandler: @escaping (URLSession.ResponseDisposition) -> Void
+    ) {
+        finish(task: dataTask, response: response, error: nil)
+        // Health checks need the status and headers, never the response body.
+        completionHandler(.cancel)
+    }
+
+    func urlSession(
+        _ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?
+    ) {
+        finish(task: task, response: task.response, error: error)
+    }
+
+    private func finish(task: URLSessionTask, response: URLResponse?, error: Error?) {
+        let callback = lock.withLock { completions.removeValue(forKey: task.taskIdentifier) }
+        callback?(response, error)
+    }
+
     func urlSession(
         _ session: URLSession,
         task: URLSessionTask,
@@ -200,23 +228,30 @@ final class ServiceMonitorStore: ObservableObject {
     private var generation = 0
     private var isRunning = false
     private let session: URLSession
+    private let sessionDelegate: ServiceMonitorProbeDelegate
     private var refreshCadence = ModuleRefreshCadence()
 
     init(
         endpoints: [ServiceMonitorEndpoint] = PanelSettings.serviceMonitorEndpoints,
         refreshInterval: TimeInterval = PanelSettings.serviceMonitorRefreshInterval,
-        session: URLSession? = nil
+        sessionConfiguration: URLSessionConfiguration? = nil
     ) {
         let endpoints = Self.limitedUniqueEndpoints(endpoints)
         self.endpoints = endpoints
         self.refreshInterval = Self.resolvedRefreshInterval(refreshInterval)
         items = endpoints.map { ServiceMonitorItem(endpoint: $0, state: .idle) }
 
-        self.session = session ?? Self.makeSession()
+        let delegate = ServiceMonitorProbeDelegate()
+        sessionDelegate = delegate
+        session = Self.makeSession(configuration: sessionConfiguration, delegate: delegate)
     }
 
-    private static func makeSession() -> URLSession {
-        let configuration = URLSessionConfiguration.ephemeral
+    deinit { session.invalidateAndCancel() }
+
+    private static func makeSession(
+        configuration: URLSessionConfiguration?, delegate: ServiceMonitorProbeDelegate
+    ) -> URLSession {
+        let configuration = configuration ?? .ephemeral
         configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
         configuration.urlCache = nil
         configuration.httpCookieStorage = nil
@@ -225,10 +260,7 @@ final class ServiceMonitorStore: ObservableObject {
         configuration.waitsForConnectivity = true
         configuration.timeoutIntervalForRequest = 8
         configuration.timeoutIntervalForResource = 10
-        return URLSession(
-            configuration: configuration,
-            delegate: ServiceMonitorSessionDelegate(),
-            delegateQueue: nil)
+        return URLSession(configuration: configuration, delegate: delegate, delegateQueue: nil)
     }
 
     func start() {
@@ -323,7 +355,8 @@ final class ServiceMonitorStore: ObservableObject {
         request.cachePolicy = .reloadIgnoringLocalCacheData
         request.timeoutInterval = 8
         if method == "GET" { request.setValue("bytes=0-0", forHTTPHeaderField: "Range") }
-        let task = session.dataTask(with: request) { [weak self] _, response, error in
+        let task = session.dataTask(with: request)
+        sessionDelegate.register(task) { [weak self] response, error in
             let latency = max(
                 Int(((ProcessInfo.processInfo.systemUptime - startedAt) * 1_000).rounded()), 0)
             DispatchQueue.main.async {
