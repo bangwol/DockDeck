@@ -77,6 +77,39 @@ final class ServiceMonitorTests: XCTestCase {
         store.stop()
     }
 
+    func testURLValidationRejectsPublicNumericHostsOverHTTP() {
+        let hosts = [
+            "[2001:4860:4860::8888]", "[2001:4860:4860::8888%25en0]",
+            "[::ffff:8.8.8.8]", "[::ffff:808:808]", "[ff02::1]", "[::]",
+            "134744072", "0x08080808", "010.010.010.010", "8.8.2056", "8.8.8.8.",
+        ]
+
+        for host in hosts {
+            let url = "http://\(host)/health"
+            XCTAssertNil(ServiceMonitorURLValidator.validatedURL(url), url)
+            XCTAssertEqual(
+                ServiceMonitorURLValidator.validationMessage(url),
+                "Public services must use HTTPS.", url)
+            XCTAssertNotNil(
+                ServiceMonitorURLValidator.validatedURL("https://\(host)/health"), host)
+        }
+    }
+
+    func testURLValidationPreservesLocalNumericHostsAndNames() {
+        let hosts = [
+            "localhost", "printer", "printer.local", "LOCALHOST.",
+            "127.0.0.1", "10.1.2.3", "172.16.0.1", "192.168.1.20", "169.254.1.2",
+            "127.1", "2130706433", "0x7f000001", "0300.0250.1.1",
+            "[::1]", "[fc00::1]", "[fd00::1]", "[fe80::1]", "[fe80::1%25en0]",
+            "[::ffff:127.0.0.1]", "[::ffff:c0a8:114]",
+        ]
+
+        for host in hosts {
+            let url = "http://\(host):8080/health"
+            XCTAssertNotNil(ServiceMonitorURLValidator.validatedURL(url), url)
+        }
+    }
+
     func testURLValidationRejectsCredentials() {
         let value = "https://user:password@example.com/health"
 

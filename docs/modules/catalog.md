@@ -11,9 +11,10 @@ If a server rejects `HEAD` with 405 or 501, DockDeck retries with a `GET` reques
 containing `Range: bytes=0-0`. Probes finish when headers arrive and cancel body
 transfer, including when a server ignores Range.
 Public endpoints must use HTTPS. Plain HTTP is accepted only for local names and
-private or loopback addresses. The packaged app declares Apple's narrow
-`NSAllowsLocalNetworking` exception instead of disabling App Transport Security
-globally. See Apple's
+private or loopback addresses. This also applies to IPv6 literals, IPv4-mapped
+IPv6 addresses, and alternate numeric IPv4 spellings. The packaged app declares
+Apple's narrow `NSAllowsLocalNetworking` exception instead of disabling App
+Transport Security globally. See Apple's
 [App Transport Security guidance](https://developer.apple.com/documentation/security/preventing-insecure-network-connections)
 and [`NSAllowsLocalNetworking` reference](https://developer.apple.com/documentation/bundleresources/information-property-list/nsapptransportsecurity/nsallowslocalnetworking).
 

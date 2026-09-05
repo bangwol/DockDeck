@@ -212,6 +212,50 @@ final class UsageProviderTests: XCTestCase {
             [Date(timeIntervalSince1970: 2_000), Date(timeIntervalSince1970: 3_000)])
     }
 
+    func testCodexProviderHandlesNotificationsBeforeAndAfterResponse() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("DockDeckCodexNotifications-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let executable = directory.appendingPathComponent("codex")
+        try Data(
+            #"""
+            #!/bin/sh
+            IFS= read -r initialize
+            IFS= read -r initialized
+            IFS= read -r request
+            printf '%s\n' \
+              '{"method":"account/rateLimits/updated","params":{"rateLimits":{"primary":{"usedPercent":10,"windowDurationMins":300}}}}' \
+              '{"id":2,"result":{"rateLimits":{"primary":{"usedPercent":18,"windowDurationMins":300}}}}' \
+              '{"method":"unrelated/updated","params":{}}' \
+              '{"method":"account/rateLimits/updated","params":{"rateLimits":{"primary":{"usedPercent":42,"windowDurationMins":300}}}}'
+            while IFS= read -r request; do :; done
+            """#.utf8
+        ).write(to: executable)
+        try FileManager.default.setAttributes(
+            [.posixPermissions: 0o700], ofItemAtPath: executable.path)
+
+        let provider = CodexAppServerProvider(executableURL: executable)
+        defer { provider.stop() }
+        let received = expectation(description: "Response and notifications received")
+        received.expectedFulfillmentCount = 3
+        var percentages: [Double] = []
+        provider.start { result in
+            DispatchQueue.main.async {
+                switch result {
+                case .success(let snapshot):
+                    percentages.append(contentsOf: snapshot.windows.map(\.usedPercent))
+                    received.fulfill()
+                case .failure(let error):
+                    XCTFail("Unexpected provider failure: \(error)")
+                }
+            }
+        }
+
+        wait(for: [received], timeout: 3)
+        XCTAssertEqual(percentages, [10, 18, 42])
+    }
+
     func testClaudeParserReadsOnlyRateLimitsAndMarksFreshCacheLive() throws {
         let now = Date(timeIntervalSince1970: 2_000)
         let data = Data(
@@ -414,14 +458,15 @@ final class UsageProviderTests: XCTestCase {
             homeDirectory: homeDirectory,
             probeDirectory: root.appendingPathComponent("probe", isDirectory: true))
 
-        let startedAt = Date()
         for _ in 0..<3 {
+            let startedAt = Date()
             guard case .success = provider.read(now: Date(timeIntervalSince1970: 2_000)) else {
                 return XCTFail("Expected direct Claude usage output to parse repeatedly")
             }
+            // Each inherited writer remains open for four seconds. Check each read
+            // independently so unrelated process-launch overhead does not accumulate.
+            XCTAssertLessThan(Date().timeIntervalSince(startedAt), 3)
         }
-
-        XCTAssertLessThan(Date().timeIntervalSince(startedAt), 3)
     }
 
     func testClaudeProviderCancellationReturnsPromptly() throws {

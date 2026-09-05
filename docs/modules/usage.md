@@ -41,7 +41,9 @@ weekly limits may also apply in the
 [Codex pricing guide](https://learn.chatgpt.com/docs/pricing).
 
 DockDeck runs the locally installed official Codex CLI as a long-lived app-server
-subprocess. It does not read browser cookies or browser credential stores.
+subprocess. Rate-limit notifications update the displayed values even when no
+refresh request is pending. Unrelated notifications are ignored. It does not
+read browser cookies or browser credential stores.
 
 ## Claude
 
