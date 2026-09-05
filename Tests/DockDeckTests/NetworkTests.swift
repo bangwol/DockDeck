@@ -5,6 +5,50 @@ import XCTest
 @testable import DockDeck
 
 final class NetworkTests: XCTestCase {
+    func testChangingInterfaceResetsBaselineAndHistory() {
+        var bytes: UInt64 = 100
+        let store = NetworkStore(interfaceName: "", counterReader: { name in
+            defer { bytes += 100 }
+            return NetworkCounters(interfaceName: name ?? "en0", receivedBytes: bytes, sentBytes: bytes)
+        })
+        store.refresh(now: Date(timeIntervalSince1970: 0))
+        store.refresh(now: Date(timeIntervalSince1970: 1))
+        XCTAssertEqual(store.snapshot?.downloadBytesPerSecond, 100)
+        XCTAssertEqual(store.downloadHistory.samples.count, 1)
+        store.setInterfaceName("utun0")
+        XCTAssertTrue(store.downloadHistory.samples.isEmpty)
+        store.refresh(now: Date(timeIntervalSince1970: 2))
+        XCTAssertEqual(store.snapshot?.interfaceName, "utun0")
+        XCTAssertNil(store.snapshot?.downloadBytesPerSecond)
+        XCTAssertEqual(store.measurementStatus, "Measuring rate")
+    }
+
+    func testAutomaticRouteChangeAlsoClearsHistory() {
+        var name = "en0"
+        var bytes: UInt64 = 100
+        let store = NetworkStore(interfaceName: "", counterReader: { _ in
+            guard !name.isEmpty else { return nil }
+            defer { bytes += 100 }
+            return NetworkCounters(interfaceName: name, receivedBytes: bytes, sentBytes: bytes)
+        })
+        store.refresh(now: Date(timeIntervalSince1970: 0))
+        store.refresh(now: Date(timeIntervalSince1970: 1))
+        name = ""
+        store.refresh(now: Date(timeIntervalSince1970: 1.5))
+        name = "utun0"
+        store.refresh(now: Date(timeIntervalSince1970: 2))
+        XCTAssertTrue(store.downloadHistory.samples.isEmpty)
+        XCTAssertNil(store.snapshot?.downloadBytesPerSecond)
+    }
+
+    func testUnavailableCountersAreDistinctFromOfflineRoute() {
+        let store = NetworkStore(interfaceName: "en9", counterReader: { _ in nil })
+        store.refresh()
+        XCTAssertEqual(store.measurementStatus, "Counters unavailable")
+        XCTAssertEqual(NetworkCounterReader.normalizedInterfaceName("en0\nignored"), "")
+        XCTAssertEqual(NetworkCounterReader.normalizedInterfaceName(String(repeating: "x", count: 16)), "")
+    }
+
     func testRateUsesCounterDeltaAndElapsedTime() {
         XCTAssertEqual(
             NetworkRateCalculator.rate(previous: 1_000, current: 5_000, elapsed: 2),

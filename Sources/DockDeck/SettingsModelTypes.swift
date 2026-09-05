@@ -227,6 +227,7 @@ struct BatterySettingsState: Equatable {
 
 struct NetworkSettingsState: Equatable {
     var refreshInterval: TimeInterval
+    var interfaceName: String = ""
 }
 
 struct AppearanceSettingsState: Equatable {
@@ -317,6 +318,7 @@ enum BatterySettingsChange {
 }
 
 enum NetworkSettingsChange {
+    case interfaceName(String)
     case refreshInterval(TimeInterval)
 }
 

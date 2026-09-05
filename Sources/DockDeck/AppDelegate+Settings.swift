@@ -248,6 +248,7 @@ extension AppDelegate {
                 refreshInterval: PanelSettings.scheduleRefreshInterval)
             self.batteryStore.setRefreshInterval(PanelSettings.batteryRefreshInterval)
             self.networkStore.setRefreshInterval(PanelSettings.networkRefreshInterval)
+            self.networkStore.setInterfaceName(PanelSettings.networkInterfaceName)
             self.projectPulseStore.updateConfiguration(
                 PanelSettings.projectPulseConfiguration)
             self.githubInboxStore.updateConfiguration(
@@ -335,7 +336,8 @@ extension AppDelegate {
             battery: BatterySettingsState(
                 refreshInterval: PanelSettings.batteryRefreshInterval),
             network: NetworkSettingsState(
-                refreshInterval: PanelSettings.networkRefreshInterval),
+                refreshInterval: PanelSettings.networkRefreshInterval,
+                interfaceName: PanelSettings.networkInterfaceName),
             projectPulse: PanelSettings.projectPulseConfiguration,
             githubInbox: PanelSettings.githubInboxConfiguration,
             docker: PanelSettings.dockerConfiguration,
@@ -453,6 +455,9 @@ extension AppDelegate {
         case .battery(.refreshInterval(let interval)):
             PanelSettings.batteryRefreshInterval = interval
             batteryStore.setRefreshInterval(interval)
+        case .network(.interfaceName(let name)):
+            PanelSettings.networkInterfaceName = name
+            networkStore.setInterfaceName(name)
         case .network(.refreshInterval(let interval)):
             PanelSettings.networkRefreshInterval = interval
             networkStore.setRefreshInterval(interval)

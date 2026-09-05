@@ -53,6 +53,7 @@ enum PanelSettings {
         "DockDeck.settings.clockTimeZoneIdentifier"
     private static let clockHourFormatKey = "DockDeck.settings.clockHourFormat"
     private static let batteryRefreshIntervalKey = "DockDeck.settings.batteryRefreshInterval"
+    private static let networkInterfaceNameKey = "DockDeck.settings.networkInterfaceName"
     private static let networkRefreshIntervalKey = "DockDeck.settings.networkRefreshInterval"
     private static let notificationsKey = "DockDeck.settings.notifications.v1"
     private static let projectPulseConfigurationKey =
@@ -442,6 +443,13 @@ enum PanelSettings {
         }
     }
 
+    static var networkInterfaceName: String {
+        get { NetworkCounterReader.normalizedInterfaceName(
+            UserDefaults.standard.string(forKey: networkInterfaceNameKey) ?? "") }
+        set { UserDefaults.standard.set(NetworkCounterReader.normalizedInterfaceName(newValue),
+                                       forKey: networkInterfaceNameKey) }
+    }
+
     static var networkRefreshInterval: TimeInterval {
         get {
             let defaults = UserDefaults.standard
@@ -681,6 +689,7 @@ enum PanelSettings {
         defaults.removeObject(forKey: clockHourFormatKey)
         defaults.removeObject(forKey: batteryRefreshIntervalKey)
         defaults.removeObject(forKey: networkRefreshIntervalKey)
+        defaults.removeObject(forKey: networkInterfaceNameKey)
         defaults.removeObject(forKey: notificationsKey)
         defaults.removeObject(forKey: projectPulseConfigurationKey)
         defaults.removeObject(forKey: githubInboxConfigurationKey)
