@@ -3,6 +3,16 @@ import XCTest
 @testable import DockDeck
 
 final class NotificationTests: XCTestCase {
+    func testExtremeStoredThresholdsNormalizeWithoutOverflow() throws {
+        for (value, expected) in [(Int.min, 10), (Int.max, 30)] {
+            let data = Data(
+                "{\"usageRemainingThreshold\":\(value),\"batteryRemainingThreshold\":\(value)}".utf8)
+            let settings = try JSONDecoder().decode(DockNotificationSettings.self, from: data)
+            XCTAssertEqual(settings.usageRemainingThreshold, expected)
+            XCTAssertEqual(settings.batteryRemainingThreshold, expected)
+        }
+    }
+
     func testUsageAlertsOnlyWhenLiveWindowCrossesThreshold() {
         var detector = DockNotificationEventDetector()
         let low = provider(usedPercent: 85)

@@ -18,6 +18,30 @@ final class FocusTimerTests: XCTestCase {
         XCTAssertEqual(normalized.durationSeconds(for: .breakTime), 10 * 60)
     }
 
+    func testExtremeSettingsRestoreToSupportedDurations() throws {
+        for (value, focus, pause) in [(Int.min, 15, 5), (Int.max, 60, 15)] {
+            let data = Data("{\"focusMinutes\":\(value),\"breakMinutes\":\(value)}".utf8)
+            let settings = try JSONDecoder().decode(FocusTimerSettings.self, from: data).normalized()
+            XCTAssertEqual(settings.focusMinutes, focus)
+            XCTAssertEqual(settings.breakMinutes, pause)
+        }
+    }
+
+    func testExtremeDeadlineRestoresWithoutOverflow() {
+        let now = Date(timeIntervalSince1970: 10_000)
+        for (interval, expected) in [(Double.greatestFiniteMagnitude, 1_500),
+                                     (-Double.greatestFiniteMagnitude, 0)] {
+            let session = FocusTimerSession(
+                phase: .focus, mode: .running,
+                deadline: Date(timeIntervalSinceReferenceDate: interval),
+                remainingSeconds: 1_500, totalSeconds: 1_500)
+            let store = FocusTimerStore(session: session, now: now)
+            XCTAssertEqual(store.snapshot.remainingSeconds, expected)
+            store.toggle(now: now)
+            XCTAssertLessThanOrEqual(store.snapshot.remainingSeconds, 1_500)
+        }
+    }
+
     func testCorruptPausedSessionAtZeroRestoresIdleDuration() {
         let settings = FocusTimerSettings()
         let session = FocusTimerSession(
