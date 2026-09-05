@@ -531,6 +531,12 @@ final class SettingsPanelModel: ObservableObject {
         updateProjectPulseConfiguration { $0 = configuration }
     }
 
+    func setLocalPortsConfiguration(_ configuration: LocalPortsConfiguration) {
+        let configuration = configuration.normalized()
+        updateValues { $0.localPorts = configuration }
+        onChange?(.localPorts(configuration))
+    }
+
     func setProjectPulseRepositoryPath(_ path: String?) {
         updateProjectPulseConfiguration { $0.repositoryPath = path }
     }

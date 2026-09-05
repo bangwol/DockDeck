@@ -68,6 +68,7 @@ final class PanelModuleServices {
     let music: MusicStore
     let battery: BatteryStore
     let network: NetworkStore
+    let localPorts: LocalPortsStore
     let projectPulse: ProjectPulseStore
     let githubInbox: GitHubInboxStore
     let docker: DockerStore
@@ -86,6 +87,7 @@ final class PanelModuleServices {
         music: MusicStore = MusicStore(),
         battery: BatteryStore = BatteryStore(),
         network: NetworkStore = NetworkStore(),
+        localPorts: LocalPortsStore = LocalPortsStore(),
         projectPulse: ProjectPulseStore = ProjectPulseStore(),
         githubInbox: GitHubInboxStore = GitHubInboxStore(),
         docker: DockerStore = DockerStore(),
@@ -101,6 +103,7 @@ final class PanelModuleServices {
         self.music = music
         self.battery = battery
         self.network = network
+        self.localPorts = localPorts
         self.projectPulse = projectPulse
         self.githubInbox = githubInbox
         self.docker = docker
@@ -116,6 +119,7 @@ final class PanelModuleServices {
             .music: music,
             .battery: battery,
             .network: network,
+            .localPorts: localPorts,
             .projectPulse: projectPulse,
             .githubInbox: githubInbox,
             .docker: docker,
@@ -228,6 +232,8 @@ struct ReadOnlyDeckPanelView: View {
             BatteryPanelView(store: services.battery, theme: presentation.theme)
         case .network:
             NetworkPanelView(store: services.network, theme: presentation.theme)
+        case .localPorts:
+            LocalPortsPanelView(store: services.localPorts, theme: presentation.theme)
         case .projectPulse:
             ProjectPulsePanelView(store: services.projectPulse, theme: presentation.theme)
         case .githubInbox:
@@ -307,6 +313,8 @@ struct ReadOnlyModuleDetailView: View {
                 hourFormat: PanelSettings.clockHourFormat, favorites: PanelSettings.clockFavorites)
         case .music:
             MusicModuleDetailView(store: services.music, theme: presentation.theme)
+        case .localPorts:
+            LocalPortsDetailView(store: services.localPorts)
         case .projectPulse:
             ProjectPulseModuleDetailView(
                 store: services.projectPulse, theme: presentation.theme)

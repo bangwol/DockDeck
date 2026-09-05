@@ -170,6 +170,7 @@ struct PanelModuleID: Hashable, Codable {
     static let music = PanelModuleID(rawValue: "music")
     static let battery = PanelModuleID(rawValue: "battery")
     static let network = PanelModuleID(rawValue: "network")
+    static let localPorts = PanelModuleID(rawValue: "local-ports")
     static let projectPulse = PanelModuleID(rawValue: "project-pulse")
     static let githubInbox = PanelModuleID(rawValue: "github-inbox")
     static let docker = PanelModuleID(rawValue: "docker")
@@ -184,7 +185,7 @@ struct PanelModuleID: Hashable, Codable {
 
     static let readOnlyBuiltIns: [PanelModuleID] = [
         .usage, .systemStats, .serviceMonitor, .weather, .schedule, .clock, .music,
-        .battery, .network,
+        .battery, .network, .localPorts,
         .projectPulse,
         .githubInbox,
         .docker,

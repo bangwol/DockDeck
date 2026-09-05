@@ -517,6 +517,18 @@ enum PanelSettings {
         }
     }
 
+    static var localPortsConfiguration: LocalPortsConfiguration {
+        get {
+            guard let data = UserDefaults.standard.data(forKey: "dockdeck.localPorts.v1"), data.count <= 8_192,
+                let value = try? JSONDecoder().decode(LocalPortsConfiguration.self, from: data) else { return .init() }
+            return value.normalized()
+        }
+        set {
+            guard let data = try? JSONEncoder().encode(newValue.normalized()) else { return }
+            UserDefaults.standard.set(data, forKey: "dockdeck.localPorts.v1")
+        }
+    }
+
     static var githubInboxConfiguration: GitHubInboxConfiguration {
         get {
             guard let data = UserDefaults.standard.data(forKey: githubInboxConfigurationKey),
@@ -745,6 +757,7 @@ enum PanelSettings {
         defaults.removeObject(forKey: networkInterfaceNameKey)
         defaults.removeObject(forKey: notificationsKey)
         defaults.removeObject(forKey: CompactReadability.preferenceKey)
+        defaults.removeObject(forKey: "dockdeck.localPorts.v1")
         defaults.removeObject(forKey: projectPulseConfigurationKey)
         defaults.removeObject(forKey: "dockdeck.projectPulseFavorites.v1")
         defaults.removeObject(forKey: githubInboxConfigurationKey)

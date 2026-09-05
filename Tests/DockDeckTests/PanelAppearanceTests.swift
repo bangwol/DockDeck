@@ -49,7 +49,7 @@ final class PanelAppearanceTests: XCTestCase {
             configuration.left,
             [
                 .usage, .systemStats, .serviceMonitor, .weather, .schedule, .clock, .music,
-                .battery, .network,
+                .battery, .network, .localPorts,
                 .projectPulse,
                 .githubInbox,
                 .docker,
@@ -76,7 +76,7 @@ final class PanelAppearanceTests: XCTestCase {
             decoded.right,
             [
                 .usage, .systemStats, .serviceMonitor, .weather, .schedule, .clock, .music,
-                .battery, .network,
+                .battery, .network, .localPorts,
                 .projectPulse,
                 .githubInbox,
                 .docker,
@@ -98,7 +98,7 @@ final class PanelAppearanceTests: XCTestCase {
             configuration.right,
             [
                 .usage, .serviceMonitor, .weather, .schedule, .clock, .music, .battery,
-                .network,
+                .network, .localPorts,
                 .projectPulse,
                 .githubInbox,
                 .docker,
@@ -171,7 +171,7 @@ final class PanelAppearanceTests: XCTestCase {
             model.values.deckConfiguration.left,
             [
                 .usage, .systemStats, .serviceMonitor, .weather, .schedule, .clock, .music,
-                .battery, .network,
+                .battery, .network, .localPorts,
                 .projectPulse,
                 .githubInbox,
                 .docker,
@@ -263,7 +263,7 @@ final class PanelAppearanceTests: XCTestCase {
             model.moduleDefinitions.map(\.id),
             [
                 .battery, .terminal, .usage,
-                .customTile, .customTile2, .customTile3, .docker, .focusTimer, .githubInbox, .music, .network,
+                .customTile, .customTile2, .customTile3, .docker, .focusTimer, .githubInbox, .localPorts, .music, .network,
                 .projectPulse, .schedule, .serviceMonitor, .systemStats, .weather, .clock,
             ])
         XCTAssertEqual(
@@ -357,7 +357,7 @@ final class PanelAppearanceTests: XCTestCase {
             model.availablePanes,
             [
                 .decks, .notifications, .diagnostics, .terminal, .usage, .battery,
-                .customTile, .customTile2, .customTile3, .docker, .focusTimer, .githubInbox, .music, .network,
+                .customTile, .customTile2, .customTile3, .docker, .focusTimer, .githubInbox, .localPorts, .music, .network,
                 .projectPulse, .schedule, .serviceMonitor, .systemStats, .weather,
                 .clock, .appearance,
             ])

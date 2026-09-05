@@ -14,6 +14,7 @@ front page harder to scan.
 - [Terminal](modules/terminal.md)
 - [Usage](modules/usage.md)
 - [System Stats](modules/system-stats.md)
+- [Local Ports](modules/local-ports.md)
 - [Schedule and Reminders](modules/schedule.md)
 - [Music](modules/music.md)
 - [Project Pulse](modules/project-pulse.md)

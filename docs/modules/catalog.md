@@ -156,3 +156,9 @@ the stopped count to its detail view, and Usage moves reset times to detail and
 hover text. Increase Contrast also enables the readable layout. macOS Reduce
 Transparency and Increase Contrast make panel backgrounds opaque; Reduce Motion
 continues to disable deck transitions.
+
+## Local Ports
+
+Up to five configured TCP ports show Open, Closed, or Unavailable using only
+IPv4/IPv6 loopback connections. See [Local Ports](local-ports.md) for polling,
+error meanings, and the distinction between reachability and service health.

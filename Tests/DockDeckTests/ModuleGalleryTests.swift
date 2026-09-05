@@ -198,6 +198,11 @@ final class ModuleGalleryTests: XCTestCase {
                 initialSnapshot: BatterySnapshot(
                     percent: 76, state: .discharging, minutesRemaining: 310)),
             network: network,
+            localPorts: LocalPortsStore(initialItems: [
+                .init(port: 3000, state: .open), .init(port: 5173, state: .closed),
+                .init(port: 8080, state: .unavailable("Permission denied while checking the local port.")),
+                .init(port: 5432, state: .closed), .init(port: 65535, state: .open),
+            ]),
             projectPulse: ProjectPulseStore(
                 configuration: ProjectPulseConfiguration(
                     source: .github, githubRepository: "example/DockDeck"),

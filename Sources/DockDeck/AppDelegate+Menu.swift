@@ -90,6 +90,7 @@ extension AppDelegate {
         if enabled.contains(.music) { musicStore.refresh() }
         if enabled.contains(.battery) { batteryStore.refresh() }
         if enabled.contains(.network) { networkStore.refresh() }
+        if enabled.contains(.localPorts) { moduleServices.localPorts.refresh() }
         if enabled.contains(.projectPulse) { projectPulseStore.refresh() }
         if enabled.contains(.githubInbox) { githubInboxStore.refresh() }
         if enabled.contains(.docker) { dockerStore.refresh() }

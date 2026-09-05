@@ -250,6 +250,7 @@ extension AppDelegate {
             self.batteryStore.setRefreshInterval(PanelSettings.batteryRefreshInterval)
             self.networkStore.setRefreshInterval(PanelSettings.networkRefreshInterval)
             self.networkStore.setInterfaceName(PanelSettings.networkInterfaceName)
+            self.moduleServices.localPorts.updateConfiguration(PanelSettings.localPortsConfiguration)
             self.projectPulseStore.updateConfiguration(
                 PanelSettings.projectPulseConfiguration)
             self.githubInboxStore.updateConfiguration(
@@ -351,7 +352,8 @@ extension AppDelegate {
                 cornerRadius: PanelSettings.cornerRadius,
                 tintOpacity: PanelSettings.tintOpacity
                     ?? currentTheme.panelTintColor.alphaComponent),
-            extraCustomTiles: PanelSettings.extraCustomTileConfigurations)
+            extraCustomTiles: PanelSettings.extraCustomTileConfigurations,
+            localPorts: PanelSettings.localPortsConfiguration)
     }
 
     private func applySettingsChange(_ change: SettingsPanelChange) {
@@ -371,6 +373,9 @@ extension AppDelegate {
             PanelSettings.deckAutoSlideSettings = settings
             for controller in readOnlyDeckPanelControllers { controller.applySettings() }
             synchronizeDeckAutoSlideTimer()
+        case .localPorts(let configuration):
+            PanelSettings.localPortsConfiguration = configuration
+            moduleServices.localPorts.updateConfiguration(configuration)
         case .notifications(let settings):
             let wasEnabled = PanelSettings.notifications.enabled
             PanelSettings.notifications = settings

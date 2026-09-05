@@ -15,6 +15,7 @@ enum SettingsPaneID: String, CaseIterable, Identifiable {
     case music
     case battery
     case network
+    case localPorts
     case projectPulse
     case githubInbox
     case docker
@@ -41,6 +42,7 @@ enum SettingsPaneID: String, CaseIterable, Identifiable {
         case .music: "Music"
         case .battery: "Battery"
         case .network: "Network"
+        case .localPorts: "Local Ports"
         case .projectPulse: "Project Pulse"
         case .githubInbox: "GitHub Inbox"
         case .docker: "Docker"
@@ -67,6 +69,7 @@ enum SettingsPaneID: String, CaseIterable, Identifiable {
         case .music: "Control the macOS Music app."
         case .battery: "Show charge, power state, and time left."
         case .network: "Show local download and upload throughput."
+        case .localPorts: "Check local development server TCP ports."
         case .projectPulse: "Show local Git or remote GitHub repository activity."
         case .githubInbox: "Summarize account notifications, reviews, and Actions failures."
         case .docker: "Show local container health and resource use."
@@ -91,6 +94,7 @@ enum SettingsPaneID: String, CaseIterable, Identifiable {
         case .music: "music.note"
         case .battery: "battery.75percent"
         case .network: "network"
+        case .localPorts: "network.badge.shield.half.filled"
         case .projectPulse: "point.3.connected.trianglepath.dotted"
         case .githubInbox: "bell.badge"
         case .docker: "shippingbox"
@@ -154,6 +158,9 @@ enum PanelModuleRegistry {
         PanelModuleDefinition(
             id: .network, title: "Network", subtitle: "Download and upload rates",
             symbolName: "network", settingsPane: .network),
+        PanelModuleDefinition(
+            id: .localPorts, title: "Local Ports", subtitle: "Loopback TCP reachability",
+            symbolName: "network", settingsPane: .localPorts),
         PanelModuleDefinition(
             id: .projectPulse, title: "Project Pulse", subtitle: "Git and GitHub activity",
             symbolName: "point.3.connected.trianglepath.dotted", settingsPane: .projectPulse),
@@ -266,6 +273,7 @@ struct SettingsPanelValues: Equatable {
     var focusTimer: FocusTimerSettings
     var appearance: AppearanceSettingsState
     var extraCustomTiles: [PanelModuleID: CustomTileConfiguration] = [:]
+    var localPorts: LocalPortsConfiguration = .init()
 
     func normalized() -> Self {
         var values = self
@@ -279,6 +287,7 @@ struct SettingsPanelValues: Equatable {
         values.extraCustomTiles = extraCustomTiles.filter {
             PanelModuleID.extraCustomTiles.contains($0.key)
         }.mapValues { $0.normalized() }
+        values.localPorts = localPorts.normalized()
         values.focusTimer = focusTimer.normalized()
         return values
     }
@@ -362,6 +371,7 @@ enum AppearanceSettingsChange {
 enum SettingsPanelChange {
     case deck(PanelDeckConfiguration)
     case deckAutoSlide(DeckAutoSlideSettings)
+    case localPorts(LocalPortsConfiguration)
     case notifications(DockNotificationSettings)
     case terminal(TerminalSettingsChange)
     case usage(UsageSettingsChange)

@@ -152,6 +152,8 @@ private struct SettingsRootView: View {
             MusicSettingsView(store: musicStore)
         case .battery:
             BatterySettingsView(model: model)
+        case .localPorts:
+            LocalPortsSettingsView(model: model)
         case .network:
             NetworkSettingsView(model: model)
         case .projectPulse:
