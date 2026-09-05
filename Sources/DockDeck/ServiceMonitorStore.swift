@@ -92,17 +92,19 @@ enum ServiceMonitorURLValidator {
 
     private static func isLocalHost(_ value: String) -> Bool {
         let host = value.lowercased().trimmingCharacters(in: CharacterSet(charactersIn: "."))
-        if host == "localhost" || host.hasSuffix(".local") || !host.contains(".") {
-            return true
+        // Classify numeric addresses before treating a single-label host as local.
+        if host.contains(":") {
+            let literal = host.trimmingCharacters(in: CharacterSet(charactersIn: "[]"))
+            return isPrivateIPv6(String(literal.prefix { $0 != "%" }))
         }
-        if isPrivateIPv4(host) { return true }
-        return isPrivateIPv6(host)
+        var address = in_addr()
+        if inet_aton(host, &address) == 1 {
+            return isPrivateIPv4(UInt32(bigEndian: address.s_addr))
+        }
+        return host == "localhost" || host.hasSuffix(".local") || !host.contains(".")
     }
 
-    private static func isPrivateIPv4(_ host: String) -> Bool {
-        var address = in_addr()
-        guard inet_pton(AF_INET, host, &address) == 1 else { return false }
-        let value = UInt32(bigEndian: address.s_addr)
+    private static func isPrivateIPv4(_ value: UInt32) -> Bool {
         let first = value >> 24
         let second = (value >> 16) & 0xff
         return first == 10
@@ -116,6 +118,10 @@ enum ServiceMonitorURLValidator {
         var address = in6_addr()
         guard inet_pton(AF_INET6, host, &address) == 1 else { return false }
         let bytes = withUnsafeBytes(of: address) { Array($0) }
+        if bytes.prefix(10).allSatisfy({ $0 == 0 }), bytes[10] == 0xff, bytes[11] == 0xff {
+            let embedded = bytes.suffix(4).reduce(UInt32(0)) { ($0 << 8) | UInt32($1) }
+            return isPrivateIPv4(embedded)
+        }
         let loopback = bytes.dropLast().allSatisfy { $0 == 0 } && bytes.last == 1
         let uniqueLocal = bytes.first.map { $0 & 0xfe == 0xfc } ?? false
         let linkLocal = bytes.count > 1 && bytes[0] == 0xfe && bytes[1] & 0xc0 == 0x80
