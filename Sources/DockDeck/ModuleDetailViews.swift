@@ -561,7 +561,9 @@ struct MusicModuleDetailView: View {
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(.pink)
                 }
-                progress(track)
+                TimelineView(.animation(minimumInterval: 1, paused: store.snapshot?.state != .playing)) { context in
+                    progress(store.snapshot?.estimatedTrack(at: context.date) ?? track)
+                }
             } else {
                 Label(placeholder, systemImage: placeholderSymbol)
                     .foregroundStyle(baseColor.opacity(0.7))

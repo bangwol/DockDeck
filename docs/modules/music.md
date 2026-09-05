@@ -47,3 +47,9 @@ library, account, streaming, and network activity.
 - **Nothing playing:** start a playable item in Music, then press Refresh.
 - **Music automation unavailable:** reinstall with `./scripts/install.sh` so
   the app has the required permission description and entitlement.
+
+The detail progress display advances locally once per second during normal
+playback, based on the last observation. It stops at the known track duration
+and corrects itself on the next Music response. Paused, stopped, fast-forward,
+rewind, and unknown-duration streams retain the observed position. This display
+update does not send additional Apple Events or change the polling interval.
