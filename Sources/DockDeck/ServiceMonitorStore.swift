@@ -211,8 +211,28 @@ final class ServiceMonitorProbeDelegate: NSObject, URLSessionDataDelegate, @unch
 struct ServiceMonitorItem: Identifiable, Equatable {
     let endpoint: ServiceMonitorEndpoint
     var state: ServiceMonitorState
+    var lastSuccessfulAt: Date? = nil
+    var outageStartedAt: Date? = nil
+    var outageEndedAt: Date? = nil
 
     var id: UUID { endpoint.id }
+
+    mutating func observe(_ state: ServiceMonitorState, at now: Date) {
+        switch state {
+        case .up:
+            lastSuccessfulAt = now
+            if let startedAt = outageStartedAt, outageEndedAt == nil {
+                outageEndedAt = max(now, startedAt)
+            }
+        case .degraded, .down:
+            if outageStartedAt == nil || outageEndedAt != nil {
+                outageStartedAt = now
+                outageEndedAt = nil
+            }
+        case .idle, .checking, .offline: break
+        }
+        self.state = state
+    }
 }
 
 final class ServiceMonitorStore: ObservableObject {
@@ -293,7 +313,10 @@ final class ServiceMonitorStore: ObservableObject {
             let previous = previousItems[$0.id]
             let unchanged = previous?.endpoint.urlString == $0.urlString
             return ServiceMonitorItem(
-                endpoint: $0, state: unchanged ? previous?.state ?? .idle : .idle)
+                endpoint: $0, state: unchanged ? previous?.state ?? .idle : .idle,
+                lastSuccessfulAt: unchanged ? previous?.lastSuccessfulAt : nil,
+                outageStartedAt: unchanged ? previous?.outageStartedAt : nil,
+                outageEndedAt: unchanged ? previous?.outageEndedAt : nil)
         }
         latencyHistories = Dictionary(uniqueKeysWithValues: endpoints.compactMap { endpoint in
             guard previousItems[endpoint.id]?.endpoint.urlString == endpoint.urlString,
@@ -427,7 +450,7 @@ final class ServiceMonitorStore: ObservableObject {
             history.append(Double(latencyMilliseconds))
             latencyHistories[endpointID] = history
         }
-        items[index].state = state
+        items[index].observe(state, at: Date())
     }
 
     func latencyHistory(for endpointID: UUID) -> MetricHistory {

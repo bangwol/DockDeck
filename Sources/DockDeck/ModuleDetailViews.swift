@@ -241,8 +241,23 @@ struct ServiceMonitorModuleDetailView: View {
                     .lineLimit(1)
                 Text(item.state.detail)
                     .font(.caption)
-                    .foregroundStyle(baseColor.opacity(0.62))
-                    .lineLimit(1)
+                    .foregroundStyle(baseColor.opacity(0.72))
+                    .textSelection(.enabled)
+                if let start = item.outageStartedAt {
+                    Text("Last failure began \(start.formatted(date: .abbreviated, time: .shortened))")
+                        .font(.caption).foregroundStyle(.secondary)
+                    if let end = item.outageEndedAt {
+                        Text("Recovered after \(end.timeIntervalSince(start).formatted(.number.precision(.fractionLength(0)))) seconds")
+                            .font(.caption).foregroundStyle(.secondary)
+                    } else {
+                        Text("Recovery not yet observed · \(start, style: .relative)")
+                            .font(.caption).foregroundStyle(.orange)
+                    }
+                }
+                if let successfulAt = item.lastSuccessfulAt {
+                    Text("Last OK \(successfulAt.formatted(date: .abbreviated, time: .shortened))")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
             }
             Spacer()
             if let p50 = history.percentile(0.5), let p95 = history.percentile(0.95) {
@@ -251,7 +266,7 @@ struct ServiceMonitorModuleDetailView: View {
                     .foregroundStyle(baseColor.opacity(0.68))
             }
         }
-        .padding(.horizontal, 10)
+        .padding(10)
         .frame(minHeight: 44)
         .background(baseColor.opacity(0.065), in: RoundedRectangle(cornerRadius: 9))
         .accessibilityElement(children: .combine)

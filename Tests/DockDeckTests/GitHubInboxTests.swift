@@ -6,6 +6,21 @@ import XCTest
 @testable import DockDeck
 
 final class GitHubInboxTests: XCTestCase {
+    func testFiltersKeepAccountTotalsAndBoundCachedMessages() {
+        let entries = (0..<150).map { index in
+            GitHubInboxEntry(id: "\(index)", title: "Notification", repository: index % 2 == 0 ? "owner/one" : "owner/two",
+                reason: index % 2 == 0 ? "team_mention" : "review_requested", updatedAt: nil)
+        }
+        let snapshot = GitHubInboxSnapshot(unreadCount: 150, mentionCount: 75, reviewRequestCount: 75,
+            ciNotificationCount: 0, failedRunsLastSevenDays: nil, actionsRepository: nil,
+            entries: entries, observedAt: Date())
+        XCTAssertEqual(snapshot.entries.count, 100)
+        XCTAssertEqual(snapshot.filteredEntries(reason: "mention").count, 50)
+        XCTAssertEqual(snapshot.filteredEntries(repository: "owner/two", reason: "mention").count, 0)
+        XCTAssertEqual(snapshot.filteredEntries(repository: "owner/two", reason: "review_requested").count, 50)
+        XCTAssertEqual(snapshot.unreadCount, 150)
+    }
+
     func testLiveClientUsesAuthenticatedGitHubSessionWhenRequested() throws {
         guard ProcessInfo.processInfo.environment["DOCKDECK_LIVE_GITHUB_TEST"] == "1"
         else { throw XCTSkip("Set DOCKDECK_LIVE_GITHUB_TEST=1 to query GitHub") }
