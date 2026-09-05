@@ -178,7 +178,11 @@ final class ModuleGalleryTests: XCTestCase {
                 initialSnapshot: DockerSnapshot(
                     runningCount: 3, stoppedCount: 1, unhealthyCount: 0,
                     cpuPercent: 4.2, memoryBytes: 640 * 1_048_576,
-                    observedAt: now)),
+                    observedAt: now, containers: [
+                        DockerContainerMetric(id: "worker", name: "build-worker", cpuPercent: 3.8, memoryBytes: 512 * 1_048_576),
+                        DockerContainerMetric(id: "api", name: "development-api-with-a-long-container-name", cpuPercent: 0.3, memoryBytes: 96 * 1_048_576),
+                        DockerContainerMetric(id: "db", name: "database", cpuPercent: 0.1, memoryBytes: 32 * 1_048_576),
+                    ])),
             customTile: CustomTileStore(
                 initialSnapshot: CustomTileSnapshot(
                     content: CustomTileContent(

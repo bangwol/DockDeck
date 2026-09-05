@@ -98,7 +98,10 @@ same reduced sampling cadence as Low Power Mode.
 Docker uses the installed local Docker CLI to show running, stopped, and
 unhealthy container counts plus aggregate live CPU and memory for running
 containers. Select a 5-second, 10-second, or 30-second interval under
-**Settings → Docker**.
+**Settings → Docker**. The detail window lists up to 50 running containers,
+ordered by CPU, with names and individual CPU/memory values from the same stats
+response. Totals still include every returned container. Missing stats are shown
+as unavailable; no extra polling stream or command is started.
 
 DockDeck runs read-only `docker ps -a` and `docker stats --no-stream` commands.
 The Docker engine and CLI must already be installed and running; DockDeck does

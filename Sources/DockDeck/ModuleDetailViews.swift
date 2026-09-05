@@ -467,6 +467,30 @@ struct DockerModuleDetailView: View {
                             title: "Memory", value: memory(snapshot.memoryBytes),
                             color: .orange, baseColor: baseColor)
                     }
+                    if !snapshot.containers.isEmpty {
+                        Text("Running containers · highest CPU first · up to 50")
+                            .font(.caption).foregroundStyle(.secondary)
+                        ScrollView {
+                            LazyVStack(spacing: 6) {
+                                ForEach(snapshot.containers) { container in
+                                    HStack {
+                                        Text(container.name).lineLimit(1).help(container.name)
+                                        Spacer()
+                                        Text(percent(container.cpuPercent)).frame(width: 75, alignment: .trailing)
+                                        Text(memory(container.memoryBytes)).frame(width: 90, alignment: .trailing)
+                                    }
+                                    .font(.callout).monospacedDigit()
+                                    .padding(8)
+                                    .background(baseColor.opacity(0.06), in: RoundedRectangle(cornerRadius: 8))
+                                    .accessibilityElement(children: .combine)
+                                    .accessibilityLabel("\(container.name), CPU \(percent(container.cpuPercent)), memory \(memory(container.memoryBytes))")
+                                }
+                            }
+                        }
+                    } else {
+                        Text(snapshot.runningCount == 0 ? "No running containers" : "Individual metrics unavailable")
+                            .foregroundStyle(.secondary)
+                    }
                     HStack {
                         Text("Updated \(snapshot.observedAt.formatted(date: .omitted, time: .shortened))")
                             .foregroundStyle(baseColor.opacity(0.55))
