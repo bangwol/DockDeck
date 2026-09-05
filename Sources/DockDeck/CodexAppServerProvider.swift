@@ -329,7 +329,7 @@ final class CodexAppServerProvider {
     private func handleLine(_ data: Data) {
         guard let envelope = try? CodexRateLimitParser.decodeEnvelope(data) else { return }
 
-        if envelope.id == pendingRateLimitID {
+        if let id = envelope.id, id == pendingRateLimitID {
             pendingTimeout?.cancel()
             pendingTimeout = nil
             pendingRateLimitID = nil
