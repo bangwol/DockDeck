@@ -44,7 +44,11 @@ Network**. See Apple's
 Weather uses the [Open-Meteo Forecast API](https://open-meteo.com/en/docs) and
 [Geocoding API](https://open-meteo.com/en/docs/geocoding-api). Search for a city
 under **Settings → Weather**, select one result, and enable the module. DockDeck
-does not use IP geolocation or request macOS Location permission.
+does not use IP geolocation or request macOS Location permission. Double-click
+Weather for current conditions and up to 12 hourly temperature, condition, and
+precipitation-probability forecasts, displayed in the selected city's time zone.
+Hourly fields use the same forecast request and polling interval; missing values
+are shown as unavailable. Failed refreshes retain the previous result with an error.
 
 DockDeck stores the selected city and coordinates in local preferences. Search
 text and coordinates are sent over HTTPS only when searching or while the

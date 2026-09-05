@@ -59,6 +59,15 @@ struct WeatherLocation: Codable, Equatable, Identifiable {
     }
 }
 
+struct WeatherHour: Equatable, Identifiable {
+    let date: Date
+    let temperature: Double?
+    let precipitationProbability: Int?
+    let weatherCode: Int?
+    let isDay: Bool
+    var id: Date { date }
+}
+
 struct WeatherSnapshot: Equatable {
     let location: WeatherLocation
     let temperature: Double
@@ -69,6 +78,7 @@ struct WeatherSnapshot: Equatable {
     let isDay: Bool
     let temperatureUnit: WeatherTemperatureUnit
     let receivedAt: Date
+    var hourly: [WeatherHour] = []
 }
 
 enum WeatherLoadStatus: Equatable {
@@ -129,6 +139,9 @@ enum WeatherAPI {
             URLQueryItem(
                 name: "daily", value: "temperature_2m_max,temperature_2m_min"),
             URLQueryItem(name: "forecast_days", value: "1"),
+            URLQueryItem(name: "hourly", value: "temperature_2m,precipitation_probability,weather_code,is_day"),
+            URLQueryItem(name: "forecast_hours", value: "13"),
+            URLQueryItem(name: "timeformat", value: "unixtime"),
             URLQueryItem(name: "timezone", value: "auto"),
             URLQueryItem(name: "temperature_unit", value: unit.rawValue),
         ]
@@ -156,16 +169,20 @@ enum WeatherAPI {
         receivedAt: Date = Date()
     ) throws -> WeatherSnapshot {
         let response = try JSONDecoder().decode(ForecastResponse.self, from: data)
+        guard validTemperature(response.current.temperature),
+            validTemperature(response.current.apparentTemperature)
+        else { throw DecodingError.dataCorrupted(.init(codingPath: [], debugDescription: "Invalid temperature")) }
         return WeatherSnapshot(
             location: location,
             temperature: response.current.temperature,
             apparentTemperature: response.current.apparentTemperature,
-            highTemperature: response.daily?.maximumTemperature.first,
-            lowTemperature: response.daily?.minimumTemperature.first,
+            highTemperature: response.daily?.maximumTemperature.first.flatMap { validTemperature($0) ? $0 : nil },
+            lowTemperature: response.daily?.minimumTemperature.first.flatMap { validTemperature($0) ? $0 : nil },
             weatherCode: response.current.weatherCode,
             isDay: response.current.isDay != 0,
             temperatureUnit: unit,
-            receivedAt: receivedAt)
+            receivedAt: receivedAt,
+            hourly: response.hourly?.hours(from: receivedAt) ?? [])
     }
 
     static func decodeLocations(_ data: Data) throws -> [WeatherLocation] {
@@ -190,6 +207,46 @@ enum WeatherAPI {
     private struct ForecastResponse: Decodable {
         let current: Current
         let daily: Daily?
+        let hourly: Hourly?
+    }
+
+    private static func validTemperature(_ value: Double) -> Bool {
+        value.isFinite && (-1_000...1_000).contains(value)
+    }
+
+    private struct Hourly: Decodable {
+        let time: [Double]
+        let temperature: [Double?]
+        let precipitation: [Int?]
+        let code: [Int?]
+        let isDay: [Int?]
+
+        enum CodingKeys: String, CodingKey {
+            case time
+            case temperature = "temperature_2m"
+            case precipitation = "precipitation_probability"
+            case code = "weather_code"
+            case isDay = "is_day"
+        }
+
+        func hours(from date: Date) -> [WeatherHour] {
+            let start = date.timeIntervalSince1970
+            var seen: Set<Double> = []
+            return Array(time.indices.compactMap { index -> WeatherHour? in
+                let stamp = time[index]
+                guard stamp.isFinite, stamp >= start, stamp < start + 12 * 3_600,
+                    seen.insert(stamp).inserted
+                else { return nil }
+                let value = temperature.indices.contains(index) ? temperature[index] : nil
+                let rain = precipitation.indices.contains(index) ? precipitation[index] : nil
+                return WeatherHour(
+                    date: Date(timeIntervalSince1970: stamp),
+                    temperature: value.flatMap { WeatherAPI.validTemperature($0) ? $0 : nil },
+                    precipitationProbability: rain.flatMap { (0...100).contains($0) ? $0 : nil },
+                    weatherCode: code.indices.contains(index) ? code[index] : nil,
+                    isDay: isDay.indices.contains(index) && isDay[index] == 1)
+            }.sorted { $0.date < $1.date }.prefix(12))
+        }
     }
 
     private struct Current: Decodable {

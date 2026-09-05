@@ -33,7 +33,7 @@ final class ModuleGalleryTests: XCTestCase {
                         "\(themeName)-compact-\(module.rawValue).png"))
             }
             for module in [
-                PanelModuleID.usage, .systemStats, .serviceMonitor, .schedule,
+                PanelModuleID.usage, .weather, .systemStats, .serviceMonitor, .schedule,
                 .music, .projectPulse, .githubInbox, .docker,
             ] {
                 let presentation = ReadOnlyDeckPresentation(
@@ -111,7 +111,12 @@ final class ModuleGalleryTests: XCTestCase {
             initialSnapshot: WeatherSnapshot(
                 location: location, temperature: 24, apparentTemperature: 25,
                 highTemperature: 27, lowTemperature: 19, weatherCode: 2,
-                isDay: true, temperatureUnit: .celsius, receivedAt: now))
+                isDay: true, temperatureUnit: .celsius, receivedAt: now,
+                hourly: (0..<12).map { index in
+                    WeatherHour(date: now.addingTimeInterval(Double(index) * 3_600),
+                        temperature: 24 + Double(index % 4), precipitationProbability: index * 7,
+                        weatherCode: index < 4 ? 0 : 63, isDay: index < 6)
+                }))
         let schedule = ScheduleStore(
             includeReminders: true,
             provider: GalleryScheduleProvider(now: now))
