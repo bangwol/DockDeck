@@ -106,9 +106,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         id: UserDefaults.standard.string(forKey: AppPreferences.themeIDKey) ?? "")
     var themePickerPanel: KeyablePanel?
     lazy var quickActions = QuickActionStore()
-    let quickActionsMenu = NSMenu(title: "Quick Actions")
+    let quickActionsMenu = NSMenu(title: L10n.text("Quick Actions"))
     lazy var deckProfiles = DeckProfileStore()
-    let deckProfilesMenu = NSMenu(title: "Deck Profiles")
+    let deckProfilesMenu = NSMenu(title: L10n.text("Deck Profiles"))
     var retainsTerminalForProfile = false
     var settingsPanel: KeyablePanel?
     var modulePickerController: ModulePickerController?

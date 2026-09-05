@@ -97,7 +97,7 @@ enum UsageProviderMarkAsset {
         return Dictionary(
             uniqueKeysWithValues: names.compactMap { name in
                 guard
-                    let url = Bundle.module.url(
+                    let url = AppResources.bundle.url(
                         forResource: name, withExtension: "svg", subdirectory: "ProviderMarks"),
                     let image = NSImage(contentsOf: url)
                 else { return nil }

@@ -24,7 +24,7 @@ final class ModulePickerModel: ObservableObject {
     var modules: [PanelModuleDefinition] {
         (configuration.left + configuration.right).compactMap { id in
             guard configuration.contains(id), let module = PanelModuleRegistry.definition(for: id),
-                ModuleSearch.matches(query, text: "\(module.title) \(module.subtitle) \(id.rawValue)") else { return nil }
+                ModuleSearch.matches(query, text: "\(module.title) \(module.displayTitle) \(module.subtitle) \(module.settingsPane?.subtitle ?? "") \(id.rawValue)") else { return nil }
             return module
         }
     }
@@ -52,7 +52,7 @@ final class ModulePickerController: NSObject, NSWindowDelegate {
         self.onSelect = onSelect
         self.onClose = onClose
         super.init()
-        window.title = "Find Module"
+        window.title = L10n.text("Find Module")
         window.isReleasedWhenClosed = false
         window.delegate = self
         window.contentView = NSHostingView(rootView: ModulePickerView(model: model) { [weak self] detail in
@@ -95,18 +95,18 @@ private struct ModulePickerView: View {
 
     var body: some View {
         VStack(spacing: 12) {
-            TextField("Search enabled modules", text: $model.query)
+            TextField(L10n.text("Search enabled modules"), text: $model.query)
                 .textFieldStyle(.roundedBorder).focused($searchFocused)
             ScrollViewReader { proxy in
                 List(selection: $model.selection) {
                     ForEach(model.modules) { module in
                         HStack {
-                            Label(module.title, systemImage: module.symbolName)
+                            Label(module.displayTitle, systemImage: module.symbolName)
                             Spacer()
-                            Text(model.configuration.side(containing: module.id) == .left ? "Left" : "Right")
+                            Text(model.configuration.side(containing: module.id) == .left ? L10n.text("Left") : L10n.text("Right"))
                                 .foregroundStyle(.secondary)
                             if model.active.contains(module.id) {
-                                Image(systemName: "checkmark.circle.fill").accessibilityLabel("Currently displayed")
+                                Image(systemName: "checkmark.circle.fill").accessibilityLabel(L10n.text("Currently displayed"))
                             }
                         }
                         .tag(module.id)
@@ -114,18 +114,18 @@ private struct ModulePickerView: View {
                     }
                 }
                 .overlay {
-                    if model.modules.isEmpty { Text("No matching modules").foregroundStyle(.secondary) }
+                    if model.modules.isEmpty { Text(L10n.text("No matching modules")).foregroundStyle(.secondary) }
                 }
                 .onChange(of: model.selection) { id in
                     if let id { proxy.scrollTo(id) }
                 }
             }
             HStack {
-                Text("↑ ↓ Select · Return Open · Esc Close").font(.caption).foregroundStyle(.secondary)
+                Text(L10n.text("↑ ↓ Select · Return Open · Esc Close")).font(.caption).foregroundStyle(.secondary)
                 Spacer()
-                Button("Open Detail") { onSelect(true) }
+                Button(L10n.text("Open Detail")) { onSelect(true) }
                     .disabled(model.selection == nil || model.selection == .terminal)
-                Button("Show Module") { onSelect(false) }.disabled(model.selection == nil)
+                Button(L10n.text("Show Module")) { onSelect(false) }.disabled(model.selection == nil)
             }
         }
         .padding(16)

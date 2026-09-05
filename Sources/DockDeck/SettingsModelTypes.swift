@@ -27,7 +27,10 @@ enum SettingsPaneID: String, CaseIterable, Identifiable {
 
     var id: Self { self }
 
-    var title: String {
+    var title: String { L10n.text(titleKey) }
+    var subtitle: String { L10n.text(subtitleKey) }
+
+    var titleKey: String {
         switch self {
         case .quickActions: "Quick Actions"
         case .decks: "Decks"
@@ -54,7 +57,7 @@ enum SettingsPaneID: String, CaseIterable, Identifiable {
         }
     }
 
-    var subtitle: String {
+    var subtitleKey: String {
         switch self {
         case .quickActions: "Open saved apps, folders, web pages, or Shortcuts."
         case .decks: "Choose which modules appear beside the Dock."
@@ -112,6 +115,7 @@ struct PanelModuleDefinition: Identifiable, Equatable {
     let subtitle: String
     let symbolName: String
     let settingsPane: SettingsPaneID?
+    var displayTitle: String { L10n.text(title) }
 }
 
 enum SettingsSidebarSectionID: String {

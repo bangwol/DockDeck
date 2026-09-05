@@ -195,3 +195,13 @@ output limit. A running action cannot be started twice, and rapid repeats are
 ignored. Only save Shortcuts you trust. Errors appear in Settings and the menu;
 raw command output is not displayed or retained. Quick Actions have no polling
 timer and are excluded from deck-profile backups.
+
+## Language
+
+DockDeck follows the macOS preferred language for core app menus, settings
+categories, profile controls, and quick-action controls. Korean and English are
+bundled; unsupported languages fall back to English. Module names keep stable
+internal IDs and ordering. Provider output and module-specific detail prose are
+not fully translated in this preview. macOS date and number formatting continues
+to use the user's locale. The app's packaged resource bundle contains both
+translations and provider marks; a source checkout is not required to load them.

@@ -178,7 +178,7 @@ struct LocalPortsPanelView: View {
     var body: some View {
         HStack(spacing: 4) {
             if store.items.isEmpty {
-                Text("Checking local ports…").font(.system(size: 10))
+                Text(L10n.text("Checking local ports…")).font(.system(size: 10))
             } else {
                 ForEach(store.items) { item in
                     VStack(spacing: 4) {
@@ -227,8 +227,8 @@ struct LocalPortsSettingsView: View {
     @State private var error: String?
     var body: some View {
         Form {
-            TextField("TCP ports (up to 5)", text: $ports)
-            Button("Apply Ports") {
+            TextField(L10n.text("TCP ports (up to 5)"), text: $ports)
+            Button(L10n.text("Apply Ports")) {
                 guard let parsed = LocalPortsConfiguration.parse(ports) else {
                     error = "Enter 1–5 unique ports between 1 and 65535, separated by commas."
                     return
@@ -239,7 +239,7 @@ struct LocalPortsSettingsView: View {
                 error = nil
             }
             if let error { Text(error).foregroundStyle(.red) }
-            Picker("Refresh", selection: Binding(get: { model.values.localPorts.refreshInterval }, set: { interval in
+            Picker(L10n.text("Refresh"), selection: Binding(get: { model.values.localPorts.refreshInterval }, set: { interval in
                 var value = model.values.localPorts
                 value.refreshInterval = interval
                 model.setLocalPortsConfiguration(value)

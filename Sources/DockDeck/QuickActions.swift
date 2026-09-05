@@ -6,7 +6,7 @@ struct QuickAction: Codable, Equatable, Identifiable {
     enum Kind: String, Codable, CaseIterable, Identifiable {
         case app, folder, webpage, shortcut
         var id: Self { self }
-        var title: String { switch self { case .app: "App"; case .folder: "Folder"; case .webpage: "Web Page"; case .shortcut: "Shortcut" } }
+        var title: String { switch self { case .app: L10n.text("App"); case .folder: L10n.text("Folder"); case .webpage: L10n.text("Web Page"); case .shortcut: L10n.text("Shortcut") } }
         var symbol: String { switch self { case .app: "app"; case .folder: "folder"; case .webpage: "globe"; case .shortcut: "command" } }
     }
     var id = UUID()
@@ -163,19 +163,19 @@ struct QuickActionsSettingsView: View {
                         Spacer()
                         Button(store.running.contains(action.id) ? "Running…" : "Run") { store.run(action.id) }
                             .disabled(store.running.contains(action.id))
-                        Button("Remove") { perform { try store.save(store.actions.filter { $0.id != action.id }) } }
+                        Button(L10n.text("Remove")) { perform { try store.save(store.actions.filter { $0.id != action.id }) } }
                     }
                 }
                 Divider()
-                Picker("Type", selection: $kind) {
+                Picker(L10n.text("Type"), selection: $kind) {
                     ForEach(QuickAction.Kind.allCases) { Text($0.title).tag($0) }
                 }.onChange(of: kind) { _ in target = "" }
-                TextField("Name", text: $name)
+                TextField(L10n.text("Name"), text: $name)
                 HStack {
                     TextField(kind == .shortcut ? "Shortcut name" : kind == .webpage ? "https://example.com" : "Path", text: $target)
-                    if kind == .app || kind == .folder { Button("Choose…", action: chooseTarget) }
+                    if kind == .app || kind == .folder { Button(L10n.text("Choose…"), action: chooseTarget) }
                 }
-                Button("Add Action") {
+                Button(L10n.text("Add Action")) {
                     perform {
                         try store.save(store.actions + [QuickAction(name: name.trimmingCharacters(in: .whitespacesAndNewlines), kind: kind, target: target)])
                         name = ""; target = ""
@@ -184,9 +184,9 @@ struct QuickActionsSettingsView: View {
                 Text("Actions run only when selected here or in the Quick Actions app menu. Shortcuts have a 30-second and 32 KiB output limit. Saving or editing never launches an action. Only use Shortcuts you trust.")
                     .font(.caption).foregroundStyle(.secondary)
                 if let message = error ?? store.error { Text(message).font(.caption).foregroundStyle(.red) }
-                Button("Clear Saved Actions") { confirmsClear = true }
-                    .confirmationDialog("Clear all saved quick actions?", isPresented: $confirmsClear) {
-                        Button("Clear", role: .destructive) { store.clear() }
+                Button(L10n.text("Clear Saved Actions")) { confirmsClear = true }
+                    .confirmationDialog(L10n.text("Clear all saved quick actions?"), isPresented: $confirmsClear) {
+                        Button(L10n.text("Clear"), role: .destructive) { store.clear() }
                     }
             }.padding(24)
         }

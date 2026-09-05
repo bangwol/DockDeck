@@ -261,7 +261,7 @@ struct ReadOnlyModuleDetailView: View {
                     .foregroundStyle(.secondary)
                     .frame(width: 26)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(definition?.title ?? "Module")
+                    Text(definition?.displayTitle ?? L10n.text("Module"))
                         .font(.headline)
                     Text(definition?.subtitle ?? "DockDeck module detail")
                         .font(.caption)
@@ -270,10 +270,10 @@ struct ReadOnlyModuleDetailView: View {
                 Spacer()
                 if let onOpenSettings {
                     Menu {
-                        Button("Module Settings…") { onOpenSettings(definition?.settingsPane ?? .decks) }
-                        Button("Diagnostics…") { onOpenSettings(.diagnostics) }
+                        Button(L10n.text("Module Settings…")) { onOpenSettings(definition?.settingsPane ?? .decks) }
+                        Button(L10n.text("Diagnostics…")) { onOpenSettings(.diagnostics) }
                     } label: {
-                        Label("Settings", systemImage: "gearshape")
+                        Label(L10n.text("Settings"), systemImage: "gearshape")
                     }
                     .fixedSize()
                 }

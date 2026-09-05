@@ -31,7 +31,7 @@ final class PanelAppearanceTests: XCTestCase {
         XCTAssertEqual(model.values.extraCustomTiles[.customTile2]?.executablePath, "/usr/bin/printf")
         XCTAssertFalse(model.values.deckConfiguration.enabled.contains(.customTile2))
         model.selectedPane = .customTile3
-        XCTAssertEqual(model.customTileConfiguration.title, "Custom Tile 3")
+        XCTAssertEqual(model.customTileConfiguration.title, L10n.text("Custom Tile 3"))
         XCTAssertFalse(model.customTileConfiguration.isConfigured)
     }
 
@@ -291,6 +291,7 @@ final class PanelAppearanceTests: XCTestCase {
         XCTAssertNil(picker.selection)
         let settings = makeSettingsModel(configuration: configuration)
         XCTAssertEqual(settings.sidebarSections(matching: "selected city").flatMap(\.panes), [.weather])
+        XCTAssertEqual(settings.sidebarSections(matching: L10n.text("Weather")).flatMap(\.panes), [.weather])
         XCTAssertTrue(settings.sidebarSections(matching: "absentword").isEmpty)
     }
 
@@ -1233,9 +1234,9 @@ final class PanelAppearanceTests: XCTestCase {
         let detail = try XCTUnwrap(controller.detailWindowForTesting)
 
         XCTAssertEqual(detail.contentMinSize, ReadOnlyModuleDetailLayout.minimumSize)
-        XCTAssertEqual(detail.title, "DockDeck — Usage")
+        XCTAssertEqual(detail.title, "DockDeck — " + L10n.text("Usage"))
         controller.select(.weather)
-        XCTAssertEqual(detail.title, "DockDeck — Weather")
+        XCTAssertEqual(detail.title, "DockDeck — " + L10n.text("Weather"))
         detail.close()
     }
 

@@ -8,18 +8,18 @@ struct DiagnosticsSettingsView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
                 HStack {
-                    Text("Current local integration status")
+                    Text(L10n.text("Current local integration status"))
                         .foregroundStyle(.secondary)
                     Spacer()
                     Button(action: store.copyReport) {
-                        Label("Copy Report", systemImage: "doc.on.doc")
+                        Label(L10n.text("Copy Report"), systemImage: "doc.on.doc")
                     }
                     .help("Copy a redacted diagnostics report")
                     Button(action: store.refresh) {
                         if store.isRefreshing {
                             ProgressView().controlSize(.small)
                         } else {
-                            Label("Refresh", systemImage: "arrow.clockwise")
+                            Label(L10n.text("Refresh"), systemImage: "arrow.clockwise")
                         }
                     }
                     .disabled(store.isRefreshing)
@@ -34,7 +34,7 @@ struct DiagnosticsSettingsView: View {
                         }
                     }
                 } label: {
-                    Label("Checks", systemImage: "stethoscope")
+                    Label(L10n.text("Checks"), systemImage: "stethoscope")
                         .font(.headline)
                 }
 
@@ -78,7 +78,7 @@ private struct ModuleRuntimeDiagnosticsView: View {
                                 Image(systemName: definition.symbolName)
                                     .foregroundStyle(.secondary)
                                     .frame(width: 15)
-                                Text(definition.title)
+                                Text(definition.displayTitle)
                                     .lineLimit(1)
                                 Spacer(minLength: 4)
                                 Text(title(state))
@@ -98,7 +98,7 @@ private struct ModuleRuntimeDiagnosticsView: View {
             }
             .padding(.top, 4)
         } label: {
-            Label("Module Runtime", systemImage: "waveform.path.ecg")
+            Label(L10n.text("Module Runtime"), systemImage: "waveform.path.ecg")
                 .font(.headline)
         }
     }

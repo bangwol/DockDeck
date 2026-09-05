@@ -130,6 +130,12 @@ cat > "$APP_PATH/Contents/Info.plist" <<EOF
 <dict>
     <key>CFBundleIdentifier</key>
     <string>$LABEL</string>
+    <key>CFBundleDevelopmentRegion</key>
+    <string>en</string>
+    <key>CFBundleLocalizations</key>
+    <array><string>en</string><string>ko</string></array>
+    <key>CFBundleAllowMixedLocalizations</key>
+    <true/>
     <key>CFBundleName</key>
     <string>DockDeck</string>
     <key>CFBundleExecutable</key>

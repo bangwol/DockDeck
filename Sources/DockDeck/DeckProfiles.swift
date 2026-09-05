@@ -126,11 +126,11 @@ struct DeckProfileControls: View {
     @State private var error: String?
 
     var body: some View {
-        GroupBox("Saved Deck Profiles") {
+        GroupBox(L10n.text("Saved Deck Profiles")) {
             VStack(alignment: .leading, spacing: 10) {
                 HStack {
-                    TextField("Profile name", text: $name)
-                    Button("Save Current") {
+                    TextField(L10n.text("Profile name"), text: $name)
+                    Button(L10n.text("Save Current")) {
                         perform {
                             try store.save(name: name, configuration: PanelSettings.deckConfiguration,
                                 autoSlide: PanelSettings.deckAutoSlideSettings)
@@ -143,12 +143,12 @@ struct DeckProfileControls: View {
                         Button(profile.name) { (NSApp.delegate as? AppDelegate)?.applyDeckProfile(profile) }
                         Text("\(profile.configuration.enabled.count) modules").font(.caption).foregroundStyle(.secondary)
                         Spacer()
-                        Button("Remove") { perform { try store.remove(profile.id) } }
+                        Button(L10n.text("Remove")) { perform { try store.remove(profile.id) } }
                     }
                 }
                 HStack {
-                    Button("Export…", action: exportProfiles).disabled(store.loadError != nil)
-                    Button("Import…", action: importProfiles)
+                    Button(L10n.text("Export…"), action: exportProfiles).disabled(store.loadError != nil)
+                    Button(L10n.text("Import…"), action: importProfiles)
                 }
                 Text("Profiles save layout and auto-slide only. A running Terminal session stays alive when a profile hides it, until Terminal is enabled again or the app quits. Other hidden modules stop normally.")
                     .font(.caption).foregroundStyle(.secondary)
@@ -177,11 +177,11 @@ struct DeckProfileControls: View {
         perform {
             let archive = try DeckProfileArchive.read(from: url)
             let alert = NSAlert()
-            alert.messageText = "Replace saved deck profiles?"
+            alert.messageText = L10n.text("Replace saved deck profiles?")
             alert.informativeText = "This imports \(archive.profiles.count) profiles and replaces the saved library. Your current deck stays unchanged.\n\n"
                 + archive.profiles.map { "\($0.name) · \($0.configuration.enabled.count) modules" }.joined(separator: "\n")
-            alert.addButton(withTitle: "Replace Profiles")
-            alert.addButton(withTitle: "Cancel")
+            alert.addButton(withTitle: L10n.text("Replace Profiles"))
+            alert.addButton(withTitle: L10n.text("Cancel"))
             guard alert.runModal() == .alertFirstButtonReturn else { return }
             try store.replace(archive)
         }

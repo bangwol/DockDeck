@@ -9,48 +9,48 @@ extension AppDelegate {
         let appMenu = NSMenu(title: "DockDeck")
         appMenuItem.submenu = appMenu
         appMenu.addItem(
-            withTitle: "About DockDeck", action: #selector(showAbout(_:)), keyEquivalent: "")
+            withTitle: L10n.text("About DockDeck"), action: #selector(showAbout(_:)), keyEquivalent: "")
         appMenu.addItem(.separator())
         appMenu.addItem(
-            withTitle: "Toggle Large Terminal", action: #selector(toggleExpanded(_:)),
+            withTitle: L10n.text("Toggle Large Terminal"), action: #selector(toggleExpanded(_:)),
             keyEquivalent: "e"
         )
         appMenu.addItem(
-            withTitle: "Switch Theme", action: #selector(toggleThemePicker(_:)), keyEquivalent: "t"
+            withTitle: L10n.text("Switch Theme"), action: #selector(toggleThemePicker(_:)), keyEquivalent: "t"
         )
         appMenu.addItem(
-            withTitle: "Settings…", action: #selector(toggleSettingsPanel(_:)), keyEquivalent: ","
+            withTitle: L10n.text("Settings…"), action: #selector(toggleSettingsPanel(_:)), keyEquivalent: ","
         )
-        appMenu.addItem(withTitle: "Find Module…", action: #selector(showModulePicker(_:)), keyEquivalent: "")
-        let actionsItem = NSMenuItem(title: "Quick Actions", action: nil, keyEquivalent: "")
+        appMenu.addItem(withTitle: L10n.text("Find Module…"), action: #selector(showModulePicker(_:)), keyEquivalent: "")
+        let actionsItem = NSMenuItem(title: L10n.text("Quick Actions"), action: nil, keyEquivalent: "")
         actionsItem.submenu = quickActionsMenu
         quickActionsMenu.delegate = self
         quickActionsMenu.autoenablesItems = false
         appMenu.addItem(actionsItem)
-        let profileItem = NSMenuItem(title: "Deck Profiles", action: nil, keyEquivalent: "")
+        let profileItem = NSMenuItem(title: L10n.text("Deck Profiles"), action: nil, keyEquivalent: "")
         profileItem.submenu = deckProfilesMenu
         deckProfilesMenu.delegate = self
         appMenu.addItem(profileItem)
         appMenu.addItem(
-            withTitle: "Refresh Modules & Layout", action: #selector(refreshModules(_:)),
+            withTitle: L10n.text("Refresh Modules & Layout"), action: #selector(refreshModules(_:)),
             keyEquivalent: "r"
         )
         appMenu.addItem(
-            withTitle: "Close Window", action: #selector(closeFrontWindow(_:)), keyEquivalent: "w"
+            withTitle: L10n.text("Close Window"), action: #selector(closeFrontWindow(_:)), keyEquivalent: "w"
         )
         appMenu.addItem(
-            withTitle: "Quit DockDeck", action: #selector(NSApplication.terminate(_:)),
+            withTitle: L10n.text("Quit DockDeck"), action: #selector(NSApplication.terminate(_:)),
             keyEquivalent: "q")
 
         let editMenuItem = NSMenuItem()
         mainMenu.addItem(editMenuItem)
-        let editMenu = NSMenu(title: "Edit")
+        let editMenu = NSMenu(title: L10n.text("Edit"))
         editMenuItem.submenu = editMenu
-        editMenu.addItem(withTitle: "Copy", action: #selector(NSText.copy(_:)), keyEquivalent: "c")
+        editMenu.addItem(withTitle: L10n.text("Copy"), action: #selector(NSText.copy(_:)), keyEquivalent: "c")
         editMenu.addItem(
-            withTitle: "Paste", action: #selector(NSText.paste(_:)), keyEquivalent: "v")
+            withTitle: L10n.text("Paste"), action: #selector(NSText.paste(_:)), keyEquivalent: "v")
         editMenu.addItem(
-            withTitle: "Select All", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
+            withTitle: L10n.text("Select All"), action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
 
         NSApp.mainMenu = mainMenu
     }
@@ -146,7 +146,7 @@ extension AppDelegate: NSMenuDelegate {
                 status.isEnabled = false
                 menu.addItem(status)
             }
-            let manage = NSMenuItem(title: "Manage Actions…", action: #selector(manageQuickActions(_:)), keyEquivalent: "")
+            let manage = NSMenuItem(title: L10n.text("Manage Actions…"), action: #selector(manageQuickActions(_:)), keyEquivalent: "")
             manage.target = self
             menu.addItem(manage)
             return
@@ -162,7 +162,7 @@ extension AppDelegate: NSMenuDelegate {
             menu.addItem(item)
         }
         if !menu.items.isEmpty { menu.addItem(.separator()) }
-        let manage = NSMenuItem(title: "Manage Profiles…", action: #selector(manageDeckProfiles(_:)), keyEquivalent: "")
+        let manage = NSMenuItem(title: L10n.text("Manage Profiles…"), action: #selector(manageDeckProfiles(_:)), keyEquivalent: "")
         manage.target = self
         menu.addItem(manage)
     }

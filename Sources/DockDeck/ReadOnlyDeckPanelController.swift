@@ -86,7 +86,7 @@ final class ReadOnlyDeckPanelController:
         hostingView.autoresizingMask = [.width, .height]
         surfaceView.contentContainer.addSubview(hostingView)
 
-        let menu = NSMenu(title: "Modules")
+        let menu = NSMenu(title: L10n.text("Modules"))
         surfaceView.menu = menu
         hostingView.menu = menu
         panel.contentView = surfaceView
@@ -152,7 +152,7 @@ final class ReadOnlyDeckPanelController:
     ) {
         appliedModule = activeModule
         PanelSettings.setActiveModule(activeModule, on: side)
-        let title = activeModule.flatMap { PanelModuleRegistry.definition(for: $0)?.title }
+        let title = activeModule.flatMap { PanelModuleRegistry.definition(for: $0)?.displayTitle }
             ?? "Modules"
         panel.title = "DockDeck \(title)"
         panel.setAccessibilityLabel("DockDeck \(title)")
@@ -235,12 +235,12 @@ final class ReadOnlyDeckPanelController:
             nextItem.target = self
             menu.addItem(nextItem)
 
-            let moduleItem = NSMenuItem(title: "Modules", action: nil, keyEquivalent: "")
-            let moduleMenu = NSMenu(title: "Modules")
+            let moduleItem = NSMenuItem(title: L10n.text("Modules"), action: nil, keyEquivalent: "")
+            let moduleMenu = NSMenu(title: L10n.text("Modules"))
             for module in enabledModules {
                 guard let definition = PanelModuleRegistry.definition(for: module) else { continue }
                 let item = NSMenuItem(
-                    title: definition.title,
+                    title: definition.displayTitle,
                     action: #selector(selectModuleFromMenu(_:)),
                     keyEquivalent: "")
                 item.target = self
@@ -360,7 +360,7 @@ final class ReadOnlyDeckPanelController:
             let definition = PanelModuleRegistry.definition(for: activeModule)
         else { return }
         if let detailPanel {
-            detailPanel.title = "DockDeck — \(definition.title)"
+            detailPanel.title = "DockDeck — \(definition.displayTitle)"
             NSApp.activate(ignoringOtherApps: true)
             detailPanel.makeKeyAndOrderFront(nil)
             onAutoSlideStateChange()
@@ -372,7 +372,7 @@ final class ReadOnlyDeckPanelController:
             styleMask: [.titled, .closable, .resizable],
             backing: .buffered,
             defer: false)
-        window.title = "DockDeck — \(definition.title)"
+        window.title = "DockDeck — \(definition.displayTitle)"
         window.isReleasedWhenClosed = false
         window.delegate = self
         window.contentMinSize = ReadOnlyModuleDetailLayout.minimumSize

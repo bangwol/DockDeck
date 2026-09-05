@@ -53,18 +53,18 @@ final class SettingsPanelModel: ObservableObject {
         let modulePanes = moduleDefinitions.compactMap(\.settingsPane)
         return [
             SettingsSidebarSection(
-                id: .general, title: "General", panes: [.decks, .quickActions, .notifications, .diagnostics]),
+                id: .general, title: L10n.text("General"), panes: [.decks, .quickActions, .notifications, .diagnostics]),
             SettingsSidebarSection(
-                id: .modules, title: "Modules", panes: modulePanes),
+                id: .modules, title: L10n.text("Modules"), panes: modulePanes),
             SettingsSidebarSection(
-                id: .interface, title: "Interface", panes: [.appearance]),
+                id: .interface, title: L10n.text("Interface"), panes: [.appearance]),
         ]
     }
 
     func sidebarSections(matching query: String) -> [SettingsSidebarSection] {
         sidebarSections.compactMap { section in
             let panes = section.panes.filter {
-                ModuleSearch.matches(query, text: "\($0.title) \($0.subtitle) \($0.rawValue)")
+                ModuleSearch.matches(query, text: "\($0.titleKey) \($0.subtitleKey) \($0.title) \($0.subtitle) \($0.rawValue)")
             }
             return panes.isEmpty ? nil : SettingsSidebarSection(id: section.id, title: section.title, panes: panes)
         }
