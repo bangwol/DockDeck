@@ -89,8 +89,18 @@ struct GitHubInboxSnapshot: Equatable {
         self.ciNotificationCount = max(ciNotificationCount, 0)
         self.failedRunsLastSevenDays = failedRunsLastSevenDays.map { max($0, 0) }
         self.actionsRepository = actionsRepository
-        self.entries = Array(entries.prefix(5))
+        self.entries = Array(entries.prefix(100))
         self.observedAt = observedAt
+    }
+}
+
+extension GitHubInboxSnapshot {
+    func filteredEntries(repository: String = "", reason: String = "") -> [GitHubInboxEntry] {
+        entries.filter { entry in
+            (repository.isEmpty || entry.repository == repository)
+                && (reason.isEmpty || entry.reason == reason
+                    || (reason == "mention" && entry.reason == "team_mention"))
+        }
     }
 }
 
