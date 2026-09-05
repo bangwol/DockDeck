@@ -42,6 +42,11 @@ final class ModuleGalleryTests: XCTestCase {
                     dark: theme.isDark,
                     to: outputURL.appendingPathComponent(
                         "\(themeName)-detail-\(module.rawValue).png"))
+                if module == .battery {
+                    try render(ReadOnlyModuleDetailView(services: services, presentation: presentation),
+                        size: ReadOnlyModuleDetailLayout.minimumSize, dark: theme.isDark,
+                        to: outputURL.appendingPathComponent("\(themeName)-detail-battery-minimum.png"))
+                }
             }
         }
     }

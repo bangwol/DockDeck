@@ -80,7 +80,9 @@ requires no permission or network access.
 
 Select a 30-second, 60-second, or 5-minute interval under
 **Settings → Battery**. Sampling stops while the module is disabled. Macs
-without an internal battery show a neutral unavailable state.
+without an internal battery show a neutral unavailable state. Double-click for
+power source, charge state, and the time-to-full or remaining-time estimate.
+Missing estimates explicitly say that macOS has not supplied them.
 
 ## Network
 

@@ -282,8 +282,8 @@ struct ReadOnlyModuleDetailView: View {
 
     @ViewBuilder private var detailContent: some View {
         switch presentation.activeModule {
-        case .weather:
-            WeatherModuleDetailView(store: services.weather)
+        case .battery:
+            BatteryModuleDetailView(store: services.battery)
         case .usage:
             UsageModuleDetailView(store: services.usage, theme: presentation.theme)
         case .systemStats:
@@ -292,6 +292,8 @@ struct ReadOnlyModuleDetailView: View {
         case .serviceMonitor:
             ServiceMonitorModuleDetailView(
                 store: services.serviceMonitor, theme: presentation.theme)
+        case .weather:
+            WeatherModuleDetailView(store: services.weather)
         case .schedule:
             ScheduleModuleDetailView(store: services.schedule, theme: presentation.theme)
         case .music:
