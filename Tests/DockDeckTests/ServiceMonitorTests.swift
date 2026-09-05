@@ -6,6 +6,28 @@ import XCTest
 @testable import DockDeck
 
 final class ServiceMonitorTests: XCTestCase {
+    func testOutageStartsAtFirstFailureAndRetainsRecoveryAcrossChecks() {
+        let now = Date(timeIntervalSince1970: 1000)
+        var item = ServiceMonitorItem(endpoint: .init(name: "API", urlString: "https://example.com"), state: .idle)
+        item.observe(.offline("Offline"), at: now)
+        XCTAssertNil(item.outageStartedAt)
+        item.observe(.degraded("HTTP 503"), at: now)
+        item.observe(.checking, at: now.addingTimeInterval(10))
+        item.observe(.down("HTTP 503"), at: now.addingTimeInterval(20))
+        XCTAssertEqual(item.outageStartedAt, now)
+        XCTAssertNil(item.outageEndedAt)
+        item.observe(.up(statusCode: 200, latencyMilliseconds: 10), at: now.addingTimeInterval(60))
+        XCTAssertEqual(item.outageEndedAt, now.addingTimeInterval(60))
+        XCTAssertEqual(item.lastSuccessfulAt, now.addingTimeInterval(60))
+        item.observe(.checking, at: now.addingTimeInterval(80))
+        XCTAssertEqual(item.outageEndedAt, now.addingTimeInterval(60))
+        item.observe(.degraded("Timed out"), at: now.addingTimeInterval(90))
+        XCTAssertEqual(item.outageStartedAt, now.addingTimeInterval(90))
+        XCTAssertNil(item.outageEndedAt)
+        item.observe(.up(statusCode: 200, latencyMilliseconds: 10), at: now)
+        XCTAssertEqual(item.outageEndedAt, item.outageStartedAt)
+    }
+
     func testURLValidationRequiresSecurePublicServices() {
         XCTAssertNotNil(
             ServiceMonitorURLValidator.validatedURL("https://status.example.com/health"))

@@ -40,6 +40,13 @@ Change the decision under **System Settings → Privacy & Security → Local
 Network**. See Apple's
 [local network privacy technote](https://developer.apple.com/documentation/technotes/tn3179-understanding-local-network-privacy).
 
+The Service Monitor detail keeps each endpoint's most recent failure start,
+observed recovery duration, and last successful check in memory. Timing begins
+with the first transient failure; confirmed-down notifications still require
+the existing repeated-failure threshold. Local network offline does not start a
+server outage. A changed URL resets its history, and time while polling is
+paused is unobserved; recovery time means when a successful check was seen.
+
 ## Weather
 
 Weather uses the [Open-Meteo Forecast API](https://open-meteo.com/en/docs) and
