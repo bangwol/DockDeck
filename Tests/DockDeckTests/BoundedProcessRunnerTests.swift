@@ -1,3 +1,4 @@
+import Darwin
 import XCTest
 
 @testable import DockDeck
@@ -32,6 +33,30 @@ final class BoundedProcessRunnerTests: XCTestCase {
         ) { error in
             XCTAssertEqual(error as? BoundedProcessError, .nonZeroExit(7))
         }
+    }
+
+    func testClosedOutputDoesNotSpinWhileProcessIsRunning() throws {
+        func cpuTime() -> Double {
+            var usage = rusage()
+            getrusage(RUSAGE_SELF, &usage)
+            return Double(usage.ru_utime.tv_sec + usage.ru_stime.tv_sec)
+                + Double(usage.ru_utime.tv_usec + usage.ru_stime.tv_usec) / 1_000_000
+        }
+        let started = cpuTime()
+        let output = try BoundedProcessRunner.run(
+            executableURL: URL(fileURLWithPath: "/bin/sh"),
+            arguments: ["-c", "printf ready; exec 1>&- 2>&-; /bin/sleep 0.5"],
+            timeout: 2)
+        XCTAssertEqual(String(decoding: output, as: UTF8.self), "ready")
+        XCTAssertLessThan(cpuTime() - started, 0.35)
+    }
+
+    func testClosingStderrKeepsReadingStdout() throws {
+        let output = try BoundedProcessRunner.run(
+            executableURL: URL(fileURLWithPath: "/bin/sh"),
+            arguments: ["-c", "exec 2>&-; /bin/sleep 0.1; printf late"],
+            timeout: 2)
+        XCTAssertEqual(String(decoding: output, as: UTF8.self), "late")
     }
 
     func testStopsCommandsAtTimeout() {

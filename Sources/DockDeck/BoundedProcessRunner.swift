@@ -141,7 +141,10 @@ private final class BoundedProcessCollector {
                 fileDescriptor: descriptor, queue: queue)
             cancellationGroup.enter()
             source.setEventHandler { [weak self] in
-                self?.drain(descriptor, capturesOutput: capturesOutput)
+                guard let self else { return }
+                if self.drain(descriptor, capturesOutput: capturesOutput) {
+                    self.readers.first { $0.handle.fileDescriptor == descriptor }?.source.cancel()
+                }
             }
             source.setCancelHandler { [cancellationGroup] in cancellationGroup.leave() }
             source.resume()
@@ -159,7 +162,7 @@ private final class BoundedProcessCollector {
         guard shouldFinish else { return }
         queue.sync {
             for reader in readers {
-                drain(reader.handle.fileDescriptor, capturesOutput: reader.capturesOutput)
+                _ = drain(reader.handle.fileDescriptor, capturesOutput: reader.capturesOutput)
                 reader.source.cancel()
             }
         }
@@ -167,7 +170,8 @@ private final class BoundedProcessCollector {
         readers.forEach { try? $0.handle.close() }
     }
 
-    private func drain(_ descriptor: Int32, capturesOutput: Bool) {
+    // EOF remains readable until its dispatch source is cancelled.
+    private func drain(_ descriptor: Int32, capturesOutput: Bool) -> Bool {
         var bytes = [UInt8](repeating: 0, count: 16_384)
         while true {
             let count = Darwin.read(descriptor, &bytes, bytes.count)
@@ -179,7 +183,7 @@ private final class BoundedProcessCollector {
             } else if count == -1, errno == EINTR {
                 continue
             } else {
-                return
+                return count == 0 || (errno != EAGAIN && errno != EWOULDBLOCK)
             }
         }
     }
