@@ -119,3 +119,66 @@ struct WeatherPanelView: View {
         return summary
     }
 }
+
+struct WeatherModuleDetailView: View {
+    @ObservedObject var store: WeatherStore
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 14) {
+                if let snapshot = store.snapshot {
+                    HStack(alignment: .firstTextBaseline) {
+                        Text(snapshot.location.name).font(.title3.bold())
+                        Spacer()
+                        Text(temperature(snapshot.temperature, unit: snapshot.temperatureUnit))
+                            .font(.title.bold()).monospacedDigit()
+                    }
+                    Text("\(WeatherCondition.title(code: snapshot.weatherCode)) · Feels like \(temperature(snapshot.apparentTemperature, unit: snapshot.temperatureUnit))")
+                    Text("Next 12 hours · city time").font(.headline)
+                    if snapshot.hourly.isEmpty {
+                        Text("Hourly forecast unavailable").foregroundStyle(.secondary)
+                    } else {
+                        ScrollView(.horizontal) {
+                            HStack(spacing: 10) {
+                                ForEach(snapshot.hourly) { hour in
+                                    VStack(spacing: 8) {
+                                        Text(ClockTextFormatter.time(hour.date,
+                                            timeZone: ClockTimeZone.resolved(identifier: snapshot.location.timezone),
+                                            format: .system)).font(.caption)
+                                        Image(systemName: WeatherCondition.symbolName(
+                                            code: hour.weatherCode ?? -1, isDay: hour.isDay))
+                                            .font(.title3)
+                                            .accessibilityLabel(WeatherCondition.title(code: hour.weatherCode ?? -1))
+                                        Text(hour.temperature.map { temperature($0, unit: snapshot.temperatureUnit) } ?? "--")
+                                            .font(.headline)
+                                        Label(hour.precipitationProbability.map { "\($0)%" } ?? "--", systemImage: "drop")
+                                            .font(.caption).accessibilityLabel("Rain probability")
+                                            .accessibilityValue(hour.precipitationProbability.map { "\($0)%" } ?? "Unavailable")
+                                    }
+                                    .padding(10).frame(minWidth: 64)
+                                    .background(Color.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: 8))
+                                    .accessibilityElement(children: .combine)
+                                }
+                            }
+                        }
+                    }
+                    Text("Updated \(snapshot.receivedAt.formatted(date: .abbreviated, time: .shortened))")
+                        .font(.caption).foregroundStyle(.secondary)
+                    Link("Weather data by Open-Meteo", destination: WeatherAPI.attributionURL).font(.caption)
+                } else if store.status == .idle {
+                    Text("Choose a city in Settings")
+                } else if store.status == .loading {
+                    ProgressView("Loading weather")
+                }
+                if case .failed(let reason) = store.status {
+                    Label(reason, systemImage: "exclamationmark.triangle").foregroundStyle(.orange)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    private func temperature(_ value: Double, unit: WeatherTemperatureUnit) -> String {
+        value.formatted(.number.precision(.fractionLength(0))) + unit.symbol
+    }
+}

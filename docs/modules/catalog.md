@@ -45,7 +45,11 @@ Network**. See Apple's
 Weather uses the [Open-Meteo Forecast API](https://open-meteo.com/en/docs) and
 [Geocoding API](https://open-meteo.com/en/docs/geocoding-api). Search for a city
 under **Settings → Weather**, select one result, and enable the module. DockDeck
-does not use IP geolocation or request macOS Location permission.
+does not use IP geolocation or request macOS Location permission. Double-click
+Weather for current conditions and up to 12 hourly temperature, condition, and
+precipitation-probability forecasts, displayed in the selected city's time zone.
+Hourly fields use the same forecast request and polling interval; missing values
+are shown as unavailable. Failed refreshes retain the previous result with an error.
 
 DockDeck stores the selected city and coordinates in local preferences. Search
 text and coordinates are sent over HTTPS only when searching or while the
@@ -66,7 +70,9 @@ World Clock uses the macOS time-zone database and makes no network request.
 Select the system time zone or an IANA time-zone identifier, listed with its
 current GMT offset, under **Settings → World Clock**. Choose the system,
 12-hour, or 24-hour format. It refreshes at minute boundaries and stops its
-timer while disabled.
+timer while disabled. Save up to three favorite time zones in Settings, and click
+a saved zone to use it in the compact panel. Detail shows favorite clocks, local
+time differences, and daylight-saving state using each observation date.
 
 ## Battery
 

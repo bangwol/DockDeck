@@ -42,6 +42,14 @@ final class ModuleGalleryTests: XCTestCase {
                     dark: theme.isDark,
                     to: outputURL.appendingPathComponent(
                         "\(themeName)-detail-\(module.rawValue).png"))
+                if module == .clock {
+                    try render(ClockModuleDetailView(store: services.clock,
+                        timeZoneIdentifier: "Asia/Seoul", hourFormat: .twentyFourHour,
+                        favorites: ["Asia/Seoul", "America/Los_Angeles", "Europe/London"])
+                        .background(Color(nsColor: .windowBackgroundColor)),
+                        size: NSSize(width: 528, height: 250), dark: theme.isDark,
+                        to: outputURL.appendingPathComponent("\(themeName)-clock-favorites.png"))
+                }
                 if module == .battery {
                     try render(ReadOnlyModuleDetailView(services: services, presentation: presentation),
                         size: ReadOnlyModuleDetailLayout.minimumSize, dark: theme.isDark,
@@ -108,15 +116,23 @@ final class ModuleGalleryTests: XCTestCase {
             ServiceMonitorEndpoint(name: "API", urlString: "https://example.com"),
             ServiceMonitorEndpoint(name: "Web", urlString: "https://example.org"),
         ])
+        let weatherHours: [WeatherHour] = (0..<12).map { index in
+            let date = now.addingTimeInterval(Double(index) * 3_600)
+            let temperature = 24.0 + Double(index % 4)
+            return WeatherHour(date: date, temperature: temperature,
+                precipitationProbability: index * 7, weatherCode: index < 4 ? 0 : 63,
+                isDay: index < 6)
+        }
         let weather = WeatherStore(
             location: location,
             initialSnapshot: WeatherSnapshot(
                 location: location, temperature: 24, apparentTemperature: 25,
                 highTemperature: 27, lowTemperature: 19, weatherCode: 2,
-                isDay: true, temperatureUnit: .celsius, receivedAt: now))
+                isDay: true, temperatureUnit: .celsius, receivedAt: now,
+                hourly: weatherHours))
         let schedule = ScheduleStore(
             includeReminders: true,
-            provider: GalleryScheduleProvider(now: now))
+            provider: GalleryScheduleProvider(now: Date()))
         schedule.start()
         let projectSnapshot = ProjectPulseSnapshot(
             git: ProjectGitSnapshot(

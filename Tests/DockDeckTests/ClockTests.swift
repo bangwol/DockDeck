@@ -5,6 +5,21 @@ import XCTest
 @testable import DockDeck
 
 final class ClockTests: XCTestCase {
+    func testFavoritesAreValidUniqueAndLimitedToThree() {
+        XCTAssertEqual(ClockTimeZone.favorites(["invalid", "Asia/Seoul", "Asia/Seoul", "Europe/London", "UTC", "Asia/Tokyo"]),
+                       ["Asia/Seoul", "Europe/London", "UTC"])
+    }
+
+    func testOffsetsFollowDaylightSavingTransition() throws {
+        let formatter = ISO8601DateFormatter()
+        let before = try XCTUnwrap(formatter.date(from: "2024-03-10T06:59:00Z"))
+        let after = try XCTUnwrap(formatter.date(from: "2024-03-10T07:01:00Z"))
+        let utc = try XCTUnwrap(TimeZone(identifier: "UTC"))
+        XCTAssertEqual(ClockTimeZone.differenceLabel(identifier: "America/New_York", at: before, local: utc), "-5h 0m")
+        XCTAssertEqual(ClockTimeZone.differenceLabel(identifier: "America/New_York", at: after, local: utc), "-4h 0m")
+        XCTAssertEqual(ClockTimeZone.differenceLabel(identifier: "Asia/Kolkata", at: after, local: utc), "+5h 30m")
+    }
+
     func testExplicitHourFormatsAreStable() throws {
         let date = Date(timeIntervalSince1970: 1_704_110_640)
         let timeZone = try XCTUnwrap(TimeZone(identifier: "UTC"))

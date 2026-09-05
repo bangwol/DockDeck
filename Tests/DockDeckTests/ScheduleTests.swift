@@ -5,6 +5,26 @@ import XCTest
 @testable import DockDeck
 
 final class ScheduleTests: XCTestCase {
+    func testAgendaGroupsRespectCalendarDaysAcrossDSTAndHideEndedEvents() throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = try XCTUnwrap(TimeZone(identifier: "America/New_York"))
+        let now = try XCTUnwrap(calendar.date(from: DateComponents(year: 2024, month: 3, day: 9, hour: 23)))
+        let tomorrow = try XCTUnwrap(calendar.date(from: DateComponents(year: 2024, month: 3, day: 10, hour: 23)))
+        let later = try XCTUnwrap(calendar.date(from: DateComponents(year: 2024, month: 3, day: 11, hour: 0)))
+        func item(_ start: Date, _ end: Date) -> ScheduleEventItem {
+            ScheduleEventItem(id: "event", title: "Event", startDate: start, endDate: end,
+                isAllDay: false, calendarTitle: "Work")
+        }
+        XCTAssertEqual(ScheduleAgendaSection.event(item(tomorrow, later), now: now, calendar: calendar), .tomorrow)
+        XCTAssertEqual(ScheduleAgendaSection.event(item(later, later.addingTimeInterval(60)), now: now, calendar: calendar), .later)
+        XCTAssertNil(ScheduleAgendaSection.event(item(now.addingTimeInterval(-60), now), now: now, calendar: calendar))
+        XCTAssertEqual(ScheduleAgendaSection.event(item(now, now.addingTimeInterval(60)), now: now, calendar: calendar), .current)
+        let dueToday = ScheduleReminderItem(id: "task", title: "Task", dueDate: calendar.startOfDay(for: now),
+            isAllDay: true, listTitle: "Tasks")
+        XCTAssertEqual(ScheduleAgendaSection.reminder(dueToday, now: now, calendar: calendar), .today)
+        XCTAssertEqual(ScheduleAgendaSection.reminder(dueToday, now: tomorrow, calendar: calendar), .overdue)
+    }
+
     func testMeetingLinkResolverFindsSupportedHTTPSLinks() {
         XCTAssertEqual(
             ScheduleMeetingLinkResolver.resolve(

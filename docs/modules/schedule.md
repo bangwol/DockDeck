@@ -53,3 +53,11 @@ Disabling Schedule stops its timer, removes its EventKit observer, releases the
 event store, and clears both in-memory item lists. Hidden Schedule panels keep
 the selected polling interval so EventKit changes remain timely; macOS Low Power
 Mode doubles that interval.
+
+The detail agenda groups unfinished events and reminders into Happening now,
+Overdue, Today, Tomorrow, and Later, using local calendar days across daylight
+saving changes. All-day reminders become overdue on the following day.
+**Open Calendar** and **Open Reminders** launch the original apps; they do not
+modify an item or promise selection of a particular event. Meeting links remain
+available beside events. Detail rows cover the fetched window (up to 100 events
+and 100 reminders), rather than only the first six of each source.

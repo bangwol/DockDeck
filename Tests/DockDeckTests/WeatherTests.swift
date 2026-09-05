@@ -6,6 +6,30 @@ import XCTest
 @testable import DockDeck
 
 final class WeatherTests: XCTestCase {
+    func testHourlyForecastBoundsMissingValuesAndUsesAbsoluteDates() throws {
+        var payload = try XCTUnwrap(JSONSerialization.jsonObject(with: forecastData()) as? [String: Any])
+        payload["hourly"] = [
+            "time": [-3600, 0, 3600, 3600, 7200, 43200],
+            "temperature_2m": [0, 21, NSNull(), 99, 1e50, 20],
+            "precipitation_probability": [0, 10, 101, 20, NSNull(), 0],
+            "weather_code": [0, 0, 63, 0, 0, 0],
+            "is_day": [0, 1, 1, 1, 0, 0],
+        ]
+        let snapshot = try WeatherAPI.decodeForecast(
+            JSONSerialization.data(withJSONObject: payload), location: fixtureLocation(),
+            unit: .celsius, receivedAt: Date(timeIntervalSince1970: 0))
+        XCTAssertEqual(snapshot.hourly.map { $0.date.timeIntervalSince1970 }, [0, 3600, 7200])
+        XCTAssertEqual(snapshot.hourly[0].precipitationProbability, 10)
+        XCTAssertNil(snapshot.hourly[1].temperature)
+        XCTAssertNil(snapshot.hourly[1].precipitationProbability)
+        XCTAssertNil(snapshot.hourly[2].temperature)
+    }
+
+    func testForecastRejectsTemperatureThatWouldOverflowCompactFormatting() throws {
+        let data = String(data: forecastData(), encoding: .utf8)!.replacingOccurrences(of: "21.2", with: "1e50")
+        XCTAssertThrowsError(try WeatherAPI.decodeForecast(Data(data.utf8), location: fixtureLocation(), unit: .celsius))
+    }
+
     func testLocationNormalizationRejectsInvalidCoordinatesAndBoundsText() {
         var location = fixtureLocation()
         location.name = String(repeating: "S", count: 100)
@@ -29,6 +53,8 @@ final class WeatherTests: XCTestCase {
         XCTAssertEqual(components.host, "api.open-meteo.com")
         XCTAssertEqual(query["temperature_unit"], "fahrenheit")
         XCTAssertEqual(query["forecast_days"], "1")
+        XCTAssertEqual(query["forecast_hours"], "13")
+        XCTAssertEqual(query["timeformat"], "unixtime")
     }
 
     func testForecastDecoderReadsCurrentAndDailyValues() throws {

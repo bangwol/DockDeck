@@ -626,6 +626,40 @@ enum ScheduleAgendaPresentation: Equatable {
     case reminder(ScheduleReminderPresentation)
 }
 
+enum ScheduleAgendaSection: String, CaseIterable, Identifiable {
+    case current = "Happening now"
+    case overdue = "Overdue"
+    case today = "Today"
+    case tomorrow = "Tomorrow"
+    case later = "Later"
+
+    var id: Self { self }
+
+    static func event(_ event: ScheduleEventItem, now: Date, calendar: Calendar = .current) -> Self? {
+        guard event.endDate > now else { return nil }
+        if event.startDate <= now { return .current }
+        return day(event.startDate, now: now, calendar: calendar)
+    }
+
+    static func reminder(_ reminder: ScheduleReminderItem, now: Date, calendar: Calendar = .current) -> Self {
+        if isOverdue(reminder, now: now, calendar: calendar) { return .overdue }
+        return day(reminder.dueDate, now: now, calendar: calendar)
+    }
+
+    static func isOverdue(_ reminder: ScheduleReminderItem, now: Date, calendar: Calendar = .current) -> Bool {
+        reminder.isAllDay
+            ? calendar.startOfDay(for: reminder.dueDate) < calendar.startOfDay(for: now)
+            : reminder.dueDate <= now
+    }
+
+    private static func day(_ date: Date, now: Date, calendar: Calendar) -> Self {
+        if calendar.isDate(date, inSameDayAs: now) { return .today }
+        if let tomorrow = calendar.date(byAdding: .day, value: 1, to: now),
+            calendar.isDate(date, inSameDayAs: tomorrow) { return .tomorrow }
+        return .later
+    }
+}
+
 enum ScheduleAgendaTimeline {
     static func presentation(
         events: [ScheduleEventItem], reminders: [ScheduleReminderItem], now: Date
@@ -638,7 +672,7 @@ enum ScheduleAgendaTimeline {
             return .event(currentEvent)
         }
 
-        if let overdue = reminders.filter({ $0.dueDate <= now }).max(by: {
+        if let overdue = reminders.filter({ ScheduleAgendaSection.isOverdue($0, now: now) }).max(by: {
             $0.dueDate < $1.dueDate
         }) {
             return .reminder(
@@ -650,7 +684,7 @@ enum ScheduleAgendaTimeline {
         }
 
         let nextEvent = currentEvent
-        let nextReminder = reminders.filter { $0.dueDate > now }.min(by: {
+        let nextReminder = reminders.filter { !ScheduleAgendaSection.isOverdue($0, now: now) }.min(by: {
             $0.dueDate < $1.dueDate
         })
         switch (nextEvent, nextReminder) {

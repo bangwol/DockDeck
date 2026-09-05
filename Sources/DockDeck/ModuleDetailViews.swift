@@ -134,15 +134,36 @@ struct SystemStatsModuleDetailView: View {
             if history.samples.count >= 2 {
                 MetricSparkline(samples: history.samples, color: color(for: metric))
                     .frame(height: 22)
-            } else {
-                Capsule()
-                    .fill(color(for: metric).opacity(0.22))
-                    .frame(height: 4)
+                HStack {
+                    Text("Range \(historyValue(history.samples.map(\.value).min(), metric))–\(historyValue(history.samples.map(\.value).max(), metric))")
+                    Spacer()
+                }
+                HStack {
+                    Text(history.samples.first!.timestamp, style: .time)
+                    Spacer()
+                    Text(history.samples.last!.timestamp, style: .time)
+                }
+                .monospacedDigit()
+            } else if metric == .cpu || metric == .memory || metric == .network {
+                Text("Collecting history")
+            }
+            if metric == .memory {
+                Text("Physical memory used; this is not memory pressure.")
+            } else if metric == .network {
+                Text("Trend: download + upload · bytes/second")
+            } else if metric == .disk {
+                Text("Startup volume capacity used")
             }
         }
+        .font(.caption)
         .padding(10)
         .background(baseColor.opacity(0.065), in: RoundedRectangle(cornerRadius: 9))
         .accessibilityElement(children: .combine)
+    }
+
+    private func historyValue(_ value: Double?, _ metric: SystemStatsMetric) -> String {
+        if metric == .network { return ByteRateFormatter.compactString(value) }
+        return percent(value)
     }
 
     private func value(for metric: SystemStatsMetric) -> String {
@@ -260,20 +281,46 @@ struct ScheduleModuleDetailView: View {
                     systemImage: "calendar.badge.exclamationmark")
                     .foregroundStyle(baseColor.opacity(0.7))
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else if store.events.isEmpty && store.reminders.isEmpty {
+            } else if store.events.allSatisfy({ $0.endDate <= Date() }) && store.reminders.isEmpty {
                 Label("No upcoming items", systemImage: "calendar")
                     .foregroundStyle(baseColor.opacity(0.7))
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                ScrollView {
-                    LazyVStack(spacing: 6) {
-                        ForEach(store.events.prefix(6)) { event in eventRow(event) }
-                        ForEach(store.reminders.prefix(6)) { reminder in reminderRow(reminder) }
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Button("Open Calendar") { openSource("com.apple.iCal") }
+                        Button("Open Reminders") { openSource("com.apple.reminders") }
+                    }
+                    TimelineView(.everyMinute) { context in
+                        ScrollView {
+                            LazyVStack(alignment: .leading, spacing: 6) {
+                                ForEach(ScheduleAgendaSection.allCases) { section in
+                                    let events = store.events.filter {
+                                        ScheduleAgendaSection.event($0, now: context.date) == section
+                                    }
+                                    let reminders = store.reminders.filter {
+                                        ScheduleAgendaSection.reminder($0, now: context.date) == section
+                                    }
+                                    if !events.isEmpty || !reminders.isEmpty {
+                                        Text(section.rawValue).font(.caption.weight(.bold))
+                                            .foregroundStyle(section == .overdue ? .orange : baseColor)
+                                            .padding(.top, 4)
+                                        ForEach(events) { event in eventRow(event) }
+                                        ForEach(reminders) { reminder in reminderRow(reminder) }
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
         }
         .moduleDetailSurface()
+    }
+
+    private func openSource(_ bundleID: String) {
+        guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) else { return }
+        NSWorkspace.shared.openApplication(at: url, configuration: .init())
     }
 
     private func eventRow(_ event: ScheduleEventItem) -> some View {
@@ -305,7 +352,7 @@ struct ScheduleModuleDetailView: View {
     private func reminderRow(_ reminder: ScheduleReminderItem) -> some View {
         HStack(spacing: 9) {
             Image(systemName: "checklist")
-                .foregroundStyle(reminder.dueDate <= Date() ? .orange : .mint)
+                .foregroundStyle(ScheduleAgendaSection.isOverdue(reminder, now: Date()) ? .orange : .mint)
                 .frame(width: 18)
             VStack(alignment: .leading, spacing: 2) {
                 Text(reminder.title)
