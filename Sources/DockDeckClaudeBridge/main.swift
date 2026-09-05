@@ -62,6 +62,17 @@ enum ClaudeBridgePayload {
 enum ClaudeBridgeRuntime {
     static let maximumInputBytes = 1_048_576
 
+    static func readInput(from handle: FileHandle = .standardInput) throws -> Data {
+        var input = Data()
+        while let chunk = try handle.read(
+            upToCount: min(16_384, maximumInputBytes - input.count + 1)), !chunk.isEmpty
+        {
+            input.append(chunk)
+            guard input.count <= maximumInputBytes else { throw UsageError.inputTooLarge }
+        }
+        return input
+    }
+
     static func cacheURL(environment: [String: String] = ProcessInfo.processInfo.environment) -> URL {
         if let override = environment["DOCKDECK_CLAUDE_CACHE_PATH"], !override.isEmpty {
             return URL(fileURLWithPath: override)
@@ -125,14 +136,8 @@ enum ClaudeBridgeRuntime {
     }
 }
 
-let input = FileHandle.standardInput.readDataToEndOfFile()
-guard input.count <= ClaudeBridgeRuntime.maximumInputBytes else {
-    FileHandle.standardError.write(
-        Data("dockdeck-claude-bridge: Claude status-line input exceeds 1 MiB\n".utf8))
-    exit(1)
-}
-
 do {
+    let input = try ClaudeBridgeRuntime.readInput()
     let now = Date().timeIntervalSince1970
     if let cache = try ClaudeBridgePayload.cacheData(
         from: input,

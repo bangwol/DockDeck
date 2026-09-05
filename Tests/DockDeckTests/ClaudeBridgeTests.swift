@@ -4,6 +4,27 @@ import XCTest
 @testable import DockDeckClaudeBridge
 
 final class ClaudeBridgeTests: XCTestCase {
+    func testInputReaderBoundsReadsBeforeRejectingOversizedInput() throws {
+        let limit = ClaudeBridgeRuntime.maximumInputBytes
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: url) }
+        for size in [0, limit, limit + 1, limit * 2] {
+            try Data(repeating: 32, count: size).write(to: url)
+            let handle = try FileHandle(forReadingFrom: url)
+            defer { try? handle.close() }
+            if size <= limit {
+                XCTAssertEqual(try ClaudeBridgeRuntime.readInput(from: handle).count, size)
+            } else {
+                XCTAssertThrowsError(try ClaudeBridgeRuntime.readInput(from: handle)) { error in
+                    guard case ClaudeBridgeRuntime.UsageError.inputTooLarge = error else {
+                        return XCTFail("Unexpected error: \(error)")
+                    }
+                }
+                XCTAssertEqual(try handle.offset(), UInt64(limit + 1))
+            }
+        }
+    }
+
     func testCacheDropsAllSessionFieldsExceptRateLimitsAndObservationTime() throws {
         let input = Data(
             #"""

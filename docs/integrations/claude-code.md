@@ -195,6 +195,10 @@ When both sources are enabled, DockDeck uses the newer observation for matching
 
 ## 5. Local files and cleanup
 
+The bridge rejects status-line input larger than 1 MiB while reading, before
+parsing or forwarding it. Accepted input is forwarded unchanged to an optional
+passthrough command.
+
 The bridge cache contains only `rate_limits` and an observation timestamp:
 
 ```text
