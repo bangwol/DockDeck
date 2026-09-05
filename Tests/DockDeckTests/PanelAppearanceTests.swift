@@ -5,6 +5,21 @@ import XCTest
 @testable import DockDeck
 
 final class PanelAppearanceTests: XCTestCase {
+    func testCustomTileSlotsCanBeConfiguredIndependentlyWhileDisabled() {
+        let model = makeSettingsModel(configuration: .legacy(order: .terminalLeft, enabledPanels: .all))
+        let original = model.values.customTile
+        model.selectedPane = .customTile2
+        model.setCustomTileTitle("Build two")
+        model.useCustomTileExample(json: true)
+        XCTAssertEqual(model.values.customTile, original)
+        XCTAssertEqual(model.values.extraCustomTiles[.customTile2]?.title, "Build two")
+        XCTAssertEqual(model.values.extraCustomTiles[.customTile2]?.executablePath, "/usr/bin/printf")
+        XCTAssertFalse(model.values.deckConfiguration.enabled.contains(.customTile2))
+        model.selectedPane = .customTile3
+        XCTAssertEqual(model.customTileConfiguration.title, "Custom Tile 3")
+        XCTAssertFalse(model.customTileConfiguration.isConfigured)
+    }
+
     func testEnabledPanelsKeepsSingleSelectionsAndRecoversEmptyState() {
         XCTAssertEqual(EnabledPanels.resolved(.terminal), .terminal)
         XCTAssertEqual(EnabledPanels.resolved(.usage), .usage)
@@ -23,7 +38,7 @@ final class PanelAppearanceTests: XCTestCase {
                 .projectPulse,
                 .githubInbox,
                 .docker,
-                .customTile,
+                .customTile, .customTile2, .customTile3,
                 .focusTimer,
             ])
         XCTAssertEqual(configuration.right, [.terminal])
@@ -50,7 +65,7 @@ final class PanelAppearanceTests: XCTestCase {
                 .projectPulse,
                 .githubInbox,
                 .docker,
-                .customTile,
+                .customTile, .customTile2, .customTile3,
                 .focusTimer,
             ])
         XCTAssertEqual(decoded.enabled, [futureModule])
@@ -72,7 +87,7 @@ final class PanelAppearanceTests: XCTestCase {
                 .projectPulse,
                 .githubInbox,
                 .docker,
-                .customTile,
+                .customTile, .customTile2, .customTile3,
                 .focusTimer,
             ])
     }
@@ -145,7 +160,7 @@ final class PanelAppearanceTests: XCTestCase {
                 .projectPulse,
                 .githubInbox,
                 .docker,
-                .customTile,
+                .customTile, .customTile2, .customTile3,
                 .focusTimer,
             ])
         XCTAssertEqual(model.values.deckConfiguration.right, [.terminal, futureModule])
@@ -233,7 +248,7 @@ final class PanelAppearanceTests: XCTestCase {
             model.moduleDefinitions.map(\.id),
             [
                 .battery, .terminal, .usage,
-                .customTile, .docker, .focusTimer, .githubInbox, .music, .network,
+                .customTile, .customTile2, .customTile3, .docker, .focusTimer, .githubInbox, .music, .network,
                 .projectPulse, .schedule, .serviceMonitor, .systemStats, .weather, .clock,
             ])
         XCTAssertEqual(
@@ -327,7 +342,7 @@ final class PanelAppearanceTests: XCTestCase {
             model.availablePanes,
             [
                 .decks, .notifications, .diagnostics, .terminal, .usage, .battery,
-                .customTile, .docker, .focusTimer, .githubInbox, .music, .network,
+                .customTile, .customTile2, .customTile3, .docker, .focusTimer, .githubInbox, .music, .network,
                 .projectPulse, .schedule, .serviceMonitor, .systemStats, .weather,
                 .clock, .appearance,
             ])

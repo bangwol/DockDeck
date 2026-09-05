@@ -8,7 +8,8 @@ requests, and subprocesses instead of merely hiding their panels.
 
 Service Monitor sends a `HEAD` request every 15–120 seconds to up to four URLs.
 If a server rejects `HEAD` with 405 or 501, DockDeck retries with a `GET` request
-containing `Range: bytes=0-0`; it still discards the body.
+containing `Range: bytes=0-0`. Probes finish when headers arrive and cancel body
+transfer, including when a server ignores Range.
 Public endpoints must use HTTPS. Plain HTTP is accepted only for local names and
 private or loopback addresses. This also applies to IPv6 literals, IPv4-mapped
 IPv6 addresses, and alternate numeric IPv4 spellings. The packaged app declares
@@ -101,7 +102,10 @@ same reduced sampling cadence as Low Power Mode.
 Docker uses the installed local Docker CLI to show running, stopped, and
 unhealthy container counts plus aggregate live CPU and memory for running
 containers. Select a 5-second, 10-second, or 30-second interval under
-**Settings → Docker**.
+**Settings → Docker**. The detail window lists up to 50 running containers,
+ordered by CPU, with names and individual CPU/memory values from the same stats
+response. Totals still include every returned container. Missing stats are shown
+as unavailable; no extra polling stream or command is started.
 
 DockDeck runs read-only `docker ps -a` and `docker stats --no-stream` commands.
 The Docker engine and CLI must already be installed and running; DockDeck does

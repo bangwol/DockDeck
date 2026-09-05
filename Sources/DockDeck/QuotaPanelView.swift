@@ -260,10 +260,7 @@ private struct QuotaRow: View {
     }
 
     private func meterColor(for window: UsageWindow) -> Color {
-        let remaining = window.remainingPercent
-        if remaining < 20 { return .red }
-        if remaining <= 50 { return .orange }
-        return baseColor
+        usageMeterColor(for: window, normal: baseColor)
     }
 
     private func usagePace(for window: UsageWindow) -> UsagePace? {
@@ -471,4 +468,10 @@ private struct MeterBar: View {
         }
         .frame(height: 2.5)
     }
+}
+
+func usageMeterColor(for window: UsageWindow, normal: Color) -> Color {
+    if window.remainingPercent < 20 { return .red }
+    if window.remainingPercent <= 50 { return .orange }
+    return normal
 }

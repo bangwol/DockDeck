@@ -13,11 +13,33 @@ struct UsageModuleDetailView: View {
                             Text(provider.name)
                                 .font(.system(size: 12, weight: .bold, design: .rounded))
                             Spacer()
+                            VStack(alignment: .trailing, spacing: 2) {
+                                Text(store.refreshPlan(for: provider.id))
+                                if let observedAt = provider.observedAt {
+                                    Text("Updated \(observedAt.formatted(date: .abbreviated, time: .shortened))")
+                                }
+                            }
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
                             if let label = provider.freshness.label {
                                 Text(label)
                                     .font(.caption2.weight(.bold))
                                     .foregroundStyle(freshnessColor(provider.freshness))
                             }
+                            Button(action: store.refresh) {
+                                Image(systemName: "arrow.clockwise")
+                            }
+                            .buttonStyle(.borderless)
+                            .help("Refresh usage")
+                            .accessibilityLabel("Refresh usage")
+                        }
+                        if let detail = provider.detail, !provider.windows.isEmpty,
+                            provider.freshness != .live
+                        {
+                            Text(detail)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .textSelection(.enabled)
                         }
                         if provider.windows.isEmpty {
                             Text(provider.detail ?? "Usage data is not available yet")
@@ -59,7 +81,7 @@ struct UsageModuleDetailView: View {
                 ZStack(alignment: .leading) {
                     Capsule().fill(baseColor.opacity(0.12))
                     Capsule()
-                        .fill(usageColor(value))
+                        .fill(usageMeterColor(for: window, normal: baseColor))
                         .frame(width: proxy.size.width * CGFloat(value / 100))
                 }
             }
@@ -76,12 +98,6 @@ struct UsageModuleDetailView: View {
         case .loading, .stale: .orange
         case .signIn, .unavailable, .setupRequired: .red
         }
-    }
-
-    private func usageColor(_ value: Double) -> Color {
-        PanelSettings.usageDisplayMode == .remaining
-            ? (value <= 10 ? .red : value <= 25 ? .orange : .cyan)
-            : (value >= 90 ? .red : value >= 75 ? .orange : .cyan)
     }
 }
 
@@ -451,6 +467,30 @@ struct DockerModuleDetailView: View {
                             title: "Memory", value: memory(snapshot.memoryBytes),
                             color: .orange, baseColor: baseColor)
                     }
+                    if !snapshot.containers.isEmpty {
+                        Text("Running containers · highest CPU first · up to 50")
+                            .font(.caption).foregroundStyle(.secondary)
+                        ScrollView {
+                            LazyVStack(spacing: 6) {
+                                ForEach(snapshot.containers) { container in
+                                    HStack {
+                                        Text(container.name).lineLimit(1).help(container.name)
+                                        Spacer()
+                                        Text(percent(container.cpuPercent)).frame(width: 75, alignment: .trailing)
+                                        Text(memory(container.memoryBytes)).frame(width: 90, alignment: .trailing)
+                                    }
+                                    .font(.callout).monospacedDigit()
+                                    .padding(8)
+                                    .background(baseColor.opacity(0.06), in: RoundedRectangle(cornerRadius: 8))
+                                    .accessibilityElement(children: .combine)
+                                    .accessibilityLabel("\(container.name), CPU \(percent(container.cpuPercent)), memory \(memory(container.memoryBytes))")
+                                }
+                            }
+                        }
+                    } else {
+                        Text(snapshot.runningCount == 0 ? "No running containers" : "Individual metrics unavailable")
+                            .foregroundStyle(.secondary)
+                    }
                     HStack {
                         Text("Updated \(snapshot.observedAt.formatted(date: .omitted, time: .shortened))")
                             .foregroundStyle(baseColor.opacity(0.55))
@@ -650,6 +690,31 @@ private struct DetailValueCard: View {
         .frame(maxWidth: .infinity, minHeight: 50)
         .background(baseColor.opacity(0.065), in: RoundedRectangle(cornerRadius: 9))
         .accessibilityElement(children: .combine)
+    }
+}
+
+struct CustomTileModuleDetailView: View {
+    @ObservedObject var store: CustomTileStore
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 12) {
+                if let snapshot = store.snapshot {
+                    Text(snapshot.content.title).font(.headline)
+                    Text(snapshot.content.value).font(.title2).textSelection(.enabled)
+                    if let detail = snapshot.content.detail {
+                        Text(detail).textSelection(.enabled)
+                    }
+                    Text("Last success: \(snapshot.observedAt.formatted(date: .abbreviated, time: .shortened))")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+                Text(store.statusDescription)
+                    .foregroundStyle(store.isStale ? Color.orange : .secondary)
+                Button("Run again", action: store.refresh)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .moduleDetailSurface()
     }
 }
 

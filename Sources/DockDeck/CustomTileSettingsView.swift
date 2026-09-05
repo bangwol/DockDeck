@@ -3,11 +3,13 @@ import SwiftUI
 struct CustomTileSettingsView: View {
     @ObservedObject var model: SettingsPanelModel
     @State private var argumentsText: String
+    @StateObject private var preview = CustomTileStore(configuration: CustomTileConfiguration())
+    @State private var testedConfiguration: CustomTileConfiguration?
 
     init(model: SettingsPanelModel) {
         self.model = model
         _argumentsText = State(
-            initialValue: model.values.customTile.arguments.joined(separator: "\n"))
+            initialValue: model.customTileConfiguration.arguments.joined(separator: "\n"))
     }
 
     var body: some View {
@@ -51,6 +53,35 @@ struct CustomTileSettingsView: View {
                 }
 
                 GroupBox {
+                    VStack(alignment: .leading, spacing: 10) {
+                        HStack {
+                            Button("Test once") {
+                                testedConfiguration = configuration
+                                preview.runOnce(configuration: configuration)
+                            }
+                            .disabled(!configuration.isConfigured || preview.status == .loading)
+                            Button("Text example") { model.useCustomTileExample(json: false) }
+                            Button("JSON example") { model.useCustomTileExample(json: true) }
+                        }
+                        if testedConfiguration == configuration {
+                            Text(preview.accessibilitySummary)
+                                .font(.caption)
+                                .textSelection(.enabled)
+                                .accessibilityLabel("Test result")
+                        } else {
+                            Text("Test runs this configuration once, even while the tile is disabled.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.top, 4)
+                } label: {
+                    Label("Preview", systemImage: "play.circle")
+                        .font(.headline)
+                }
+
+                GroupBox {
                     VStack(alignment: .leading, spacing: 7) {
                         Text("Plain text: first line is the value; second line is optional detail.")
                         Text(#"{"value":"42%","detail":"Ready","symbol":"gauge"}"#)
@@ -88,7 +119,8 @@ struct CustomTileSettingsView: View {
                 }
 
                 Text(
-                    "Commands run only while this module is enabled. DockDeck uses no shell, "
+                    "Automatic commands run only while this tile is enabled. Test once runs on demand. "
+                        + "DockDeck uses no shell, "
                         + "requires an absolute executable path, allows at most 16 arguments, "
                         + "and limits each run to 5 seconds and 32 KB of output. Configure only "
                         + "software you trust; it runs with your macOS user permissions.")
@@ -96,6 +128,10 @@ struct CustomTileSettingsView: View {
                     .foregroundStyle(.secondary)
             }
             .padding(24)
+        }
+        .onDisappear { preview.stop() }
+        .onChange(of: configuration.arguments) { arguments in
+            argumentsText = arguments.joined(separator: "\n")
         }
     }
 
@@ -161,5 +197,5 @@ struct CustomTileSettingsView: View {
         }
     }
 
-    private var configuration: CustomTileConfiguration { model.values.customTile }
+    private var configuration: CustomTileConfiguration { model.customTileConfiguration }
 }

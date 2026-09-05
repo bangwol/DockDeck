@@ -6,6 +6,18 @@ import XCTest
 @testable import DockDeck
 
 final class DockerTests: XCTestCase {
+    func testContainerMetricsAreSortedBoundedAndIncludedInTotals() throws {
+        let lines = (0..<60).map { index in
+            "{\"ID\":\"id-\(index)\",\"Name\":\"worker-\(index)\",\"CPUPerc\":\"\(index)%\",\"MemUsage\":\"1MiB / 1GiB\"}"
+        }.joined(separator: "\n")
+        let stats = try DockerOutputParser.parseStats(Data(lines.utf8))
+        XCTAssertEqual(stats.containers.count, 50)
+        XCTAssertEqual(stats.containers.first?.name, "worker-59")
+        XCTAssertEqual(stats.containers.last?.cpuPercent, 10)
+        XCTAssertEqual(stats.memoryBytes, 60 * 1_048_576)
+        XCTAssertEqual(stats.cpuPercent, Double((0..<60).reduce(0, +)))
+    }
+
     func testConfigurationChoosesNearestRefreshInterval() {
         XCTAssertEqual(DockerConfiguration(refreshInterval: 8).refreshInterval, 10)
         XCTAssertEqual(DockerConfiguration(refreshInterval: 29).refreshInterval, 30)
@@ -45,6 +57,8 @@ final class DockerTests: XCTestCase {
 
     func testStatsParserRejectsValuesThatCannotBeDisplayedSafely() {
         XCTAssertNil(DockerOutputParser.bytes("9000000000GiB"))
+        XCTAssertThrowsError(try DockerOutputParser.parseStats(
+            Data(#"{"CPUPerc":"1e30%","MemUsage":"1MiB / 1GiB"}"#.utf8)))
         XCTAssertThrowsError(
             try DockerOutputParser.parseStats(Data(
                 """
