@@ -294,6 +294,8 @@ struct ReadOnlyModuleDetailView: View {
         case .serviceMonitor:
             ServiceMonitorModuleDetailView(
                 store: services.serviceMonitor, theme: presentation.theme)
+        case .weather:
+            WeatherModuleDetailView(store: services.weather)
         case .schedule:
             ScheduleModuleDetailView(store: services.schedule, theme: presentation.theme)
         case .music:

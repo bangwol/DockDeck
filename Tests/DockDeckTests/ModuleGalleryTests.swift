@@ -108,12 +108,20 @@ final class ModuleGalleryTests: XCTestCase {
             ServiceMonitorEndpoint(name: "API", urlString: "https://example.com"),
             ServiceMonitorEndpoint(name: "Web", urlString: "https://example.org"),
         ])
+        let weatherHours: [WeatherHour] = (0..<12).map { index in
+            let date = now.addingTimeInterval(Double(index) * 3_600)
+            let temperature = 24.0 + Double(index % 4)
+            return WeatherHour(date: date, temperature: temperature,
+                precipitationProbability: index * 7, weatherCode: index < 4 ? 0 : 63,
+                isDay: index < 6)
+        }
         let weather = WeatherStore(
             location: location,
             initialSnapshot: WeatherSnapshot(
                 location: location, temperature: 24, apparentTemperature: 25,
                 highTemperature: 27, lowTemperature: 19, weatherCode: 2,
-                isDay: true, temperatureUnit: .celsius, receivedAt: now))
+                isDay: true, temperatureUnit: .celsius, receivedAt: now,
+                hourly: weatherHours))
         let schedule = ScheduleStore(
             includeReminders: true,
             provider: GalleryScheduleProvider(now: now))
