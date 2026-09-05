@@ -59,3 +59,45 @@ struct ClockPanelView: View {
         return city + " · " + abbreviation
     }
 }
+
+struct ClockModuleDetailView: View {
+    @ObservedObject var store: ClockStore
+    let timeZoneIdentifier: String
+    let hourFormat: ClockHourFormat
+    let favorites: [String]
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 12) {
+                clock(timeZoneIdentifier)
+                ForEach(ClockTimeZone.favorites(favorites).filter { $0 != timeZoneIdentifier }, id: \.self) { identifier in
+                    clock(identifier)
+                }
+                if favorites.isEmpty {
+                    Text("Save up to three favorite time zones in Settings.").foregroundStyle(.secondary)
+                }
+            }
+        }
+    }
+
+    private func clock(_ identifier: String) -> some View {
+        let timeZone = ClockTimeZone.resolved(identifier: identifier)
+        return VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                Text(ClockTimeZone.title(identifier: identifier, at: store.now)).font(.headline)
+                Spacer()
+                Text(ClockTextFormatter.time(store.now, timeZone: timeZone, format: hourFormat))
+                    .font(.title2).monospacedDigit()
+            }
+            HStack {
+                Text(ClockTextFormatter.date(store.now, timeZone: timeZone))
+                Spacer()
+                Text("Local difference: \(ClockTimeZone.differenceLabel(identifier: identifier, at: store.now))")
+            }.font(.callout)
+            Text(timeZone.isDaylightSavingTime(for: store.now) ? "Daylight saving time" : "Standard time")
+                .font(.caption).foregroundStyle(.secondary)
+        }
+        .padding(10).background(Color.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: 10))
+        .accessibilityElement(children: .combine)
+    }
+}

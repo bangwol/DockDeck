@@ -33,7 +33,7 @@ final class ModuleGalleryTests: XCTestCase {
                         "\(themeName)-compact-\(module.rawValue).png"))
             }
             for module in [
-                PanelModuleID.usage, .systemStats, .serviceMonitor, .schedule,
+                PanelModuleID.usage, .clock, .systemStats, .serviceMonitor, .schedule,
                 .music, .projectPulse, .githubInbox, .docker, .customTile,
             ] {
                 let presentation = ReadOnlyDeckPresentation(
@@ -45,6 +45,14 @@ final class ModuleGalleryTests: XCTestCase {
                     dark: theme.isDark,
                     to: outputURL.appendingPathComponent(
                         "\(themeName)-detail-\(module.rawValue).png"))
+                if module == .clock {
+                    try render(ClockModuleDetailView(store: services.clock,
+                        timeZoneIdentifier: "Asia/Seoul", hourFormat: .twentyFourHour,
+                        favorites: ["Asia/Seoul", "America/Los_Angeles", "Europe/London"])
+                        .background(Color(nsColor: .windowBackgroundColor)),
+                        size: NSSize(width: 528, height: 250), dark: theme.isDark,
+                        to: outputURL.appendingPathComponent("\(themeName)-clock-favorites.png"))
+                }
             }
         }
     }

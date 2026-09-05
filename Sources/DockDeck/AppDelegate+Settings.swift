@@ -334,7 +334,7 @@ extension AppDelegate {
                 refreshInterval: PanelSettings.scheduleRefreshInterval),
             clock: ClockSettingsState(
                 timeZoneIdentifier: PanelSettings.clockTimeZoneIdentifier,
-                hourFormat: PanelSettings.clockHourFormat),
+                hourFormat: PanelSettings.clockHourFormat, favorites: PanelSettings.clockFavorites),
             battery: BatterySettingsState(
                 refreshInterval: PanelSettings.batteryRefreshInterval),
             network: NetworkSettingsState(
@@ -448,6 +448,9 @@ extension AppDelegate {
         case .schedule(.refreshInterval(let interval)):
             PanelSettings.scheduleRefreshInterval = interval
             applyScheduleConfiguration()
+        case .clock(.favorites(let identifiers)):
+            PanelSettings.clockFavorites = identifiers
+            for controller in readOnlyDeckPanelControllers { controller.applySettings() }
         case .clock(.timeZoneIdentifier(let identifier)):
             PanelSettings.clockTimeZoneIdentifier = identifier
             for controller in readOnlyDeckPanelControllers { controller.applySettings() }

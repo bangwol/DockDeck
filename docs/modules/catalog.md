@@ -66,7 +66,9 @@ World Clock uses the macOS time-zone database and makes no network request.
 Select the system time zone or an IANA time-zone identifier, listed with its
 current GMT offset, under **Settings → World Clock**. Choose the system,
 12-hour, or 24-hour format. It refreshes at minute boundaries and stops its
-timer while disabled.
+timer while disabled. Save up to three favorite time zones in Settings, and click
+a saved zone to use it in the compact panel. Detail shows favorite clocks, local
+time differences, and daylight-saving state using each observation date.
 
 ## Battery
 

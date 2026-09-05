@@ -229,6 +229,7 @@ struct ScheduleSettingsState: Equatable {
 struct ClockSettingsState: Equatable {
     var timeZoneIdentifier: String
     var hourFormat: ClockHourFormat
+    var favorites: [String] = []
 }
 
 struct BatterySettingsState: Equatable {
@@ -322,6 +323,7 @@ enum ScheduleSettingsChange {
 }
 
 enum ClockSettingsChange {
+    case favorites([String])
     case timeZoneIdentifier(String)
     case hourFormat(ClockHourFormat)
 }
