@@ -68,6 +68,7 @@ final class SettingsPanelView: NSView {
 }
 
 private struct SettingsRootView: View {
+    @State private var search = ""
     @ObservedObject var model: SettingsPanelModel
     @ObservedObject var scheduleStore: ScheduleStore
     @ObservedObject var musicStore: MusicStore
@@ -86,8 +87,19 @@ private struct SettingsRootView: View {
                 .padding(.horizontal, 14)
                 .frame(height: 54)
 
+                TextField("Search settings", text: $search)
+                    .textFieldStyle(.roundedBorder)
+                    .padding(.horizontal, 10).padding(.bottom, 8)
+                    .onSubmit {
+                        if let pane = model.sidebarSections(matching: search).first?.panes.first {
+                            model.selectPane(pane)
+                        }
+                    }
+                if model.sidebarSections(matching: search).isEmpty {
+                    Text("No matching settings").font(.caption).foregroundStyle(.secondary)
+                }
                 List(selection: $model.selectedPane) {
-                    ForEach(model.sidebarSections) { section in
+                    ForEach(model.sidebarSections(matching: search)) { section in
                         Section(section.title) {
                             ForEach(section.panes) { pane in
                                 SettingsSidebarRow(pane: pane, model: model)

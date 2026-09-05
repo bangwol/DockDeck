@@ -247,6 +247,7 @@ struct ReadOnlyDeckPanelView: View {
 struct ReadOnlyModuleDetailView: View {
     let services: PanelModuleServices
     @ObservedObject var presentation: ReadOnlyDeckPresentation
+    var onOpenSettings: ((SettingsPaneID) -> Void)? = nil
 
     var body: some View {
         VStack(spacing: 0) {
@@ -263,6 +264,15 @@ struct ReadOnlyModuleDetailView: View {
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
+                if let onOpenSettings {
+                    Menu {
+                        Button("Module Settings…") { onOpenSettings(definition?.settingsPane ?? .decks) }
+                        Button("Diagnostics…") { onOpenSettings(.diagnostics) }
+                    } label: {
+                        Label("Settings", systemImage: "gearshape")
+                    }
+                    .fixedSize()
+                }
             }
             .padding(.horizontal, 18)
             .frame(height: 58)

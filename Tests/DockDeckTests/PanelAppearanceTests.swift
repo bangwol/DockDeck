@@ -246,6 +246,25 @@ final class PanelAppearanceTests: XCTestCase {
         XCTAssertEqual(model.recentlyActivatedModule, .weather)
     }
 
+    func testModuleAndSettingsSearchRetainEnabledBoundsAndKeyboardSelection() {
+        let configuration = PanelDeckConfiguration(left: [.terminal], right: [.usage, .weather], enabled: [.terminal, .usage])
+        let picker = ModulePickerModel(configuration: configuration, active: [.terminal])
+        XCTAssertEqual(picker.modules.map(\.id), [.terminal, .usage])
+        picker.move(1)
+        XCTAssertEqual(picker.selection, .usage)
+        picker.move(Int.max)
+        XCTAssertEqual(picker.selection, .usage)
+        picker.query = "CLAUDE limits"
+        XCTAssertEqual(picker.modules.map(\.id), [.usage])
+        picker.query = "weather"
+        XCTAssertNil(picker.selection)
+        picker.move(-1)
+        XCTAssertNil(picker.selection)
+        let settings = makeSettingsModel(configuration: configuration)
+        XCTAssertEqual(settings.sidebarSections(matching: "selected city").flatMap(\.panes), [.weather])
+        XCTAssertTrue(settings.sidebarSections(matching: "absentword").isEmpty)
+    }
+
     func testSettingsSidebarSortsEnabledModulesThenTitlesWithoutChangingDeckOrder() {
         let model = makeSettingsModel(
             configuration: PanelDeckConfiguration(
@@ -1112,7 +1131,7 @@ final class PanelAppearanceTests: XCTestCase {
         XCTAssertEqual(
             menu.items.filter { !$0.isSeparatorItem }.map(\.title),
             [
-                "Settings…", "Open Detail…", "Show Used Values", "Move Terminal to Right",
+                "Settings…", "Find Module…", "Open Detail…", "Show Used Values", "Move Terminal to Right",
                 "Refresh Modules & Layout",
             ])
     }

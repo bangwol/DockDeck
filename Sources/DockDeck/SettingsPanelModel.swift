@@ -61,6 +61,15 @@ final class SettingsPanelModel: ObservableObject {
         ]
     }
 
+    func sidebarSections(matching query: String) -> [SettingsSidebarSection] {
+        sidebarSections.compactMap { section in
+            let panes = section.panes.filter {
+                ModuleSearch.matches(query, text: "\($0.title) \($0.subtitle) \($0.rawValue)")
+            }
+            return panes.isEmpty ? nil : SettingsSidebarSection(id: section.id, title: section.title, panes: panes)
+        }
+    }
+
     func moduleDefinitions(on side: PanelSide) -> [PanelModuleDefinition] {
         let modules = side == .left
             ? values.deckConfiguration.left : values.deckConfiguration.right

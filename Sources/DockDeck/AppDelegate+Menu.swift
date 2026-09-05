@@ -21,6 +21,7 @@ extension AppDelegate {
         appMenu.addItem(
             withTitle: "Settings…", action: #selector(toggleSettingsPanel(_:)), keyEquivalent: ","
         )
+        appMenu.addItem(withTitle: "Find Module…", action: #selector(showModulePicker(_:)), keyEquivalent: "")
         appMenu.addItem(
             withTitle: "Refresh Modules & Layout", action: #selector(refreshModules(_:)),
             keyEquivalent: "r"
@@ -102,14 +103,14 @@ extension AppDelegate {
         runEvaluation()
     }
 
-    /// Only the Settings window and theme picker are closable; the Dock panels ignore ⌘W
-    /// instead of beeping through NSWindow.performClose(_:).
     @objc func closeFrontWindow(_ sender: Any?) {
-        if let settingsPanel, settingsPanel.isKeyWindow {
-            settingsPanel.close()
-        } else if themePickerPanel?.isKeyWindow == true {
+        if themePickerPanel?.isKeyWindow == true {
             toggleThemePicker(nil)
+            return
         }
+        guard let window = NSApp.keyWindow, window !== panel,
+            window.styleMask.contains(.closable) else { return }
+        window.performClose(sender)
     }
 
     @objc func showAbout(_ sender: Any?) {
