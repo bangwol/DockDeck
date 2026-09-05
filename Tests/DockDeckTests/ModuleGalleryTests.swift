@@ -31,11 +31,20 @@ final class ModuleGalleryTests: XCTestCase {
         let profiles = DeckProfileStore(url: profilesURL)
         try profiles.save(name: "Development", configuration: .legacy(order: .terminalLeft, enabledPanels: .all), autoSlide: .init())
         try profiles.save(name: "Focus", configuration: .init(left: [.focusTimer], right: [.clock], enabled: [.focusTimer, .clock]), autoSlide: .init())
+        let login = LoginItemStore(service: GalleryLoginItem())
+        ProcessDiagnostics.shared.record(source: .customTile, duration: 0.024, failure: .cancelled)
+        let diagnostics = DiagnosticsStore(checker: { [] })
 
         for (themeName, theme) in [
             ("dark", Theme.theme(id: "")),
             ("light", Theme.theme(id: "github-light")),
         ] {
+            try render(StartupSettingsView(store: login).background(Color(nsColor: .windowBackgroundColor)),
+                size: NSSize(width: 650, height: 460), dark: theme.isDark,
+                to: outputURL.appendingPathComponent("\(themeName)-startup.png"))
+            try render(DiagnosticsSettingsView(store: diagnostics).background(Color(nsColor: .windowBackgroundColor)),
+                size: NSSize(width: 650, height: 650), dark: theme.isDark,
+                to: outputURL.appendingPathComponent("\(themeName)-diagnostics.png"))
             try render(QuickActionsSettingsView(store: actions).background(Color(nsColor: .windowBackgroundColor)),
                 size: NSSize(width: 650, height: 460), dark: theme.isDark,
                 to: outputURL.appendingPathComponent("\(themeName)-quick-actions.png"))
@@ -303,4 +312,10 @@ private final class GalleryScheduleProvider: ScheduleEventProviding {
                     listTitle: "Tasks"),
             ]))
     }
+}
+
+private struct GalleryLoginItem: LoginItemControlling {
+    var status: LoginItemStatus { .requiresApproval }
+    func register() throws { throw CocoaError(.featureUnsupported) }
+    func unregister() throws { throw CocoaError(.featureUnsupported) }
 }

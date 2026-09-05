@@ -12,16 +12,27 @@ versioning are separate:
 | Change | Version action |
 | --- | --- |
 | Documentation, tests, or internal refactoring only | No version change |
-| Feature or fix PR | No version change; merge it independently after review |
+| Goal PR (features, fixes, UI, tests, and docs for one goal) | No version change; review and merge the accumulated goal together |
 | Release integration PR | Increment the patch version exactly once (`0.1.0` → `0.1.1`) for all selected changes already on `main` |
 | Another build of the same base version | Keep `VERSION`; increment only the preview sequence |
 
-Keep one logical change in each feature or fix PR. If combined testing is
-needed, use a temporary integration branch without replacing those focused
-reviews with one oversized PR. When the selected work is ready to distribute,
-create a release integration branch from the latest `main`; update `VERSION`
-and release-facing documentation there, then run the release and package
-checks. Do not reserve versions on unfinished feature branches.
+Use one branch and one PR per user-visible goal. Related features, module
+updates, UI work, and fixes stay on that branch as separately tested local
+commits. Do not create a branch or PR for every module or commit. Start a new
+goal from synchronized `main`; use `codex/<goal>` for Codex-created branches.
+Split only for a requested or independently deliverable scope.
+
+Before pushing, review the accumulated diff and prepare a single Conventional
+Commit PR title and description covering the final goal and validation. Once a
+push is authorized, push the tested commits together and update that same PR
+for review fixes. Do not push after every local commit. Feature work reaches
+`main` through the goal PR, preferably by squash merge.
+
+When the selected work is ready to distribute, create a release integration
+branch from the latest `main`; update `VERSION` and release-facing documentation
+there, then run the release and package checks. This is one release checkpoint,
+not a reason to split the goal into feature-by-feature PRs. Do not reserve
+versions on unfinished feature branches.
 
 Preview sequence numbers belong to Git tags, not `VERSION`. For example,
 `VERSION` remains `0.1.1` for `v0.1.1-preview.1` and
