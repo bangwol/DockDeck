@@ -282,6 +282,8 @@ struct ReadOnlyModuleDetailView: View {
 
     @ViewBuilder private var detailContent: some View {
         switch presentation.activeModule {
+        case .focusTimer:
+            FocusTimerModuleDetailView(store: services.focusTimer)
         case .usage:
             UsageModuleDetailView(store: services.usage, theme: presentation.theme)
         case .systemStats:

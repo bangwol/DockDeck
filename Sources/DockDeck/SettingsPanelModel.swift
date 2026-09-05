@@ -574,6 +574,10 @@ final class SettingsPanelModel: ObservableObject {
         updateCustomTileConfiguration { $0.refreshInterval = value }
     }
 
+    func setFocusTimerAutomaticallyAdvances(_ value: Bool) {
+        updateFocusTimerSettings { $0.automaticallyAdvances = value }
+    }
+
     func setFocusTimerFocusMinutes(_ value: Int) {
         updateFocusTimerSettings { $0.focusMinutes = value }
     }

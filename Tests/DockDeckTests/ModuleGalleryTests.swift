@@ -33,7 +33,7 @@ final class ModuleGalleryTests: XCTestCase {
                         "\(themeName)-compact-\(module.rawValue).png"))
             }
             for module in [
-                PanelModuleID.usage, .systemStats, .serviceMonitor, .schedule,
+                PanelModuleID.usage, .focusTimer, .systemStats, .serviceMonitor, .schedule,
                 .music, .projectPulse, .githubInbox, .docker, .customTile,
             ] {
                 let presentation = ReadOnlyDeckPresentation(
