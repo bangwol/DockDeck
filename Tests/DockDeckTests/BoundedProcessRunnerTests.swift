@@ -59,6 +59,40 @@ final class BoundedProcessRunnerTests: XCTestCase {
         XCTAssertLessThan(ProcessInfo.processInfo.systemUptime - started, 3)
     }
 
+    func testAppShutdownWaitsForOwnedCommandsAndRejectsNewLaunches() throws {
+        let lifetime = BoundedProcessLifetime()
+        defer { lifetime.shutdown() }
+        let marker = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: marker) }
+        let finished = expectation(description: "Shutdown command finished")
+        DispatchQueue.global().async {
+            do {
+                _ = try BoundedProcessRunner.run(executableURL: URL(fileURLWithPath: "/bin/sh"),
+                    arguments: ["-c", "trap '' TERM; printf '%s' $$ > \"$1\"; exec /bin/sleep 20", "sh", marker.path],
+                    timeout: 10, lifetime: lifetime)
+                XCTFail("Shutdown command returned success")
+            } catch { XCTAssertEqual(error as? BoundedProcessError, .cancelled) }
+            finished.fulfill()
+        }
+        let deadline = Date(timeIntervalSinceNow: 2)
+        var observedPID: Int32?
+        while observedPID == nil, Date() < deadline {
+            observedPID = (try? String(contentsOf: marker, encoding: .utf8)).flatMap(Int32.init)
+            if observedPID == nil { Thread.sleep(forTimeInterval: 0.01) }
+        }
+        let pid = try XCTUnwrap(observedPID)
+        let started = ProcessInfo.processInfo.systemUptime
+        lifetime.shutdown()
+        wait(for: [finished], timeout: 1)
+        XCTAssertLessThan(ProcessInfo.processInfo.systemUptime - started, 3)
+        XCTAssertEqual(kill(pid, 0), -1)
+        XCTAssertEqual(errno, ESRCH)
+        XCTAssertThrowsError(try BoundedProcessRunner.run(
+            executableURL: URL(fileURLWithPath: "/usr/bin/true"), arguments: [], lifetime: lifetime)) {
+            XCTAssertEqual($0 as? BoundedProcessError, .cancelled)
+        }
+    }
+
     func testDiagnosticsKeepFailureCategoriesAndLastSuccess() {
         XCTAssertEqual(DiagnosticCommandRunner.run(URL(fileURLWithPath: "/no-such-dockdeck-command"), arguments: []), .failed)
         XCTAssertEqual(DiagnosticCommandRunner.run(URL(fileURLWithPath: "/bin/sleep"), arguments: ["2"], timeout: 0.1), .timedOut)

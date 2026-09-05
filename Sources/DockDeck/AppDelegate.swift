@@ -323,6 +323,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         trackingTimer?.invalidate()
         deckAutoSlideTimer?.invalidate()
         moduleRuntimeCoordinator.stopAll()
+        BoundedProcessLifetime.shared.shutdown()
         notificationCancellables.removeAll()
     }
 

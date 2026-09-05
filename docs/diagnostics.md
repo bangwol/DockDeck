@@ -33,6 +33,9 @@ commands. DockDeck terminates only the process it launched, allows one second
 for graceful exit, then uses a bounded forced termination if needed. A custom
 command is responsible for cleaning up any descendants it launches; avoid
 detached daemons in tiles. Late results cannot overwrite a stopped module.
+When the app quits, it stops accepting new bounded commands and spends at most
+two seconds terminating and collecting existing ones. This also covers explicit
+Quick Actions and diagnostic commands that are still running during shutdown.
 
 Diagnostics reports dependency readiness, not service uptime or entitlement
 details. Use the module's panel help and guide when a dependency is ready but a

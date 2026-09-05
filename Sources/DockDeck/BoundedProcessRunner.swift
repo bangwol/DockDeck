@@ -22,7 +22,8 @@ enum BoundedProcessRunner {
         maximumOutputBytes: Int = defaultMaximumOutputBytes,
         allowedExitStatuses: Set<Int32> = [0],
         cancellation: Progress? = nil,
-        diagnosticSource: ProcessDiagnosticSource = .other
+        diagnosticSource: ProcessDiagnosticSource = .other,
+        lifetime: BoundedProcessLifetime = .shared
     ) throws -> Data {
         let started = ProcessInfo.processInfo.systemUptime
         var failure: BoundedProcessError? = .launchFailed
@@ -39,6 +40,11 @@ enum BoundedProcessRunner {
         cancellation?.cancellationHandler = { wake.signal() }
         defer { cancellation?.cancellationHandler = nil }
         let process = Process()
+        guard lifetime.register(process) else {
+            failure = .cancelled
+            throw BoundedProcessError.cancelled
+        }
+        defer { lifetime.remove(process) }
         let outputPipe = Pipe()
         let errorPipe = Pipe()
         process.executableURL = executableURL
@@ -74,7 +80,7 @@ enum BoundedProcessRunner {
 
         let waitResult = cancellation?.isCancelled == true
             ? DispatchTimeoutResult.success : wake.wait(timeout: .now() + max(timeout, 0.1))
-        if cancellation?.isCancelled == true {
+        if cancellation?.isCancelled == true || lifetime.isShuttingDown {
             failure = .cancelled
         } else if capture.exceededLimit {
             failure = .outputTooLarge
@@ -103,6 +109,43 @@ enum BoundedProcessRunner {
         if terminated.wait(timeout: .now() + 1) == .timedOut {
             if process.isRunning { kill(process.processIdentifier, SIGKILL) }
             _ = terminated.wait(timeout: .now() + 1)
+        }
+    }
+}
+
+// App termination must wait for owned commands; Progress handlers are asynchronous.
+final class BoundedProcessLifetime {
+    static let shared = BoundedProcessLifetime()
+    private let lock = NSLock()
+    private var stopping = false
+    private var processes: [ObjectIdentifier: Process] = [:]
+    var isShuttingDown: Bool { lock.withLock { stopping } }
+
+    func register(_ process: Process) -> Bool {
+        lock.withLock {
+            guard !stopping else { return false }
+            processes[ObjectIdentifier(process)] = process
+            return true
+        }
+    }
+
+    func remove(_ process: Process) { _ = lock.withLock { processes.removeValue(forKey: ObjectIdentifier(process)) } }
+
+    func shutdown() {
+        lock.withLock { stopping = true }
+        var signalled: Set<ObjectIdentifier> = []
+        let started = ProcessInfo.processInfo.systemUptime
+        while ProcessInfo.processInfo.systemUptime - started < 2 {
+            let active = lock.withLock { Array(processes.values) }
+            if active.isEmpty { return }
+            for process in active where process.isRunning {
+                if ProcessInfo.processInfo.systemUptime - started >= 1 {
+                    kill(process.processIdentifier, SIGKILL)
+                } else if signalled.insert(ObjectIdentifier(process)).inserted {
+                    process.terminate()
+                }
+            }
+            Thread.sleep(forTimeInterval: 0.01)
         }
     }
 }

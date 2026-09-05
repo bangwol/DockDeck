@@ -98,7 +98,7 @@ enum DockDeckControl: String {
             let running = NSRunningApplication.runningApplications(withBundleIdentifier: "com.dockdeck.app")
                 .filter { $0.processIdentifier != getpid() && $0.bundleURL?.standardizedFileURL == installed }
             running.forEach { _ = $0.terminate() }
-            let deadline = ProcessInfo.processInfo.systemUptime + 3
+            let deadline = ProcessInfo.processInfo.systemUptime + 5
             while running.contains(where: { !$0.isTerminated }), ProcessInfo.processInfo.systemUptime < deadline {
                 // NSRunningApplication updates termination state through the run loop.
                 RunLoop.current.run(until: Date(timeIntervalSinceNow: 0.05))
