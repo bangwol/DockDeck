@@ -690,9 +690,9 @@ final class SettingsPanelModel: ObservableObject {
         updateCustomTileConfiguration { configuration in
             configuration.source = .executable
             configuration.executablePath = "/usr/bin/printf"
-            configuration.arguments = [json
-                ? #"{"value":"Ready","detail":"Example output","symbol":"checkmark.circle"}"#
-                : "Ready\nExample output"]
+            configuration.arguments = json
+                ? [#"{"value":"Ready","detail":"Example output","symbol":"checkmark.circle"}"#]
+                : ["%s\\n", "Ready", "Example output"]
         }
     }
 
