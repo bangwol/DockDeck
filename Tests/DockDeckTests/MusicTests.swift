@@ -6,6 +6,22 @@ import XCTest
 @testable import DockDeck
 
 final class MusicTests: XCTestCase {
+    func testProgressInterpolationStopsAtDurationAndNeverGuessesOtherPlaybackModes() {
+        let now = Date(timeIntervalSince1970: 1000)
+        let track = MusicTrackSnapshot(title: "Song", artist: "Artist", album: nil, duration: 240, position: 90)
+        let playing = MusicPlaybackSnapshot(state: .playing, track: track, observedAt: now)
+        XCTAssertEqual(playing.estimatedTrack(at: now.addingTimeInterval(10))?.position, 100)
+        XCTAssertEqual(playing.estimatedTrack(at: .distantFuture)?.position, 240)
+        XCTAssertEqual(playing.estimatedTrack(at: now.addingTimeInterval(-10))?.position, 90)
+        for state in [MusicPlaybackState.paused, .stopped, .fastForwarding, .rewinding] {
+            let snapshot = MusicPlaybackSnapshot(state: state, track: track, observedAt: now)
+            XCTAssertEqual(snapshot.estimatedTrack(at: now.addingTimeInterval(30)), track)
+        }
+        let stream = MusicTrackSnapshot(title: "Stream", artist: "Artist", album: nil, duration: nil, position: 90)
+        XCTAssertEqual(MusicPlaybackSnapshot(state: .playing, track: stream, observedAt: now)
+            .estimatedTrack(at: .distantFuture), stream)
+    }
+
     func testAppleEventParserBoundsMetadataAndProgress() throws {
         let descriptor = NSAppleEventDescriptor.list()
         descriptor.insert(NSAppleEventDescriptor(string: "playing"), at: 1)

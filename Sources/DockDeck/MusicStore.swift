@@ -45,6 +45,17 @@ struct MusicPlaybackSnapshot: Equatable {
     let state: MusicPlaybackState
     let track: MusicTrackSnapshot?
     let observedAt: Date
+
+    func estimatedTrack(at date: Date) -> MusicTrackSnapshot? {
+        guard let track, state == .playing,
+            let duration = track.duration, duration.isFinite, duration > 0,
+            let position = track.position, position.isFinite
+        else { return track }
+        let elapsed = max(date.timeIntervalSince(observedAt), 0)
+        guard elapsed.isFinite else { return track }
+        return MusicTrackSnapshot(title: track.title, artist: track.artist, album: track.album,
+            duration: duration, position: min(max(position + elapsed, 0), duration))
+    }
 }
 
 enum MusicStatus: Equatable {

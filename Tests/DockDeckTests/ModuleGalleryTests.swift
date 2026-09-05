@@ -162,7 +162,7 @@ final class ModuleGalleryTests: XCTestCase {
                     track: MusicTrackSnapshot(
                         title: "Midnight Drive", artist: "DockDeck",
                         album: "Preview", duration: 240, position: 90),
-                    observedAt: now),
+                    observedAt: Date()),
                 initialStatus: .ready),
             battery: BatteryStore(
                 initialSnapshot: BatterySnapshot(
