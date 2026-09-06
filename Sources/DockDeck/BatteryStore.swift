@@ -134,7 +134,8 @@ final class BatteryStore: ObservableObject {
     }
 
     func refresh() {
-        snapshot = BatteryReader.read()
+        let next = BatteryReader.read()
+        if next != snapshot { snapshot = next }
     }
 
     private func scheduleTimer() {

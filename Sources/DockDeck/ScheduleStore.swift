@@ -57,9 +57,7 @@ enum ScheduleMeetingLinkResolver {
         if let eventURL, validated(eventURL) != nil { return eventURL }
         for text in [location, notes].compactMap({ $0 }) {
             let bounded = String(text.prefix(8_192))
-            guard let detector = try? NSDataDetector(
-                types: NSTextCheckingResult.CheckingType.link.rawValue)
-            else { continue }
+            guard let detector = linkDetector else { continue }
             let range = NSRange(bounded.startIndex..., in: bounded)
             var match: URL?
             detector.enumerateMatches(in: bounded, range: range) { result, _, stop in
@@ -71,6 +69,9 @@ enum ScheduleMeetingLinkResolver {
         }
         return nil
     }
+
+    private static let linkDetector = try? NSDataDetector(
+        types: NSTextCheckingResult.CheckingType.link.rawValue)
 
     private static func validated(_ url: URL) -> URL? {
         guard url.absoluteString.count <= 2_048,
@@ -399,6 +400,7 @@ final class ScheduleStore: ObservableObject {
     private var refreshInterval: TimeInterval
     private var timer: Timer?
     private var generation = 0
+    private var storeChangeRefresh: DispatchWorkItem?
     private var isRunning = false
     private let provider: ScheduleEventProviding
     private var refreshCadence = ModuleRefreshCadence()
@@ -420,7 +422,7 @@ final class ScheduleStore: ObservableObject {
         self.provider = provider
         authorization = provider.authorizationState
         reminderAuthorization = provider.reminderAuthorizationState
-        provider.onStoreChanged = { [weak self] in self?.refresh() }
+        provider.onStoreChanged = { [weak self] in self?.scheduleStoreChangeRefresh() }
     }
 
     var canReadAnySource: Bool {
@@ -439,6 +441,8 @@ final class ScheduleStore: ObservableObject {
         generation += 1
         timer?.invalidate()
         timer = nil
+        storeChangeRefresh?.cancel()
+        storeChangeRefresh = nil
         calendars = []
         events = []
         reminderLists = []
@@ -514,17 +518,29 @@ final class ScheduleStore: ObservableObject {
         scheduleTimer()
     }
 
+    /// EventKit posts bursts of change notifications while syncing; fetch once they settle.
+    private func scheduleStoreChangeRefresh() {
+        storeChangeRefresh?.cancel()
+        let work = DispatchWorkItem { [weak self] in self?.refresh() }
+        storeChangeRefresh = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1, execute: work)
+    }
+
     func refresh(now: Date = Date()) {
         guard isRunning else { return }
-        authorization = provider.authorizationState
-        reminderAuthorization = provider.reminderAuthorizationState
+        let authorization = provider.authorizationState
+        if self.authorization != authorization { self.authorization = authorization }
+        let reminderAuthorization = provider.reminderAuthorizationState
+        if self.reminderAuthorization != reminderAuthorization {
+            self.reminderAuthorization = reminderAuthorization
+        }
         guard canReadAnySource else {
             refreshAuthorization()
             return
         }
         generation += 1
         let generation = generation
-        status = .loading
+        if status != .loading { status = .loading }
         provider.fetch(
             from: now.addingTimeInterval(-12 * 60 * 60),
             to: now.addingTimeInterval(48 * 60 * 60),
@@ -535,11 +551,13 @@ final class ScheduleStore: ObservableObject {
             includeReminders: includeReminders
         ) { [weak self] result in
             guard let self, self.isRunning, generation == self.generation else { return }
-            self.calendars = result.calendars
-            self.events = result.events
-            self.reminderLists = result.reminderLists
-            self.reminders = result.reminders
-            self.status = .ready
+            if self.calendars != result.calendars { self.calendars = result.calendars }
+            if self.events != result.events { self.events = result.events }
+            if self.reminderLists != result.reminderLists {
+                self.reminderLists = result.reminderLists
+            }
+            if self.reminders != result.reminders { self.reminders = result.reminders }
+            if self.status != .ready { self.status = .ready }
         }
     }
 
