@@ -1,7 +1,7 @@
 import Foundation
 
 extension URLSessionConfiguration {
-    /// Disables caches, cookies, and credential storage so module requests leave no local trace.
+    /// Disables persistent response caches, cookies, and credential storage for module requests.
     func applyDockDeckPrivacyDefaults(requestTimeout: TimeInterval, resourceTimeout: TimeInterval) {
         requestCachePolicy = .reloadIgnoringLocalCacheData
         urlCache = nil

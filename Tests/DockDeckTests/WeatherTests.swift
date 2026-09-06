@@ -6,6 +6,53 @@ import XCTest
 @testable import DockDeck
 
 final class WeatherTests: XCTestCase {
+    func testOversizedStreamsAreCancelledBeforeTheyFinish() {
+        for search in [false, true] {
+            for advertisedLength in [false, true] {
+                let session = makeSession()
+                let forecast = WeatherStore(location: fixtureLocation(), session: session)
+                let locations = WeatherLocationSearchStore(session: session)
+                let rejected = expectation(description: "Oversized response rejected")
+                let cancelled = expectation(description: "Unfinished stream cancelled")
+                WeatherURLProtocol.streamHandler = { source in
+                    source.onStop = { cancelled.fulfill() }
+                    var headers = ["Content-Type": "application/json"]
+                    if advertisedLength { headers["Content-Length"] = String(WeatherAPI.maximumResponseBytes + 1) }
+                    let response = HTTPURLResponse(url: source.request.url!, statusCode: 200,
+                        httpVersion: "HTTP/1.1", headerFields: headers)!
+                    source.client?.urlProtocol(source, didReceive: response, cacheStoragePolicy: .notAllowed)
+                    if !advertisedLength {
+                        source.client?.urlProtocol(source, didLoad: Data(count: WeatherAPI.maximumResponseBytes + 1))
+                    }
+                    // Never finish: a completion-handler size check cannot stop this stream.
+                }
+                var didReject = false
+                let onFailure = {
+                    guard !didReject else { return }
+                    didReject = true
+                    rejected.fulfill()
+                }
+                let observation: AnyCancellable
+                if search {
+                    observation = locations.$status.sink { if case .failed = $0 { onFailure() } }
+                    locations.query = "Seoul"
+                    locations.search()
+                } else {
+                    observation = forecast.$status.sink { if case .failed = $0 { onFailure() } }
+                    forecast.start()
+                }
+                wait(for: [rejected, cancelled], timeout: 2)
+                XCTAssertNil(forecast.snapshot)
+                XCTAssertTrue(locations.results.isEmpty)
+                observation.cancel()
+                forecast.stop()
+                locations.cancel()
+                session.invalidateAndCancel()
+                WeatherURLProtocol.streamHandler = nil
+            }
+        }
+    }
+
     func testOversizedForecastResponsesAreRejected() throws {
         let session = makeSession()
         WeatherURLProtocol.handler = { _ in
@@ -247,12 +294,15 @@ final class WeatherTests: XCTestCase {
 
 private final class WeatherURLProtocol: URLProtocol {
     static var handler: ((URLRequest) throws -> (statusCode: Int, data: Data))?
+    static var streamHandler: ((WeatherURLProtocol) -> Void)?
+    var onStop: (() -> Void)?
 
     override class func canInit(with request: URLRequest) -> Bool { true }
 
     override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
 
     override func startLoading() {
+        if let streamHandler = Self.streamHandler { streamHandler(self); return }
         guard let handler = Self.handler else {
             client?.urlProtocol(self, didFailWithError: URLError(.unknown))
             return
@@ -272,5 +322,5 @@ private final class WeatherURLProtocol: URLProtocol {
         }
     }
 
-    override func stopLoading() {}
+    override func stopLoading() { onStop?() }
 }
