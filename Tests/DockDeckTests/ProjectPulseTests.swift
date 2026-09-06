@@ -37,6 +37,15 @@ final class ProjectPulseTests: XCTestCase {
                 environment: pathOnly)?.path,
             onPath.path)
         XCTAssertNil(ExecutableLocator.locate(name: "tool", environment: ["PATH": "/nonexistent"]))
+
+        let directory = root.appendingPathComponent("directory")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        XCTAssertEqual(ExecutableLocator.locate(name: "tool", overrideKey: "TOOL",
+            environment: pathOnly.merging(["TOOL": directory.path]) { $1 })?.path, onPath.path)
+        let link = root.appendingPathComponent("tool-link")
+        try FileManager.default.createSymbolicLink(at: link, withDestinationURL: onPath)
+        XCTAssertEqual(ExecutableLocator.locate(name: "tool", preferredPaths: [link.path],
+            environment: [:])?.path, link.path)
     }
 
     func testFavoritesValidateDeduplicateAndLimitWithoutChangingOptions() {
@@ -529,7 +538,7 @@ final class ProjectPulseTests: XCTestCase {
 private struct FakeProjectPulseReader: ProjectPulseReading {
     let snapshot: ProjectPulseSnapshot
 
-    func read(configuration: ProjectPulseConfiguration) throws -> ProjectPulseSnapshot {
+    func read(configuration: ProjectPulseConfiguration, cancellation: Progress?) throws -> ProjectPulseSnapshot {
         snapshot
     }
 }
@@ -551,20 +560,20 @@ private struct FakeGitHubProjectReader: GitHubProjectReading {
     func readRepository(
         _ nameWithOwner: String,
         includesWorkflow: Bool,
-        now: Date
+        now: Date, cancellation: Progress?
     ) throws -> GitHubProjectResult {
         guard let result else { throw ProjectPulseError.githubUnavailable }
         return result
     }
 
-    func readActivity(now: Date) throws -> ProjectGitHubActivitySnapshot {
+    func readActivity(now: Date, cancellation: Progress?) throws -> ProjectGitHubActivitySnapshot {
         guard let activity else { throw ProjectPulseError.githubUnavailable }
         return activity
     }
 
     func readWorkflow(
         repository: String?,
-        currentDirectoryURL: URL
+        currentDirectoryURL: URL, cancellation: Progress?
     ) -> ProjectWorkflowSnapshot {
         result?.workflow
             ?? ProjectWorkflowSnapshot(state: .neutral, title: "No workflow runs")

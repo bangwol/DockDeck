@@ -193,7 +193,7 @@ private struct FakeGitHubInboxReader: GitHubInboxReading {
     let snapshot: GitHubInboxSnapshot
 
     func read(
-        configuration: GitHubInboxConfiguration, now: Date
+        configuration: GitHubInboxConfiguration, now: Date, cancellation: Progress?
     ) throws -> GitHubInboxSnapshot {
         snapshot
     }

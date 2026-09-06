@@ -16,7 +16,10 @@ enum ExecutableLocator {
         }
         var seen: Set<String> = []
         return candidates.first {
-            seen.insert($0).inserted && FileManager.default.isExecutableFile(atPath: $0)
+            var isDirectory: ObjCBool = false
+            return seen.insert($0).inserted
+                && FileManager.default.fileExists(atPath: $0, isDirectory: &isDirectory)
+                && !isDirectory.boolValue && FileManager.default.isExecutableFile(atPath: $0)
         }.map(URL.init(fileURLWithPath:))
     }
 }
