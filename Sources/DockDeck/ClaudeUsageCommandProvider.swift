@@ -383,8 +383,9 @@ final class ClaudeUsageCommandProvider: ClaudeUsageCommandReading {
 
         do {
             let directSession = UUID()
-            defer { cleanupSessionArtifact(directSession) }
             do {
+                try rememberSession(directSession)
+                defer { cleanupSessionArtifact(directSession) }
                 let output = try runDirect(
                     executable: executable, sessionID: directSession, operation: operation)
                 return .success(try ClaudeUsageCommandParser.parse(output, capturedAt: now))
@@ -398,6 +399,7 @@ final class ClaudeUsageCommandProvider: ClaudeUsageCommandReading {
 
             guard isCurrent(operation) else { throw ProbeFailure.cancelled }
             let ptySession = UUID()
+            try rememberSession(ptySession)
             defer { cleanupSessionArtifact(ptySession) }
             let screen = try runPTY(
                 executable: executable, sessionID: ptySession, operation: operation)
@@ -607,40 +609,65 @@ final class ClaudeUsageCommandProvider: ClaudeUsageCommandReading {
             .appendingPathComponent(String(encodedDirectory), isDirectory: true)
     }
 
-    /// A probe interrupted by quit or a crash never reached its own cleanup; only DockDeck's
-    /// probe sessions live in this directory, so any leftover transcript is ours to remove.
+    private func sessionMarker(_ sessionID: UUID) -> URL {
+        probeDirectory.appendingPathComponent(".dockdeck-session-" + sessionID.uuidString.lowercased())
+    }
+
+    private func rememberSession(_ sessionID: UUID) throws {
+        try Data().write(to: sessionMarker(sessionID), options: .withoutOverwriting)
+    }
+
+    // The encoded project path can collide with another directory. Only recorded UUIDs are ours.
     private func removeStaleProbeArtifacts() {
-        let projectDirectory = probeProjectDirectory
-        guard let names = try? fileManager.contentsOfDirectory(atPath: projectDirectory.path)
+        guard let names = try? fileManager.contentsOfDirectory(atPath: probeDirectory.path)
         else { return }
-        for name in names where name.hasSuffix(".jsonl") {
-            let artifact = projectDirectory.appendingPathComponent(name)
-            guard let values = try? artifact.resourceValues(
-                forKeys: [.isRegularFileKey, .isSymbolicLinkKey]),
-                values.isRegularFile == true, values.isSymbolicLink != true
+        var cleaned = 0
+        for name in names where name.hasPrefix(".dockdeck-session-") {
+            guard let sessionID = UUID(uuidString: String(name.dropFirst(".dockdeck-session-".count)))
             else { continue }
-            try? fileManager.removeItem(at: artifact)
+            let marker = sessionMarker(sessionID)
+            guard let values = try? marker.resourceValues(forKeys: [
+                .isRegularFileKey, .isSymbolicLinkKey, .fileSizeKey, .contentModificationDateKey]),
+                values.isRegularFile == true, values.isSymbolicLink != true, values.fileSize == 0,
+                let modified = values.contentModificationDate,
+                Date().timeIntervalSince(modified) >= 60
+            else { continue }
+            cleanupSessionArtifact(sessionID, attempts: 1)
+            let artifact = probeProjectDirectory.appendingPathComponent(sessionID.uuidString.lowercased() + ".jsonl")
+            if !fileManager.fileExists(atPath: artifact.path) { _ = unlink(marker.path) }
+            cleaned += 1
+            if cleaned == 64 { break }
         }
     }
 
-    private func cleanupSessionArtifact(_ sessionID: UUID) {
+    private var hasSafeProjectDirectory: Bool {
+        let claude = homeDirectory.appendingPathComponent(".claude")
+        return [claude, claude.appendingPathComponent("projects"), probeProjectDirectory].allSatisfy {
+            guard let values = try? $0.resourceValues(forKeys: [.isDirectoryKey, .isSymbolicLinkKey])
+            else { return false }
+            return values.isDirectory == true && values.isSymbolicLink != true
+        }
+    }
+
+    private func cleanupSessionArtifact(_ sessionID: UUID, attempts: Int = 6) {
         let projectDirectory = probeProjectDirectory
         let artifact = projectDirectory.appendingPathComponent(
             "\(sessionID.uuidString.lowercased()).jsonl")
 
         // ponytail: Claude can flush its session file just after the CLI exits. Retry this
-        // exact random session briefly; replace this with a no-persistence CLI flag if added.
-        for attempt in 0..<6 {
+        // exact random session briefly; replace with interactive no-persistence support when available.
+        for attempt in 0..<attempts {
             if attempt > 0 { Thread.sleep(forTimeInterval: 0.1) }
-            guard let values = try? artifact.resourceValues(
+            guard hasSafeProjectDirectory,
+                let values = try? artifact.resourceValues(
                 forKeys: [.isRegularFileKey, .isSymbolicLinkKey]),
                 values.isRegularFile == true, values.isSymbolicLink != true
             else { continue }
-            try? fileManager.removeItem(at: artifact)
+            _ = unlink(artifact.path)
         }
-        if (try? fileManager.contentsOfDirectory(atPath: projectDirectory.path).isEmpty) == true {
-            try? fileManager.removeItem(at: projectDirectory)
-        }
+        // rmdir fails atomically if another session created a file in the meantime.
+        if hasSafeProjectDirectory { _ = rmdir(projectDirectory.path) }
+        // Retain the marker for the next sweep: a late writer or crash can outlive this retry.
     }
 
     private func begin(_ operation: UUID) {

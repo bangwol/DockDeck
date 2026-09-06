@@ -137,11 +137,14 @@ Automatic mode uses this private working directory:
 ~/Library/Application Support/DockDeck/ClaudeProbe
 ```
 
-The working directory uses `0700` permissions. DockDeck passes a unique session
-ID, removes that exact probe transcript after the process exits, clears any
-transcript an interrupted probe left in the same probe project directory before
-the next run, caps captured output at 256 KiB, and does not persist or log the
-captured screen. It removes
+The working directory uses `0700` permissions. DockDeck records each random
+session ID in an empty local marker before launching the probe and removes that
+exact transcript after the process exits. Before later runs, it retries cleanup
+for recorded sessions older than one minute, up to 64 markers per pass. This
+recovers interrupted probes without deleting unrecorded sessions; cleanup skips
+symbolic-link project directories and transcripts. Markers contain no captured
+output. Captured output is capped at 256 KiB and is not persisted or logged.
+DockDeck removes
 `ANTHROPIC_*` and `CLAUDE_CODE_OAUTH_TOKEN*` overrides from the child
 environment. Authentication remains owned by the installed Claude Code CLI;
 DockDeck does not read token files, browser sessions, or undocumented account
