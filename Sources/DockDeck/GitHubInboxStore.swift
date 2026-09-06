@@ -480,6 +480,8 @@ final class GitHubInboxStore: ObservableObject {
         }
     }
 
+    deinit { timer?.invalidate() }
+
     private func scheduleTimer() {
         timer?.invalidate()
         guard isRunning else {

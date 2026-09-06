@@ -310,6 +310,8 @@ final class FocusTimerStore: ObservableObject {
         self.completionTimer = completionTimer
     }
 
+    deinit { invalidateTimers() }
+
     private func invalidateTimers() {
         displayTimer?.invalidate()
         displayTimer = nil

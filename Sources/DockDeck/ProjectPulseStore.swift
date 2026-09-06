@@ -574,6 +574,8 @@ final class ProjectPulseStore: ObservableObject {
         }
     }
 
+    deinit { timer?.invalidate() }
+
     private func scheduleTimer() {
         timer?.invalidate()
         guard isRunning, configuration.isConfigured else {
