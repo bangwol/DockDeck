@@ -60,7 +60,8 @@ and inbox requests when both modules refresh together; it does not add a second
 credential store or background service. Conditional-request validators and the
 last parsed notification page exist only for the lifetime of the app process.
 
-Disabling the module stops its timer and subprocesses. Hidden polling is three
+Disabling the module stops its timer; a GitHub CLI call already in flight finishes
+within its timeout and its result is discarded. Hidden polling is three
 times slower than the selected interval; macOS Low Power Mode adds another
 two-times multiplier. `⌘R` requests an immediate refresh when the module is
 enabled. A failed refresh retains the last successful snapshot and exposes the
