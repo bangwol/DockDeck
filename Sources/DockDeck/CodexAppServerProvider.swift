@@ -1,3 +1,4 @@
+import Darwin
 import Foundation
 
 enum CodexRateLimitParser {
@@ -220,6 +221,8 @@ final class CodexAppServerProvider {
         let inputPipe = Pipe()
         let outputPipe = Pipe()
         let errorPipe = Pipe()
+        // A dead app-server must surface as EPIPE in send(), not as SIGPIPE ending DockDeck.
+        _ = fcntl(inputPipe.fileHandleForWriting.fileDescriptor, F_SETNOSIGPIPE, 1)
         process.executableURL = executableURL
         process.arguments = ["app-server"]
         process.environment = CodexBinaryLocator.launchEnvironment(for: executableURL)
@@ -231,7 +234,7 @@ final class CodexAppServerProvider {
         outputHandle.readabilityHandler = { [weak self] handle in
             let data = handle.availableData
             self?.queue.async {
-                self?.consume(data)
+                self?.consume(data, from: handle)
             }
         }
         let errorHandle = errorPipe.fileHandleForReading
@@ -300,7 +303,9 @@ final class CodexAppServerProvider {
         try inputHandle.write(contentsOf: data)
     }
 
-    private func consume(_ data: Data) {
+    private func consume(_ data: Data, from handle: FileHandle) {
+        // A callback from a replaced process must not feed the current one's buffer.
+        guard handle === outputHandle else { return }
         guard !data.isEmpty else {
             outputHandle?.readabilityHandler = nil
             return
