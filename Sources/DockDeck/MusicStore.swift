@@ -190,9 +190,18 @@ final class MusicAutomationProvider: MusicAutomationProviding {
                 target.aeDesc, typeWildCard, typeWildCard, prompt))
     }
 
+    /// Compiled once; `readPlayback` runs every few seconds on the serial Music queue.
+    private lazy var compiledPlaybackScript: NSAppleScript? = {
+        let script = NSAppleScript(source: Self.playbackScript)
+        _ = script?.compileAndReturnError(nil)
+        return script
+    }()
+
     func readPlayback(now: Date) throws -> MusicPlaybackSnapshot {
-        try MusicAppleEventParser.parse(
-            execute(Self.playbackScript), now: now)
+        guard let script = compiledPlaybackScript else {
+            throw MusicAutomationError.commandFailed
+        }
+        return try MusicAppleEventParser.parse(execute(script), now: now)
     }
 
     func send(_ command: MusicCommand) throws {
@@ -230,6 +239,10 @@ final class MusicAutomationProvider: MusicAutomationProviding {
         guard let script = NSAppleScript(source: source) else {
             throw MusicAutomationError.commandFailed
         }
+        return try execute(script)
+    }
+
+    private func execute(_ script: NSAppleScript) throws -> NSAppleEventDescriptor {
         var errorInfo: NSDictionary?
         let result = script.executeAndReturnError(&errorInfo)
         guard errorInfo == nil else { throw MusicAutomationError.commandFailed }
