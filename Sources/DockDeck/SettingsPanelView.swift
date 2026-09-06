@@ -75,7 +75,8 @@ private struct SettingsRootView: View {
     @ObservedObject var diagnosticsStore: DiagnosticsStore
 
     var body: some View {
-        HStack(spacing: 0) {
+        let sections = model.sidebarSections(matching: search)
+        return HStack(spacing: 0) {
             VStack(spacing: 0) {
                 HStack(spacing: 8) {
                     Image(systemName: "dock.rectangle")
@@ -91,15 +92,13 @@ private struct SettingsRootView: View {
                     .textFieldStyle(.roundedBorder)
                     .padding(.horizontal, 10).padding(.bottom, 8)
                     .onSubmit {
-                        if let pane = model.sidebarSections(matching: search).first?.panes.first {
-                            model.selectPane(pane)
-                        }
+                        if let pane = sections.first?.panes.first { model.selectPane(pane) }
                     }
-                if model.sidebarSections(matching: search).isEmpty {
+                if sections.isEmpty {
                     Text(L10n.text("No matching settings")).font(.caption).foregroundStyle(.secondary)
                 }
                 List(selection: $model.selectedPane) {
-                    ForEach(model.sidebarSections(matching: search)) { section in
+                    ForEach(sections) { section in
                         Section(section.title) {
                             ForEach(section.panes) { pane in
                                 SettingsSidebarRow(pane: pane, model: model)
