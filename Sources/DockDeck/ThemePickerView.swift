@@ -56,6 +56,11 @@ final class ThemePickerView: NSView {
     override var acceptsFirstResponder: Bool { true }
     override var isFlipped: Bool { true }
 
+    override func isAccessibilityElement() -> Bool { true }
+    override func accessibilityRole() -> NSAccessibility.Role? { .list }
+    override func accessibilityLabel() -> String? { L10n.text("Theme") }
+    override func accessibilityValue() -> Any? { themes[selectedIndex].name }
+
     override func draw(_ dirtyRect: NSRect) {
         let selectedID = themes[selectedIndex].id
         for row in rows {
@@ -117,6 +122,7 @@ final class ThemePickerView: NSView {
     private func move(_ delta: Int) {
         selectedIndex = (selectedIndex + delta + themes.count) % themes.count
         needsDisplay = true
+        NSAccessibility.post(element: self, notification: .valueChanged)
     }
 
     override func mouseDown(with event: NSEvent) {

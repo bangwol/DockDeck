@@ -227,7 +227,6 @@ struct ProjectPulseSettingsView: View {
                             }
                         }
                         .labelsHidden()
-                        .frame(maxWidth: 300)
                         .disabled(githubRepositories.status != .ready)
                     }
 

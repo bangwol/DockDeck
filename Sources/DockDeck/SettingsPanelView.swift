@@ -96,6 +96,7 @@ private struct SettingsRootView: View {
                     }
                 if sections.isEmpty {
                     Text(L10n.text("No matching settings")).font(.caption).foregroundStyle(.secondary)
+                        .padding(.horizontal, 14)
                 }
                 List(selection: $model.selectedPane) {
                     ForEach(sections) { section in
@@ -243,6 +244,7 @@ private struct SettingsHeader: View {
                         get: { model.isEnabled(definition.id) },
                         set: { model.setEnabled($0, for: definition.id) }))
                     .toggleStyle(.switch)
+                    .accessibilityLabel("Enable \(definition.displayTitle)")
                     .disabled(!model.canDisable(definition.id))
                     .help(
                         model.canDisable(definition.id)

@@ -24,7 +24,7 @@ struct CustomTileSettingsView: View {
                                     get: { configuration.title },
                                     set: model.setCustomTileTitle))
                                 .textFieldStyle(.roundedBorder)
-                                .frame(maxWidth: 310)
+                                .accessibilityLabel("Title")
                         }
                         Divider()
                         Picker(
@@ -146,7 +146,7 @@ struct CustomTileSettingsView: View {
                             set: model.setCustomTileExecutablePath))
                         .textFieldStyle(.roundedBorder)
                         .font(.system(.body, design: .monospaced))
-                        .frame(maxWidth: 310)
+                        .accessibilityLabel("Executable path")
                 }
                 Divider()
                 VStack(alignment: .leading, spacing: 5) {
@@ -184,7 +184,6 @@ struct CustomTileSettingsView: View {
                             get: { configuration.shortcutName },
                             set: model.setCustomTileShortcutName))
                         .textFieldStyle(.roundedBorder)
-                        .frame(maxWidth: 310)
                 }
                 Text("The Shortcut must return plain text or the JSON format below.")
                     .font(.caption)
