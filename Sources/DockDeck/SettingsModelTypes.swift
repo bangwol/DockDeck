@@ -202,6 +202,7 @@ struct TerminalSettingsState: Equatable {
     var focusWidthMultiplier: CGFloat
     var focusHeightMultiplier: CGFloat
     var fontName: String
+    var fontSize: CGFloat = TerminalTheme.fontSize
 }
 
 struct UsageSettingsState: Equatable {
@@ -296,6 +297,7 @@ struct SettingsPanelValues: Equatable {
 enum TerminalSettingsChange {
     case focusSize(width: CGFloat, height: CGFloat)
     case font(String)
+    case fontSize(CGFloat)
 }
 
 enum UsageSettingsChange {

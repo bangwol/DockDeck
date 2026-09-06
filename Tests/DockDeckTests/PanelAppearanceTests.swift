@@ -1294,6 +1294,23 @@ final class PanelAppearanceTests: XCTestCase {
         XCTAssertEqual(PanelSettings.nearest(.infinity, in: options, default: 2), 2)
     }
 
+    func testTerminalFontSizeIsClampedAndEmitted() {
+        let model = makeSettingsModel(
+            configuration: .legacy(order: .terminalLeft, enabledPanels: .all))
+        var emitted: CGFloat?
+        model.onChange = {
+            if case .terminal(.fontSize(let size)) = $0 { emitted = size }
+        }
+
+        model.setTerminalFontSize(20)
+
+        XCTAssertEqual(model.values.terminal.fontSize, TerminalTheme.maximumFontSize)
+        XCTAssertEqual(emitted, TerminalTheme.maximumFontSize)
+        XCTAssertEqual(
+            TerminalTheme.font(named: TerminalTheme.systemFontName, size: 12).pointSize, 12)
+        XCTAssertEqual(TerminalTheme.clampedFontSize(.nan), TerminalTheme.fontSize)
+    }
+
     private func makeSettingsModel(
         configuration: PanelDeckConfiguration
     ) -> SettingsPanelModel {

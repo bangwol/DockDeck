@@ -18,6 +18,7 @@ enum PanelSettings {
     private static let cornerRadiusKey = "DockDeck.settings.cornerRadius"
     private static let tintOpacityKey = "DockDeck.settings.tintOpacity"
     private static let fontNameKey = "DockDeck.settings.fontName"
+    private static let terminalFontSizeKey = "DockDeck.settings.terminalFontSize"
     private static let focusWidthMultiplierKey = "DockDeck.settings.focusWidthMultiplier"
     private static let focusHeightMultiplierKey = "DockDeck.settings.focusHeightMultiplier"
     private static let usageDisplayModeKey = "DockDeck.settings.usageDisplayMode"
@@ -102,6 +103,19 @@ enum PanelSettings {
     static var fontName: String? {
         get { UserDefaults.standard.string(forKey: fontNameKey) }
         set { UserDefaults.standard.set(newValue, forKey: fontNameKey) }
+    }
+
+    static var terminalFontSize: CGFloat {
+        get {
+            let defaults = UserDefaults.standard
+            let value = defaults.object(forKey: terminalFontSizeKey) == nil
+                ? TerminalTheme.fontSize : CGFloat(defaults.double(forKey: terminalFontSizeKey))
+            return TerminalTheme.clampedFontSize(value)
+        }
+        set {
+            UserDefaults.standard.set(
+                Double(TerminalTheme.clampedFontSize(newValue)), forKey: terminalFontSizeKey)
+        }
     }
 
     static var usageDisplayMode: UsageDisplayMode {
@@ -596,6 +610,7 @@ enum PanelSettings {
         defaults.removeObject(forKey: cornerRadiusKey)
         defaults.removeObject(forKey: tintOpacityKey)
         defaults.removeObject(forKey: fontNameKey)
+        defaults.removeObject(forKey: terminalFontSizeKey)
         defaults.removeObject(forKey: focusWidthMultiplierKey)
         defaults.removeObject(forKey: focusHeightMultiplierKey)
         defaults.removeObject(forKey: usageDisplayModeKey)

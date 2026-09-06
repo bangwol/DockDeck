@@ -303,6 +303,12 @@ final class SettingsPanelModel: ObservableObject {
         onChange?(.terminal(.font(value)))
     }
 
+    func setTerminalFontSize(_ value: CGFloat) {
+        let value = TerminalTheme.clampedFontSize(value)
+        updateValues { $0.terminal.fontSize = value }
+        onChange?(.terminal(.fontSize(value)))
+    }
+
     func setUsageFontName(_ value: String) {
         updateValues { $0.usage.fontName = value }
         onChange?(.usage(.font(value)))
