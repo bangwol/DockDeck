@@ -77,15 +77,9 @@ struct UsageModuleDetailView: View {
                     .font(.caption.monospacedDigit())
                     .foregroundStyle(baseColor.opacity(0.65))
             }
-            GeometryReader { proxy in
-                ZStack(alignment: .leading) {
-                    Capsule().fill(baseColor.opacity(0.12))
-                    Capsule()
-                        .fill(usageMeterColor(for: window, normal: baseColor))
-                        .frame(width: proxy.size.width * CGFloat(value / 100))
-                }
-            }
-            .frame(height: 5)
+            CapsuleMeter(
+                fraction: value / 100, color: usageMeterColor(for: window, normal: baseColor),
+                baseColor: baseColor, height: 5)
         }
         .help(UsageResetFormatter.helpText(for: window))
         .accessibilityElement(children: .combine)
@@ -676,15 +670,8 @@ struct MusicModuleDetailView: View {
 
     private func progress(_ track: MusicTrackSnapshot) -> some View {
         VStack(spacing: 5) {
-            GeometryReader { proxy in
-                ZStack(alignment: .leading) {
-                    Capsule().fill(baseColor.opacity(0.12))
-                    Capsule()
-                        .fill(.pink)
-                        .frame(width: proxy.size.width * CGFloat(track.progress ?? 0))
-                }
-            }
-            .frame(height: 5)
+            CapsuleMeter(
+                fraction: track.progress ?? 0, color: .pink, baseColor: baseColor, height: 5)
             HStack {
                 Text(time(track.position))
                 Spacer()
@@ -798,7 +785,8 @@ struct CustomTileModuleDetailView: View {
     }
 }
 
-private extension View {
+extension View {
+    /// The shared detail-window surface: inset content on a translucent rounded card.
     func moduleDetailSurface() -> some View {
         padding(12)
             .frame(maxWidth: .infinity, maxHeight: .infinity)

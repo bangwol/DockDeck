@@ -48,17 +48,9 @@ struct MusicPanelView: View {
     }
 
     private var progressBar: some View {
-        GeometryReader { proxy in
-            ZStack(alignment: .leading) {
-                Capsule().fill(baseColor.opacity(0.13))
-                Capsule()
-                    .fill(accentColor)
-                    .frame(
-                        width: proxy.size.width
-                            * CGFloat(store.snapshot?.track?.progress ?? 0))
-            }
-        }
-        .frame(height: 3)
+        CapsuleMeter(
+            fraction: store.snapshot?.track?.progress ?? 0, color: accentColor,
+            baseColor: baseColor)
         .opacity(store.snapshot?.track?.progress == nil ? 0.45 : 1)
         .accessibilityHidden(true)
     }

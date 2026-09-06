@@ -140,15 +140,7 @@ struct SystemStatsPanelView: View {
     }
 
     private func indicatorBar(value: Double, color: Color) -> some View {
-        GeometryReader { proxy in
-            ZStack(alignment: .leading) {
-                Capsule().fill(baseColor.opacity(0.14))
-                Capsule()
-                    .fill(color)
-                    .frame(width: proxy.size.width * CGFloat(min(max(value, 0), 1)))
-            }
-        }
-        .frame(height: 3)
+        CapsuleMeter(fraction: value, color: color, baseColor: baseColor)
     }
 
     private var valueFontSize: CGFloat {

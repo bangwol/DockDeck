@@ -5,6 +5,14 @@ import XCTest
 @testable import DockDeck
 
 final class PanelAppearanceTests: XCTestCase {
+    func testCapsuleMeterClampsFractionsAndIgnoresNonFiniteValues() {
+        XCTAssertEqual(CapsuleMeter.clamped(1.4), 1)
+        XCTAssertEqual(CapsuleMeter.clamped(-0.2), 0)
+        XCTAssertEqual(CapsuleMeter.clamped(0.35), 0.35)
+        XCTAssertEqual(CapsuleMeter.clamped(.nan), 0)
+        XCTAssertEqual(CapsuleMeter.clamped(.infinity), 0)
+    }
+
     func testReadableCompactTypeKeepsTenPointFloorWithoutShrinkingLargerText() {
         XCTAssertEqual(CompactReadability.size(7.5, enabled: false), 7.5)
         XCTAssertEqual(CompactReadability.size(7.5, enabled: true), 10)

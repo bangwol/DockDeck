@@ -75,18 +75,13 @@ struct GitHubInboxPanelView: View {
     }
 
     private var placeholder: some View {
-        HStack(spacing: 7) {
-            if case .loading = store.status {
-                ProgressView().controlSize(.small)
-            } else {
-                Image(systemName: "bell.slash")
-            }
-            Text(placeholderText)
-                .lineLimit(2)
-        }
-        .font(.system(size: CompactReadability.size(9.5, enabled: readable), weight: .semibold, design: .rounded))
-        .foregroundStyle(baseColor.opacity(0.78))
-        .padding(.horizontal, 9)
+        CompactPlaceholder(
+            text: placeholderText, symbol: "bell.slash", baseColor: baseColor, isLoading: isLoading)
+    }
+
+    private var isLoading: Bool {
+        if case .loading = store.status { return true }
+        return false
     }
 
     private var placeholderText: String {
@@ -200,11 +195,7 @@ struct GitHubInboxDetailView: View {
         .onChange(of: store.snapshot?.entries.map(\.repository)) { values in
             if !repository.isEmpty, !(values ?? []).contains(repository) { repository = "" }
         }
-        .padding(12)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(Color.black.opacity(0.12)))
+        .moduleDetailSurface()
     }
 
     private func summary(_ title: String, _ value: Int?, color: Color) -> some View {
