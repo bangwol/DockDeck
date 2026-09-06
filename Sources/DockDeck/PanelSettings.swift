@@ -536,16 +536,27 @@ enum PanelSettings {
         }
     }
 
+    /// Dock tracking resolves the deck layout several times per tick, up to ten ticks per
+    /// second with an auto-hiding Dock. Decode each stored blob once and reuse it while the
+    /// bytes are unchanged, so external writes are still picked up.
+    private static var deckConfigurationCache: (data: Data, configuration: PanelDeckConfiguration)?
+
     static var deckConfiguration: PanelDeckConfiguration {
         get {
             let defaults = UserDefaults.standard
-            if let data = defaults.data(forKey: panelDeckConfigurationKey),
+            guard let data = defaults.data(forKey: panelDeckConfigurationKey) else {
+                return legacyDeckConfiguration(defaults: defaults)
+            }
+            if let cache = deckConfigurationCache, cache.data == data {
+                return cache.configuration
+            }
+            guard
                 let configuration = try? JSONDecoder().decode(
                     PanelDeckConfiguration.self, from: data)
-            {
-                return configuration.normalized()
-            }
-            return legacyDeckConfiguration(defaults: defaults)
+            else { return legacyDeckConfiguration(defaults: defaults) }
+            let normalized = configuration.normalized()
+            deckConfigurationCache = (data, normalized)
+            return normalized
         }
         set { persistDeckConfiguration(newValue.normalized(), defaults: .standard) }
     }
