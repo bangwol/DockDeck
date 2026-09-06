@@ -138,8 +138,10 @@ Automatic mode uses this private working directory:
 ```
 
 The working directory uses `0700` permissions. DockDeck passes a unique session
-ID, removes that exact probe transcript after the process exits, caps captured
-output at 256 KiB, and does not persist or log the captured screen. It removes
+ID, removes that exact probe transcript after the process exits, clears any
+transcript an interrupted probe left in the same probe project directory before
+the next run, caps captured output at 256 KiB, and does not persist or log the
+captured screen. It removes
 `ANTHROPIC_*` and `CLAUDE_CODE_OAUTH_TOKEN*` overrides from the child
 environment. Authentication remains owned by the installed Claude Code CLI;
 DockDeck does not read token files, browser sessions, or undocumented account

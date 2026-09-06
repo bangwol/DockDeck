@@ -381,6 +381,7 @@ final class ClaudeUsageCommandProvider: ClaudeUsageCommandReading {
         } catch {
             return .failure(.transport("Could not prepare Claude probe directory"))
         }
+        removeStaleProbeArtifacts()
 
         let operation = UUID()
         begin(operation)
@@ -599,16 +600,37 @@ final class ClaudeUsageCommandProvider: ClaudeUsageCommandReading {
             [.posixPermissions: 0o700], ofItemAtPath: probeDirectory.path)
     }
 
-    private func cleanupSessionArtifact(_ sessionID: UUID) {
+    /// Claude keeps probe transcripts under a project directory derived from the probe path.
+    private var probeProjectDirectory: URL {
         let encodedDirectory = probeDirectory.path.unicodeScalars.map { scalar -> Character in
             switch scalar.value {
             case 48...57, 65...90, 97...122: Character(scalar)
             default: "-"
             }
         }
-        let projectDirectory = homeDirectory
+        return homeDirectory
             .appendingPathComponent(".claude/projects", isDirectory: true)
             .appendingPathComponent(String(encodedDirectory), isDirectory: true)
+    }
+
+    /// A probe interrupted by quit or a crash never reached its own cleanup; only DockDeck's
+    /// probe sessions live in this directory, so any leftover transcript is ours to remove.
+    private func removeStaleProbeArtifacts() {
+        let projectDirectory = probeProjectDirectory
+        guard let names = try? fileManager.contentsOfDirectory(atPath: projectDirectory.path)
+        else { return }
+        for name in names where name.hasSuffix(".jsonl") {
+            let artifact = projectDirectory.appendingPathComponent(name)
+            guard let values = try? artifact.resourceValues(
+                forKeys: [.isRegularFileKey, .isSymbolicLinkKey]),
+                values.isRegularFile == true, values.isSymbolicLink != true
+            else { continue }
+            try? fileManager.removeItem(at: artifact)
+        }
+    }
+
+    private func cleanupSessionArtifact(_ sessionID: UUID) {
+        let projectDirectory = probeProjectDirectory
         let artifact = projectDirectory.appendingPathComponent(
             "\(sessionID.uuidString.lowercased()).jsonl")
 
