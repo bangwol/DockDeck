@@ -22,6 +22,8 @@ struct CustomTileConfiguration: Codable, Equatable {
     static let maximumArgumentCount = 16
     static let maximumArgumentLength = 1_024
     static let maximumShortcutNameLength = 255
+    // JSON for sixteen valid Unicode arguments can exceed 64 KiB.
+    static let maximumConfigurationBytes = 512 * 1_024
 
     var title: String
     var source: CustomTileSource

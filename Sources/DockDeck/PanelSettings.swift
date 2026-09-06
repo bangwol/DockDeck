@@ -449,7 +449,7 @@ enum PanelSettings {
                 forKey: localPortsConfigurationKey, default: LocalPortsConfiguration(),
                 maximumBytes: 8_192)
         }
-        set { setSetting(newValue, forKey: localPortsConfigurationKey) }
+        set { setSetting(newValue, forKey: localPortsConfigurationKey, maximumBytes: 8_192) }
     }
 
     static var githubInboxConfiguration: GitHubInboxConfiguration {
@@ -463,8 +463,14 @@ enum PanelSettings {
     }
 
     static var customTileConfiguration: CustomTileConfiguration {
-        get { setting(forKey: customTileConfigurationKey, default: CustomTileConfiguration()) }
-        set { setSetting(newValue, forKey: customTileConfigurationKey) }
+        get {
+            setting(forKey: customTileConfigurationKey, default: CustomTileConfiguration(),
+                maximumBytes: CustomTileConfiguration.maximumConfigurationBytes)
+        }
+        set {
+            setSetting(newValue, forKey: customTileConfigurationKey,
+                maximumBytes: CustomTileConfiguration.maximumConfigurationBytes)
+        }
     }
 
     static var extraCustomTileConfigurations: [PanelModuleID: CustomTileConfiguration] {
@@ -766,9 +772,9 @@ enum PanelSettings {
     }
 
     private static func setSetting<Value: Codable & NormalizedSetting>(
-        _ value: Value, forKey key: String
+        _ value: Value, forKey key: String, maximumBytes: Int = 64 * 1_024
     ) {
-        guard let data = try? JSONEncoder().encode(value.normalized()) else { return }
+        guard let data = try? JSONEncoder().encode(value.normalized()), data.count <= maximumBytes else { return }
         UserDefaults.standard.set(data, forKey: key)
     }
 }
