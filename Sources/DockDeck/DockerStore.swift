@@ -163,18 +163,13 @@ enum DockerBinaryLocator {
     static func locate(
         environment: [String: String] = ProcessInfo.processInfo.environment
     ) -> URL? {
-        var candidates = [
-            environment["DOCKDECK_DOCKER_PATH"],
-            "/opt/homebrew/bin/docker", "/usr/local/bin/docker",
-            "/Applications/Docker.app/Contents/Resources/bin/docker",
-        ].compactMap { $0 }
-        if let path = environment["PATH"] {
-            candidates.append(contentsOf: path.split(separator: ":").map { "\($0)/docker" })
-        }
-        var seen: Set<String> = []
-        return candidates.first {
-            seen.insert($0).inserted && FileManager.default.isExecutableFile(atPath: $0)
-        }.map(URL.init(fileURLWithPath:))
+        ExecutableLocator.locate(
+            name: "docker", overrideKey: "DOCKDECK_DOCKER_PATH",
+            preferredPaths: [
+                "/opt/homebrew/bin/docker", "/usr/local/bin/docker",
+                "/Applications/Docker.app/Contents/Resources/bin/docker",
+            ],
+            environment: environment)
     }
 }
 

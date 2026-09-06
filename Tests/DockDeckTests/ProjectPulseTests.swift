@@ -5,6 +5,40 @@ import XCTest
 @testable import DockDeck
 
 final class ProjectPulseTests: XCTestCase {
+    func testExecutableLocatorPrefersOverrideThenKnownPathsThenPATH() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("dockdeck-locator-\(UUID().uuidString)", isDirectory: true)
+        let override = root.appendingPathComponent("override/tool")
+        let preferred = root.appendingPathComponent("preferred/tool")
+        let onPath = root.appendingPathComponent("bin/tool")
+        for url in [override, preferred, onPath] {
+            try FileManager.default.createDirectory(
+                at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try Data("#!/bin/sh\n".utf8).write(to: url)
+            try FileManager.default.setAttributes(
+                [.posixPermissions: 0o755], ofItemAtPath: url.path)
+        }
+        defer { try? FileManager.default.removeItem(at: root) }
+        let pathOnly = ["PATH": root.appendingPathComponent("bin").path]
+
+        XCTAssertEqual(
+            ExecutableLocator.locate(
+                name: "tool", overrideKey: "TOOL", preferredPaths: [preferred.path],
+                environment: pathOnly.merging(["TOOL": override.path]) { $1 })?.path,
+            override.path)
+        XCTAssertEqual(
+            ExecutableLocator.locate(
+                name: "tool", overrideKey: "TOOL", preferredPaths: [preferred.path],
+                environment: pathOnly)?.path,
+            preferred.path)
+        XCTAssertEqual(
+            ExecutableLocator.locate(
+                name: "tool", overrideKey: "TOOL", preferredPaths: ["/nonexistent/tool"],
+                environment: pathOnly)?.path,
+            onPath.path)
+        XCTAssertNil(ExecutableLocator.locate(name: "tool", environment: ["PATH": "/nonexistent"]))
+    }
+
     func testFavoritesValidateDeduplicateAndLimitWithoutChangingOptions() {
         let local = ProjectPulseConfiguration(repositoryPath: "/tmp/project", includesGitHubActions: true)
         let github = ProjectPulseConfiguration(source: .github, githubRepository: "owner/repo")

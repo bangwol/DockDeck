@@ -90,8 +90,7 @@ enum DiagnosticsChecker {
                 arguments: ["auth", "status"], environment: environment, now: now),
             cliCheck(
                 id: .github, title: "GitHub CLI", symbolName: "point.3.connected.trianglepath.dotted",
-                executable: locateExecutable(
-                    named: "gh", overrideKey: "DOCKDECK_GH_PATH", environment: environment),
+                executable: ProjectPulseBinaryLocator.githubCLI(environment: environment),
                 arguments: ["auth", "status", "--hostname", "github.com"],
                 environment: environment, now: now),
             item(
@@ -153,23 +152,6 @@ enum DiagnosticsChecker {
             id: .network, title: "Network", symbolName: "network",
             state: .ready, detail: "\(counters.interfaceName) is active",
             checkedAt: now, lastSuccessfulAt: now)
-    }
-
-    private static func locateExecutable(
-        named name: String, overrideKey: String, environment: [String: String]
-    ) -> URL? {
-        var candidates = [environment[overrideKey]].compactMap { $0 }
-        if let path = environment["PATH"] {
-            candidates.append(contentsOf: path.split(separator: ":").map { "\($0)/\(name)" })
-        }
-        candidates.append(contentsOf: [
-            "/opt/homebrew/bin/\(name)", "/usr/local/bin/\(name)",
-            "\(FileManager.default.homeDirectoryForCurrentUser.path)/.local/bin/\(name)",
-        ])
-        var seen: Set<String> = []
-        return candidates.first {
-            seen.insert($0).inserted && FileManager.default.isExecutableFile(atPath: $0)
-        }.map(URL.init(fileURLWithPath:))
     }
 }
 

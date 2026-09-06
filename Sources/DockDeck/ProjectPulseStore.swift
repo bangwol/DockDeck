@@ -454,33 +454,16 @@ enum GitHubRunParser {
 
 enum ProjectPulseBinaryLocator {
     static func git() -> URL? {
-        executable(named: "git", preferredPaths: ["/usr/bin/git"])
+        ExecutableLocator.locate(name: "git", preferredPaths: ["/usr/bin/git"])
     }
 
     static func githubCLI(
         environment: [String: String] = ProcessInfo.processInfo.environment
     ) -> URL? {
-        executable(
-            named: "gh",
-            preferredPaths: [
-                environment["DOCKDECK_GH_PATH"], "/opt/homebrew/bin/gh", "/usr/local/bin/gh",
-            ].compactMap { $0 },
+        ExecutableLocator.locate(
+            name: "gh", overrideKey: "DOCKDECK_GH_PATH",
+            preferredPaths: ["/opt/homebrew/bin/gh", "/usr/local/bin/gh"],
             environment: environment)
-    }
-
-    private static func executable(
-        named name: String,
-        preferredPaths: [String],
-        environment: [String: String] = ProcessInfo.processInfo.environment
-    ) -> URL? {
-        var paths = preferredPaths
-        if let path = environment["PATH"] {
-            paths.append(contentsOf: path.split(separator: ":").map { "\($0)/\(name)" })
-        }
-        var seen: Set<String> = []
-        return paths.first {
-            seen.insert($0).inserted && FileManager.default.isExecutableFile(atPath: $0)
-        }.map(URL.init(fileURLWithPath:))
     }
 }
 
