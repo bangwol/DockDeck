@@ -6,6 +6,17 @@ import XCTest
 @testable import DockDeck
 
 final class CustomTileTests: XCTestCase {
+    func testShortcutNamesThatLookLikeOptionsAreRejected() {
+        let configuration = CustomTileConfiguration(
+            source: .shortcut, shortcutName: "-list", refreshInterval: 60)
+
+        XCTAssertThrowsError(
+            try CustomTileClient().read(configuration: configuration, now: Date())
+        ) { error in
+            XCTAssertEqual(error as? CustomTileError, .shortcutUnavailable)
+        }
+    }
+
     func testManualPreviewRetainsLastSuccessAndReportsFailureThenRecovery() {
         let configuration = CustomTileConfiguration(executablePath: "/usr/bin/printf")
         let store = CustomTileStore(configuration: configuration, reader: SequenceTileReader())

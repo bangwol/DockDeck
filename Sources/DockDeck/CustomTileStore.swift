@@ -220,6 +220,11 @@ struct CustomTileClient: CustomTileReading {
             guard FileManager.default.isExecutableFile(atPath: path) else {
                 throw CustomTileError.shortcutUnavailable
             }
+            // Quick Actions already rejects option-like names; keep `shortcuts run` from
+            // interpreting one here.
+            guard !configuration.shortcutName.hasPrefix("-") else {
+                throw CustomTileError.shortcutUnavailable
+            }
             executable = URL(fileURLWithPath: path)
             arguments = ["run", configuration.shortcutName]
         }
