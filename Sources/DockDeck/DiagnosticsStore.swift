@@ -12,6 +12,28 @@ enum DiagnosticCheckID: String, CaseIterable, Identifiable {
     case network
 
     var id: Self { self }
+
+    var title: String {
+        switch self {
+        case .codex: "Codex"
+        case .claude: "Claude Code"
+        case .github: "GitHub CLI"
+        case .accessibility: "Accessibility"
+        case .temperature: "Temperature sensor"
+        case .network: "Network"
+        }
+    }
+
+    var symbolName: String {
+        switch self {
+        case .codex: "chevron.left.forwardslash.chevron.right"
+        case .claude: "sparkles"
+        case .github: "point.3.connected.trianglepath.dotted"
+        case .accessibility: "accessibility"
+        case .temperature: "thermometer.medium"
+        case .network: "network"
+        }
+    }
 }
 
 enum DiagnosticCheckState: Equatable {
@@ -81,25 +103,25 @@ enum DiagnosticsChecker {
     ) -> [DiagnosticCheckItem] {
         [
             cliCheck(
-                id: .codex, title: "Codex", symbolName: "chevron.left.forwardslash.chevron.right",
+                id: .codex,
                 executable: CodexBinaryLocator.locate(environment: environment),
                 arguments: ["login", "status"], environment: environment, now: now),
             cliCheck(
-                id: .claude, title: "Claude Code", symbolName: "sparkles",
+                id: .claude,
                 executable: ClaudeBinaryLocator.locate(environment: environment),
                 arguments: ["auth", "status"], environment: environment, now: now),
             cliCheck(
-                id: .github, title: "GitHub CLI", symbolName: "point.3.connected.trianglepath.dotted",
+                id: .github,
                 executable: ProjectPulseBinaryLocator.githubCLI(environment: environment),
                 arguments: ["auth", "status", "--hostname", "github.com"],
                 environment: environment, now: now),
             item(
-                id: .accessibility, title: "Accessibility", symbolName: "accessibility",
+                id: .accessibility,
                 ready: AXIsProcessTrusted(),
                 readyDetail: "Dock tracking permission granted",
                 failureDetail: "Grant permission in Privacy & Security", now: now),
             item(
-                id: .temperature, title: "Temperature sensor", symbolName: "thermometer.medium",
+                id: .temperature,
                 ready: InstalledTemperatureReader.isAvailable,
                 readyDetail: "Signed Stats sensor helper available",
                 failureDetail: "Numeric temperature unavailable; thermal pressure still works",
@@ -109,20 +131,20 @@ enum DiagnosticsChecker {
     }
 
     private static func cliCheck(
-        id: DiagnosticCheckID, title: String, symbolName: String,
-        executable: URL?, arguments: [String], environment: [String: String], now: Date
+        id: DiagnosticCheckID, executable: URL?, arguments: [String],
+        environment: [String: String], now: Date
     ) -> DiagnosticCheckItem {
         guard let executable else {
             return DiagnosticCheckItem(
-                id: id, title: title, symbolName: symbolName, state: .unavailable,
+                id: id, title: id.title, symbolName: id.symbolName, state: .unavailable,
                 detail: "Executable not found", checkedAt: now, lastSuccessfulAt: nil)
         }
         let status = DiagnosticCommandRunner.run(
             executable, arguments: arguments, environment: environment)
         return DiagnosticCheckItem(
             id: id,
-            title: title,
-            symbolName: symbolName,
+            title: id.title,
+            symbolName: id.symbolName,
             state: status == .ready ? .ready : .warning,
             detail: status.detail,
             checkedAt: now,
@@ -130,11 +152,10 @@ enum DiagnosticsChecker {
     }
 
     private static func item(
-        id: DiagnosticCheckID, title: String, symbolName: String, ready: Bool,
-        readyDetail: String, failureDetail: String, now: Date
+        id: DiagnosticCheckID, ready: Bool, readyDetail: String, failureDetail: String, now: Date
     ) -> DiagnosticCheckItem {
         DiagnosticCheckItem(
-            id: id, title: title, symbolName: symbolName,
+            id: id, title: id.title, symbolName: id.symbolName,
             state: ready ? .ready : .warning,
             detail: ready ? readyDetail : failureDetail,
             checkedAt: now,
@@ -144,12 +165,14 @@ enum DiagnosticsChecker {
     private static func networkCheck(now: Date) -> DiagnosticCheckItem {
         guard let counters = NetworkCounterReader.read() else {
             return DiagnosticCheckItem(
-                id: .network, title: "Network", symbolName: "network",
+                id: .network, title: DiagnosticCheckID.network.title,
+                symbolName: DiagnosticCheckID.network.symbolName,
                 state: .warning, detail: "No active primary interface",
                 checkedAt: now, lastSuccessfulAt: nil)
         }
         return DiagnosticCheckItem(
-            id: .network, title: "Network", symbolName: "network",
+            id: .network, title: DiagnosticCheckID.network.title,
+            symbolName: DiagnosticCheckID.network.symbolName,
             state: .ready, detail: "\(counters.interfaceName) is active",
             checkedAt: now, lastSuccessfulAt: now)
     }
@@ -176,7 +199,7 @@ enum DiagnosticsReportBuilder {
         ]
         for id in DiagnosticCheckID.allCases {
             guard let item = items.first(where: { $0.id == id }) else { continue }
-            var line = "- \(title(for: id)): \(title(for: item.state))"
+            var line = "- \(id.title): \(title(for: item.state))"
             if let checkedAt = item.checkedAt { line += "; checked \(timestamp(checkedAt))" }
             if let lastSuccessfulAt = item.lastSuccessfulAt {
                 line += "; last OK \(timestamp(lastSuccessfulAt))"
@@ -203,17 +226,6 @@ enum DiagnosticsReportBuilder {
         lines.append("")
         lines.append("Details, paths, URLs, command output, and account identifiers are omitted.")
         return lines.joined(separator: "\n")
-    }
-
-    private static func title(for id: DiagnosticCheckID) -> String {
-        switch id {
-        case .codex: "Codex"
-        case .claude: "Claude Code"
-        case .github: "GitHub CLI"
-        case .accessibility: "Accessibility"
-        case .temperature: "Temperature sensor"
-        case .network: "Network"
-        }
     }
 
     private static func title(for state: DiagnosticCheckState) -> String {
@@ -267,7 +279,7 @@ final class DiagnosticsStore: ObservableObject {
         moduleRuntime = runtimeProvider()
         items = DiagnosticCheckID.allCases.map {
             DiagnosticCheckItem(
-                id: $0, title: Self.title(for: $0), symbolName: Self.symbol(for: $0),
+                id: $0, title: $0.title, symbolName: $0.symbolName,
                 state: .checking, detail: "Not checked", checkedAt: nil,
                 lastSuccessfulAt: nil)
         }
@@ -321,28 +333,6 @@ final class DiagnosticsStore: ObservableObject {
                 checkedAt: result.checkedAt,
                 lastSuccessfulAt: result.lastSuccessfulAt
                     ?? previousByID[result.id]?.lastSuccessfulAt)
-        }
-    }
-
-    private static func title(for id: DiagnosticCheckID) -> String {
-        switch id {
-        case .codex: "Codex"
-        case .claude: "Claude Code"
-        case .github: "GitHub CLI"
-        case .accessibility: "Accessibility"
-        case .temperature: "Temperature sensor"
-        case .network: "Network"
-        }
-    }
-
-    private static func symbol(for id: DiagnosticCheckID) -> String {
-        switch id {
-        case .codex: "chevron.left.forwardslash.chevron.right"
-        case .claude: "sparkles"
-        case .github: "point.3.connected.trianglepath.dotted"
-        case .accessibility: "accessibility"
-        case .temperature: "thermometer.medium"
-        case .network: "network"
         }
     }
 
