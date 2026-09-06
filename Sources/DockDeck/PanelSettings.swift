@@ -736,7 +736,7 @@ enum PanelSettings {
         _ value: TimeInterval, in options: [TimeInterval], default fallback: TimeInterval
     ) -> TimeInterval {
         guard value.isFinite else { return fallback }
-        return options.min(by: { abs($0 - value) < abs($1 - value) }) ?? fallback
+        return options.nearest(to: value) ?? fallback
     }
 
     private static func interval(
@@ -786,3 +786,10 @@ extension DockerConfiguration: NormalizedSetting {}
 extension CustomTileConfiguration: NormalizedSetting {}
 extension FocusTimerSettings: NormalizedSetting {}
 extension DeckAutoSlideSettings: NormalizedSetting {}
+
+extension Collection where Element: SignedNumeric & Comparable {
+    /// The option closest to `value`; ties keep the earlier option.
+    func nearest(to value: Element) -> Element? {
+        self.min { abs($0 - value) < abs($1 - value) }
+    }
+}

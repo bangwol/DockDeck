@@ -8,9 +8,8 @@ struct DockerConfiguration: Codable, Equatable {
     var refreshInterval: TimeInterval
 
     init(refreshInterval: TimeInterval = Self.defaultRefreshInterval) {
-        self.refreshInterval = Self.refreshIntervals.min {
-            abs($0 - refreshInterval) < abs($1 - refreshInterval)
-        } ?? Self.defaultRefreshInterval
+        self.refreshInterval =
+            Self.refreshIntervals.nearest(to: refreshInterval) ?? Self.defaultRefreshInterval
     }
 
     func normalized() -> Self { Self(refreshInterval: refreshInterval) }

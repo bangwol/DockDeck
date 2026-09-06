@@ -97,9 +97,8 @@ struct ProjectPulseConfiguration: Codable, Equatable {
         var configuration = self
         configuration.repositoryPath = Self.normalizedRepositoryPath(repositoryPath)
         configuration.githubRepository = Self.normalizedGitHubRepository(githubRepository)
-        configuration.refreshInterval = Self.refreshIntervals.min {
-            abs($0 - refreshInterval) < abs($1 - refreshInterval)
-        } ?? Self.defaultRefreshInterval
+        configuration.refreshInterval =
+            Self.refreshIntervals.nearest(to: refreshInterval) ?? Self.defaultRefreshInterval
         if configuration.source == .github, configuration.githubScope == .activity {
             configuration.refreshInterval = max(configuration.refreshInterval, 5 * 60)
         }

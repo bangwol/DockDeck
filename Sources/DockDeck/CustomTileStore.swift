@@ -66,9 +66,8 @@ struct CustomTileConfiguration: Codable, Equatable {
         }
         value.shortcutName = Self.singleLine(
             shortcutName, limit: Self.maximumShortcutNameLength)
-        value.refreshInterval = Self.refreshIntervals.min {
-            abs($0 - refreshInterval) < abs($1 - refreshInterval)
-        } ?? Self.defaultRefreshInterval
+        value.refreshInterval =
+            Self.refreshIntervals.nearest(to: refreshInterval) ?? Self.defaultRefreshInterval
         return value
     }
 

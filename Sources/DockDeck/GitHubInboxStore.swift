@@ -21,9 +21,8 @@ struct GitHubInboxConfiguration: Codable, Equatable {
         Self(
             uncheckedRepository: ProjectPulseConfiguration.normalizedGitHubRepository(
                 actionsRepository),
-            refreshInterval: Self.refreshIntervals.min {
-                abs($0 - refreshInterval) < abs($1 - refreshInterval)
-            } ?? Self.defaultRefreshInterval)
+            refreshInterval: Self.refreshIntervals.nearest(to: refreshInterval)
+                ?? Self.defaultRefreshInterval)
     }
 
     private init(uncheckedRepository: String?, refreshInterval: TimeInterval) {
