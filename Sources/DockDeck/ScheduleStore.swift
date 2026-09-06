@@ -568,9 +568,8 @@ final class ScheduleStore: ObservableObject {
     }
 
     private static func resolvedRefreshInterval(_ value: TimeInterval) -> TimeInterval {
-        PanelSettings.scheduleRefreshIntervals.min(by: {
-            abs($0 - value) < abs($1 - value)
-        }) ?? PanelSettings.defaultScheduleRefreshInterval
+        PanelSettings.nearest(
+            value, in: PanelSettings.scheduleRefreshIntervals, default: PanelSettings.defaultScheduleRefreshInterval)
     }
 }
 

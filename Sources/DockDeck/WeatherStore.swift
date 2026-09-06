@@ -463,9 +463,8 @@ final class WeatherStore: ObservableObject {
     }
 
     private static func resolvedRefreshInterval(_ value: TimeInterval) -> TimeInterval {
-        PanelSettings.weatherRefreshIntervals.min(by: {
-            abs($0 - value) < abs($1 - value)
-        }) ?? PanelSettings.defaultWeatherRefreshInterval
+        PanelSettings.nearest(
+            value, in: PanelSettings.weatherRefreshIntervals, default: PanelSettings.defaultWeatherRefreshInterval)
     }
 }
 

@@ -1285,6 +1285,15 @@ final class PanelAppearanceTests: XCTestCase {
             side: side)
     }
 
+    func testNearestIntervalSnapsToOptionsAndRejectsNonFiniteValues() {
+        let options: [TimeInterval] = [1, 2, 5, 10]
+
+        XCTAssertEqual(PanelSettings.nearest(4.2, in: options, default: 2), 5)
+        XCTAssertEqual(PanelSettings.nearest(0, in: options, default: 2), 1)
+        XCTAssertEqual(PanelSettings.nearest(.nan, in: options, default: 2), 2)
+        XCTAssertEqual(PanelSettings.nearest(.infinity, in: options, default: 2), 2)
+    }
+
     private func makeSettingsModel(
         configuration: PanelDeckConfiguration
     ) -> SettingsPanelModel {

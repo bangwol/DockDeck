@@ -71,6 +71,7 @@ enum PanelSettings {
         "DockDeck.settings.panelDeckConfiguration.v1"
     private static let deckAutoSlideSettingsKey =
         "DockDeck.settings.deckAutoSlide.v1"
+    private static let localPortsConfigurationKey = "dockdeck.localPorts.v1"
 
     static var cornerRadius: CGFloat {
         get {
@@ -232,20 +233,10 @@ enum PanelSettings {
 
     static var systemStatsRefreshInterval: TimeInterval {
         get {
-            let defaults = UserDefaults.standard
-            guard defaults.object(forKey: systemStatsRefreshIntervalKey) != nil else {
-                return defaultSystemStatsRefreshInterval
-            }
-            let value = defaults.double(forKey: systemStatsRefreshIntervalKey)
-            return systemStatsRefreshIntervals.min(by: {
-                abs($0 - value) < abs($1 - value)
-            }) ?? defaultSystemStatsRefreshInterval
+            interval(forKey: systemStatsRefreshIntervalKey, options: systemStatsRefreshIntervals, default: defaultSystemStatsRefreshInterval)
         }
         set {
-            let value = systemStatsRefreshIntervals.min(by: {
-                abs($0 - newValue) < abs($1 - newValue)
-            }) ?? defaultSystemStatsRefreshInterval
-            UserDefaults.standard.set(value, forKey: systemStatsRefreshIntervalKey)
+            setInterval(newValue, forKey: systemStatsRefreshIntervalKey, options: systemStatsRefreshIntervals, default: defaultSystemStatsRefreshInterval)
         }
     }
 
@@ -280,20 +271,10 @@ enum PanelSettings {
 
     static var serviceMonitorRefreshInterval: TimeInterval {
         get {
-            let defaults = UserDefaults.standard
-            guard defaults.object(forKey: serviceMonitorRefreshIntervalKey) != nil else {
-                return defaultServiceMonitorRefreshInterval
-            }
-            let value = defaults.double(forKey: serviceMonitorRefreshIntervalKey)
-            return serviceMonitorRefreshIntervals.min(by: {
-                abs($0 - value) < abs($1 - value)
-            }) ?? defaultServiceMonitorRefreshInterval
+            interval(forKey: serviceMonitorRefreshIntervalKey, options: serviceMonitorRefreshIntervals, default: defaultServiceMonitorRefreshInterval)
         }
         set {
-            let value = serviceMonitorRefreshIntervals.min(by: {
-                abs($0 - newValue) < abs($1 - newValue)
-            }) ?? defaultServiceMonitorRefreshInterval
-            UserDefaults.standard.set(value, forKey: serviceMonitorRefreshIntervalKey)
+            setInterval(newValue, forKey: serviceMonitorRefreshIntervalKey, options: serviceMonitorRefreshIntervals, default: defaultServiceMonitorRefreshInterval)
         }
     }
 
@@ -325,20 +306,10 @@ enum PanelSettings {
 
     static var weatherRefreshInterval: TimeInterval {
         get {
-            let defaults = UserDefaults.standard
-            guard defaults.object(forKey: weatherRefreshIntervalKey) != nil else {
-                return defaultWeatherRefreshInterval
-            }
-            let value = defaults.double(forKey: weatherRefreshIntervalKey)
-            return weatherRefreshIntervals.min(by: {
-                abs($0 - value) < abs($1 - value)
-            }) ?? defaultWeatherRefreshInterval
+            interval(forKey: weatherRefreshIntervalKey, options: weatherRefreshIntervals, default: defaultWeatherRefreshInterval)
         }
         set {
-            let value = weatherRefreshIntervals.min(by: {
-                abs($0 - newValue) < abs($1 - newValue)
-            }) ?? defaultWeatherRefreshInterval
-            UserDefaults.standard.set(value, forKey: weatherRefreshIntervalKey)
+            setInterval(newValue, forKey: weatherRefreshIntervalKey, options: weatherRefreshIntervals, default: defaultWeatherRefreshInterval)
         }
     }
 
@@ -386,20 +357,10 @@ enum PanelSettings {
 
     static var scheduleRefreshInterval: TimeInterval {
         get {
-            let defaults = UserDefaults.standard
-            guard defaults.object(forKey: scheduleRefreshIntervalKey) != nil else {
-                return defaultScheduleRefreshInterval
-            }
-            let value = defaults.double(forKey: scheduleRefreshIntervalKey)
-            return scheduleRefreshIntervals.min(by: {
-                abs($0 - value) < abs($1 - value)
-            }) ?? defaultScheduleRefreshInterval
+            interval(forKey: scheduleRefreshIntervalKey, options: scheduleRefreshIntervals, default: defaultScheduleRefreshInterval)
         }
         set {
-            let value = scheduleRefreshIntervals.min(by: {
-                abs($0 - newValue) < abs($1 - newValue)
-            }) ?? defaultScheduleRefreshInterval
-            UserDefaults.standard.set(value, forKey: scheduleRefreshIntervalKey)
+            setInterval(newValue, forKey: scheduleRefreshIntervalKey, options: scheduleRefreshIntervals, default: defaultScheduleRefreshInterval)
         }
     }
 
@@ -431,20 +392,10 @@ enum PanelSettings {
 
     static var batteryRefreshInterval: TimeInterval {
         get {
-            let defaults = UserDefaults.standard
-            guard defaults.object(forKey: batteryRefreshIntervalKey) != nil else {
-                return defaultBatteryRefreshInterval
-            }
-            let value = defaults.double(forKey: batteryRefreshIntervalKey)
-            return batteryRefreshIntervals.min(by: {
-                abs($0 - value) < abs($1 - value)
-            }) ?? defaultBatteryRefreshInterval
+            interval(forKey: batteryRefreshIntervalKey, options: batteryRefreshIntervals, default: defaultBatteryRefreshInterval)
         }
         set {
-            let value = batteryRefreshIntervals.min(by: {
-                abs($0 - newValue) < abs($1 - newValue)
-            }) ?? defaultBatteryRefreshInterval
-            UserDefaults.standard.set(value, forKey: batteryRefreshIntervalKey)
+            setInterval(newValue, forKey: batteryRefreshIntervalKey, options: batteryRefreshIntervals, default: defaultBatteryRefreshInterval)
         }
     }
 
@@ -456,31 +407,13 @@ enum PanelSettings {
     }
 
     static var notifications: DockNotificationSettings {
-        get {
-            guard let data = UserDefaults.standard.data(forKey: notificationsKey),
-                let settings = try? JSONDecoder().decode(
-                    DockNotificationSettings.self, from: data)
-            else { return DockNotificationSettings() }
-            return settings.normalized()
-        }
-        set {
-            guard let data = try? JSONEncoder().encode(newValue.normalized()) else { return }
-            UserDefaults.standard.set(data, forKey: notificationsKey)
-        }
+        get { setting(forKey: notificationsKey, default: DockNotificationSettings()) }
+        set { setSetting(newValue, forKey: notificationsKey) }
     }
 
     static var projectPulseConfiguration: ProjectPulseConfiguration {
-        get {
-            guard let data = UserDefaults.standard.data(forKey: projectPulseConfigurationKey),
-                let configuration = try? JSONDecoder().decode(
-                    ProjectPulseConfiguration.self, from: data)
-            else { return ProjectPulseConfiguration() }
-            return configuration.normalized()
-        }
-        set {
-            guard let data = try? JSONEncoder().encode(newValue.normalized()) else { return }
-            UserDefaults.standard.set(data, forKey: projectPulseConfigurationKey)
-        }
+        get { setting(forKey: projectPulseConfigurationKey, default: ProjectPulseConfiguration()) }
+        set { setSetting(newValue, forKey: projectPulseConfigurationKey) }
     }
 
     static var projectPulseFavorites: [ProjectPulseConfiguration] {
@@ -498,55 +431,26 @@ enum PanelSettings {
 
     static var localPortsConfiguration: LocalPortsConfiguration {
         get {
-            guard let data = UserDefaults.standard.data(forKey: "dockdeck.localPorts.v1"), data.count <= 8_192,
-                let value = try? JSONDecoder().decode(LocalPortsConfiguration.self, from: data) else { return .init() }
-            return value.normalized()
+            setting(
+                forKey: localPortsConfigurationKey, default: LocalPortsConfiguration(),
+                maximumBytes: 8_192)
         }
-        set {
-            guard let data = try? JSONEncoder().encode(newValue.normalized()) else { return }
-            UserDefaults.standard.set(data, forKey: "dockdeck.localPorts.v1")
-        }
+        set { setSetting(newValue, forKey: localPortsConfigurationKey) }
     }
 
     static var githubInboxConfiguration: GitHubInboxConfiguration {
-        get {
-            guard let data = UserDefaults.standard.data(forKey: githubInboxConfigurationKey),
-                let configuration = try? JSONDecoder().decode(
-                    GitHubInboxConfiguration.self, from: data)
-            else { return GitHubInboxConfiguration() }
-            return configuration.normalized()
-        }
-        set {
-            guard let data = try? JSONEncoder().encode(newValue.normalized()) else { return }
-            UserDefaults.standard.set(data, forKey: githubInboxConfigurationKey)
-        }
+        get { setting(forKey: githubInboxConfigurationKey, default: GitHubInboxConfiguration()) }
+        set { setSetting(newValue, forKey: githubInboxConfigurationKey) }
     }
 
     static var dockerConfiguration: DockerConfiguration {
-        get {
-            guard let data = UserDefaults.standard.data(forKey: dockerConfigurationKey),
-                let configuration = try? JSONDecoder().decode(DockerConfiguration.self, from: data)
-            else { return DockerConfiguration() }
-            return configuration.normalized()
-        }
-        set {
-            guard let data = try? JSONEncoder().encode(newValue.normalized()) else { return }
-            UserDefaults.standard.set(data, forKey: dockerConfigurationKey)
-        }
+        get { setting(forKey: dockerConfigurationKey, default: DockerConfiguration()) }
+        set { setSetting(newValue, forKey: dockerConfigurationKey) }
     }
 
     static var customTileConfiguration: CustomTileConfiguration {
-        get {
-            guard let data = UserDefaults.standard.data(forKey: customTileConfigurationKey),
-                let configuration = try? JSONDecoder().decode(
-                    CustomTileConfiguration.self, from: data)
-            else { return CustomTileConfiguration() }
-            return configuration.normalized()
-        }
-        set {
-            guard let data = try? JSONEncoder().encode(newValue.normalized()) else { return }
-            UserDefaults.standard.set(data, forKey: customTileConfigurationKey)
-        }
+        get { setting(forKey: customTileConfigurationKey, default: CustomTileConfiguration()) }
+        set { setSetting(newValue, forKey: customTileConfigurationKey) }
     }
 
     static var extraCustomTileConfigurations: [PanelModuleID: CustomTileConfiguration] {
@@ -582,16 +486,8 @@ enum PanelSettings {
     }
 
     static var focusTimerSettings: FocusTimerSettings {
-        get {
-            guard let data = UserDefaults.standard.data(forKey: focusTimerSettingsKey),
-                let settings = try? JSONDecoder().decode(FocusTimerSettings.self, from: data)
-            else { return FocusTimerSettings() }
-            return settings.normalized()
-        }
-        set {
-            guard let data = try? JSONEncoder().encode(newValue.normalized()) else { return }
-            UserDefaults.standard.set(data, forKey: focusTimerSettingsKey)
-        }
+        get { setting(forKey: focusTimerSettingsKey, default: FocusTimerSettings()) }
+        set { setSetting(newValue, forKey: focusTimerSettingsKey) }
     }
 
     static var focusTimerSession: FocusTimerSession? {
@@ -641,16 +537,8 @@ enum PanelSettings {
     }
 
     static var deckAutoSlideSettings: DeckAutoSlideSettings {
-        get {
-            guard let data = UserDefaults.standard.data(forKey: deckAutoSlideSettingsKey),
-                let settings = try? JSONDecoder().decode(DeckAutoSlideSettings.self, from: data)
-            else { return DeckAutoSlideSettings() }
-            return settings.normalized()
-        }
-        set {
-            guard let data = try? JSONEncoder().encode(newValue.normalized()) else { return }
-            UserDefaults.standard.set(data, forKey: deckAutoSlideSettingsKey)
-        }
+        get { setting(forKey: deckAutoSlideSettingsKey, default: DeckAutoSlideSettings()) }
+        set { setSetting(newValue, forKey: deckAutoSlideSettingsKey) }
     }
 
     static func migratePanelDeckIfNeeded() {
@@ -740,7 +628,7 @@ enum PanelSettings {
         defaults.removeObject(forKey: networkInterfaceNameKey)
         defaults.removeObject(forKey: notificationsKey)
         defaults.removeObject(forKey: CompactReadability.preferenceKey)
-        defaults.removeObject(forKey: "dockdeck.localPorts.v1")
+        defaults.removeObject(forKey: localPortsConfigurationKey)
         defaults.removeObject(forKey: projectPulseConfigurationKey)
         defaults.removeObject(forKey: "dockdeck.projectPulseFavorites.v1")
         defaults.removeObject(forKey: githubInboxConfigurationKey)
@@ -816,4 +704,59 @@ enum PanelSettings {
     private static func activeModuleKey(for side: PanelSide) -> String {
         side == .left ? activeLeftModuleKey : activeRightModuleKey
     }
+
+    /// Snaps a stored or requested interval to the closest allowed option.
+    static func nearest(
+        _ value: TimeInterval, in options: [TimeInterval], default fallback: TimeInterval
+    ) -> TimeInterval {
+        guard value.isFinite else { return fallback }
+        return options.min(by: { abs($0 - value) < abs($1 - value) }) ?? fallback
+    }
+
+    private static func interval(
+        forKey key: String, options: [TimeInterval], default fallback: TimeInterval
+    ) -> TimeInterval {
+        let defaults = UserDefaults.standard
+        guard defaults.object(forKey: key) != nil else { return fallback }
+        return nearest(defaults.double(forKey: key), in: options, default: fallback)
+    }
+
+    private static func setInterval(
+        _ value: TimeInterval, forKey key: String, options: [TimeInterval],
+        default fallback: TimeInterval
+    ) {
+        UserDefaults.standard.set(nearest(value, in: options, default: fallback), forKey: key)
+    }
+
+    /// Decodes a JSON-backed setting and normalizes it; missing, oversized, or unreadable
+    /// data falls back to the default instead of failing.
+    private static func setting<Value: Codable & NormalizedSetting>(
+        forKey key: String, default fallback: Value, maximumBytes: Int = 64 * 1_024
+    ) -> Value {
+        guard let data = UserDefaults.standard.data(forKey: key), data.count <= maximumBytes,
+            let value = try? JSONDecoder().decode(Value.self, from: data)
+        else { return fallback }
+        return value.normalized()
+    }
+
+    private static func setSetting<Value: Codable & NormalizedSetting>(
+        _ value: Value, forKey key: String
+    ) {
+        guard let data = try? JSONEncoder().encode(value.normalized()) else { return }
+        UserDefaults.standard.set(data, forKey: key)
+    }
 }
+
+/// Settings that repair themselves after decoding, so every persisted value stays in bounds.
+protocol NormalizedSetting {
+    func normalized() -> Self
+}
+
+extension DockNotificationSettings: NormalizedSetting {}
+extension ProjectPulseConfiguration: NormalizedSetting {}
+extension LocalPortsConfiguration: NormalizedSetting {}
+extension GitHubInboxConfiguration: NormalizedSetting {}
+extension DockerConfiguration: NormalizedSetting {}
+extension CustomTileConfiguration: NormalizedSetting {}
+extension FocusTimerSettings: NormalizedSetting {}
+extension DeckAutoSlideSettings: NormalizedSetting {}

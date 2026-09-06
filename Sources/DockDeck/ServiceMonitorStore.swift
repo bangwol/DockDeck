@@ -517,8 +517,7 @@ final class ServiceMonitorStore: ObservableObject {
     }
 
     private static func resolvedRefreshInterval(_ value: TimeInterval) -> TimeInterval {
-        PanelSettings.serviceMonitorRefreshIntervals.min(by: {
-            abs($0 - value) < abs($1 - value)
-        }) ?? PanelSettings.defaultServiceMonitorRefreshInterval
+        PanelSettings.nearest(
+            value, in: PanelSettings.serviceMonitorRefreshIntervals, default: PanelSettings.defaultServiceMonitorRefreshInterval)
     }
 }

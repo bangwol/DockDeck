@@ -144,8 +144,7 @@ final class BatteryStore: ObservableObject {
     }
 
     private static func resolvedRefreshInterval(_ interval: TimeInterval) -> TimeInterval {
-        PanelSettings.batteryRefreshIntervals.min(by: {
-            abs($0 - interval) < abs($1 - interval)
-        }) ?? PanelSettings.defaultBatteryRefreshInterval
+        PanelSettings.nearest(
+            interval, in: PanelSettings.batteryRefreshIntervals, default: PanelSettings.defaultBatteryRefreshInterval)
     }
 }
