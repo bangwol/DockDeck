@@ -329,6 +329,10 @@ extension AppDelegate {
             defer: false)
         settingsPanelWindow.title = pane.windowTitle
         settingsPanelWindow.contentMinSize = SettingsPanelView.preferredSize
+        // Reopen where the user left it; a first launch keeps the centered origin above.
+        let frameName = "DockDeck.Settings"
+        _ = settingsPanelWindow.setFrameUsingName(frameName)
+        settingsPanelWindow.setFrameAutosaveName(frameName)
         settingsPanelWindow.level = .floating
         settingsPanelWindow.isOpaque = true
         settingsPanelWindow.backgroundColor = .windowBackgroundColor
