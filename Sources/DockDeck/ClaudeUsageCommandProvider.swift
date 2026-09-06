@@ -51,19 +51,13 @@ enum ClaudeBinaryLocator {
         environment: [String: String] = ProcessInfo.processInfo.environment,
         homeDirectory: URL = FileManager.default.homeDirectoryForCurrentUser
     ) -> URL? {
-        let home = homeDirectory.path
-        var candidates = [
-            environment["DOCKDECK_CLAUDE_PATH"],
-            "/opt/homebrew/bin/claude", "/usr/local/bin/claude",
-            "\(home)/.local/bin/claude",
-        ].compactMap { $0 }
-        if let path = environment["PATH"] {
-            candidates.append(contentsOf: path.split(separator: ":").map { "\($0)/claude" })
-        }
-        var seen: Set<String> = []
-        return candidates.first {
-            seen.insert($0).inserted && FileManager.default.isExecutableFile(atPath: $0)
-        }.map(URL.init(fileURLWithPath:))
+        ExecutableLocator.locate(
+            name: "claude", overrideKey: "DOCKDECK_CLAUDE_PATH",
+            preferredPaths: [
+                "/opt/homebrew/bin/claude", "/usr/local/bin/claude",
+                "\(homeDirectory.path)/.local/bin/claude",
+            ],
+            environment: environment)
     }
 }
 
