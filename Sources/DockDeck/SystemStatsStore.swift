@@ -326,7 +326,7 @@ final class SystemStatsStore: ObservableObject {
     }
 
     private func refreshTemperatureIfNeeded(now: Date) {
-        guard InstalledTemperatureReader.isAvailable, !temperatureReadInFlight,
+        guard !temperatureReadInFlight,
             lastTemperatureAttempt.map({
                 now.timeIntervalSince($0) >= Self.temperatureRefreshInterval
             }) ?? true
@@ -336,6 +336,8 @@ final class SystemStatsStore: ObservableObject {
         temperatureReadInFlight = true
         let generation = temperatureReadGeneration
         DispatchQueue.global(qos: .utility).async { [weak self] in
+            // The first availability check validates the helper's code signature; keep that
+            // file-system and Security work off the main thread. It returns nil when absent.
             let value = InstalledTemperatureReader.readHottestCPUCelsius()
             DispatchQueue.main.async {
                 guard let self, self.temperatureReadGeneration == generation else { return }
@@ -374,9 +376,11 @@ final class SystemStatsStore: ObservableObject {
         var info = host_cpu_load_info_data_t()
         var count = mach_msg_type_number_t(
             MemoryLayout<host_cpu_load_info_data_t>.size / MemoryLayout<integer_t>.size)
+        let host = mach_host_self()
+        defer { mach_port_deallocate(mach_task_self_, host) }
         let result = withUnsafeMutablePointer(to: &info) { pointer in
             pointer.withMemoryRebound(to: integer_t.self, capacity: Int(count)) {
-                host_statistics(mach_host_self(), HOST_CPU_LOAD_INFO, $0, &count)
+                host_statistics(host, HOST_CPU_LOAD_INFO, $0, &count)
             }
         }
         guard result == KERN_SUCCESS else { return nil }
@@ -396,15 +400,17 @@ final class SystemStatsStore: ObservableObject {
         var info = vm_statistics64_data_t()
         var count = mach_msg_type_number_t(
             MemoryLayout<vm_statistics64_data_t>.size / MemoryLayout<integer_t>.size)
+        let host = mach_host_self()
+        defer { mach_port_deallocate(mach_task_self_, host) }
         let result = withUnsafeMutablePointer(to: &info) { pointer in
             pointer.withMemoryRebound(to: integer_t.self, capacity: Int(count)) {
-                host_statistics64(mach_host_self(), HOST_VM_INFO64, $0, &count)
+                host_statistics64(host, HOST_VM_INFO64, $0, &count)
             }
         }
         guard result == KERN_SUCCESS else { return nil }
 
         var pageSize: vm_size_t = 0
-        guard host_page_size(mach_host_self(), &pageSize) == KERN_SUCCESS else { return nil }
+        guard host_page_size(host, &pageSize) == KERN_SUCCESS else { return nil }
         let usedPages = SystemStatsCalculator.activityMonitorMemoryUsedPages(
             internalPages: UInt64(info.internal_page_count),
             wiredPages: UInt64(info.wire_count),
