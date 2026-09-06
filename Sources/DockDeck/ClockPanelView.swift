@@ -79,6 +79,7 @@ struct ClockModuleDetailView: View {
                 }
             }
         }
+        .moduleDetailSurface()
     }
 
     private func clock(_ identifier: String) -> some View {

@@ -216,8 +216,9 @@ struct LocalPortsDetailView: View {
                 if let date = store.observedAt { Text("Checked \(date.formatted(date: .omitted, time: .standard))").font(.caption) }
                 Text("Opening a TCP connection checks reachability only. It does not verify application health. No payload is sent and no processes are stopped.")
                     .font(.caption).foregroundStyle(.secondary)
-            }.frame(maxWidth: .infinity, alignment: .leading).padding(14)
+            }.frame(maxWidth: .infinity, alignment: .leading)
         }
+        .moduleDetailSurface()
     }
 }
 
