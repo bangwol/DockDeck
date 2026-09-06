@@ -187,9 +187,11 @@ struct GitHubProjectClient: GitHubProjectReading, GitHubRepositoryListing {
                 arguments: [
                     "api", "graphql",
                     "-f", "query=\(Self.repositoryQuery)",
-                    "-F", "owner=\(parts[0])",
-                    "-F", "name=\(parts[1])",
-                    "-F", "since=\(since)",
+                    // -f keeps these raw strings; -F would send an all-digit owner or
+                    // repository name as a JSON number and fail the String! variables.
+                    "-f", "owner=\(parts[0])",
+                    "-f", "name=\(parts[1])",
+                    "-f", "since=\(since)",
                 ],
                 currentDirectoryURL: FileManager.default.homeDirectoryForCurrentUser,
                 environment: Self.environment,
@@ -225,8 +227,8 @@ struct GitHubProjectClient: GitHubProjectReading, GitHubRepositoryListing {
                 arguments: [
                     "api", "graphql",
                     "-f", "query=\(Self.activityQuery)",
-                    "-F", "from=\(from)",
-                    "-F", "to=\(to)",
+                    "-f", "from=\(from)",
+                    "-f", "to=\(to)",
                 ],
                 currentDirectoryURL: FileManager.default.homeDirectoryForCurrentUser,
                 environment: Self.environment,
