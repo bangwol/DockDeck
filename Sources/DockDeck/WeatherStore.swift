@@ -122,6 +122,8 @@ enum WeatherCondition {
 }
 
 enum WeatherAPI {
+    /// Forecast and geocoding payloads are a few kilobytes; anything larger is not ours to parse.
+    static let maximumResponseBytes = 512 * 1_024
     static let attributionURL = URL(string: "https://open-meteo.com/")!
     static let licenseURL = URL(string: "https://open-meteo.com/en/license")!
 
@@ -412,7 +414,8 @@ final class WeatherStore: ObservableObject {
             return
         }
         guard let response = response as? HTTPURLResponse,
-            (200..<300).contains(response.statusCode), let data
+            (200..<300).contains(response.statusCode), let data,
+            data.count <= WeatherAPI.maximumResponseBytes
         else {
             status = .failed("Weather service unavailable")
             return
@@ -436,16 +439,10 @@ final class WeatherStore: ObservableObject {
         timer = .moduleRefreshTimer(interval: interval) { [weak self] in self?.refresh() }
     }
 
+    deinit { session.invalidateAndCancel() }
+
     private static func makeSession() -> URLSession {
-        let configuration = URLSessionConfiguration.ephemeral
-        configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
-        configuration.urlCache = nil
-        configuration.httpCookieStorage = nil
-        configuration.httpShouldSetCookies = false
-        configuration.urlCredentialStorage = nil
-        configuration.timeoutIntervalForRequest = 10
-        configuration.timeoutIntervalForResource = 12
-        return URLSession(configuration: configuration)
+        URLSession(configuration: .dockDeckEphemeral(requestTimeout: 10, resourceTimeout: 12))
     }
 
     private static func failureLabel(_ error: Error) -> String {
@@ -535,6 +532,7 @@ final class WeatherLocationSearchStore: ObservableObject {
         }
         guard let response = response as? HTTPURLResponse,
             (200..<300).contains(response.statusCode), let data,
+            data.count <= WeatherAPI.maximumResponseBytes,
             let locations = try? WeatherAPI.decodeLocations(data)
         else {
             results = []
@@ -545,15 +543,9 @@ final class WeatherLocationSearchStore: ObservableObject {
         status = results.isEmpty ? .failed("No matching cities.") : .ready
     }
 
+    deinit { session.invalidateAndCancel() }
+
     private static func makeSession() -> URLSession {
-        let configuration = URLSessionConfiguration.ephemeral
-        configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
-        configuration.urlCache = nil
-        configuration.httpCookieStorage = nil
-        configuration.httpShouldSetCookies = false
-        configuration.urlCredentialStorage = nil
-        configuration.timeoutIntervalForRequest = 10
-        configuration.timeoutIntervalForResource = 12
-        return URLSession(configuration: configuration)
+        URLSession(configuration: .dockDeckEphemeral(requestTimeout: 10, resourceTimeout: 12))
     }
 }

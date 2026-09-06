@@ -6,6 +6,32 @@ import XCTest
 @testable import DockDeck
 
 final class WeatherTests: XCTestCase {
+    func testOversizedForecastResponsesAreRejected() throws {
+        let session = makeSession()
+        WeatherURLProtocol.handler = { _ in
+            (200, Data(count: WeatherAPI.maximumResponseBytes + 1))
+        }
+        let store = WeatherStore(
+            location: fixtureLocation(), unit: .celsius,
+            refreshInterval: 3_600, session: session)
+        let failed = expectation(description: "Forecast rejected")
+        var fulfilled = false
+        let cancellable = store.$status.sink { status in
+            guard !fulfilled, case .failed = status else { return }
+            fulfilled = true
+            failed.fulfill()
+        }
+
+        store.start()
+        wait(for: [failed], timeout: 1)
+
+        XCTAssertNil(store.snapshot)
+        cancellable.cancel()
+        store.stop()
+        session.invalidateAndCancel()
+        WeatherURLProtocol.handler = nil
+    }
+
     func testHourlyForecastBoundsMissingValuesAndUsesAbsoluteDates() throws {
         var payload = try XCTUnwrap(JSONSerialization.jsonObject(with: forecastData()) as? [String: Any])
         payload["hourly"] = [
