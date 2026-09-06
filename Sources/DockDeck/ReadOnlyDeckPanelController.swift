@@ -216,12 +216,14 @@ final class ReadOnlyDeckPanelController:
 
         addItem(
             to: menu,
-            title: "Settings…",
+            title: L10n.text("Settings…"),
             action: #selector(AppDelegate.openReadOnlyModuleSettings(_:)),
             representedObject: side.rawValue)
-        addItem(to: menu, title: "Find Module…", action: #selector(AppDelegate.showModulePicker(_:)))
+        addItem(
+            to: menu, title: L10n.text("Find Module…"),
+            action: #selector(AppDelegate.showModulePicker(_:)))
         let detailItem = NSMenuItem(
-            title: "Open Detail…", action: #selector(showDetailFromMenu(_:)),
+            title: L10n.text("Open Detail…"), action: #selector(showDetailFromMenu(_:)),
             keyEquivalent: "")
         detailItem.target = self
         detailItem.isEnabled = activeModule != nil
@@ -230,7 +232,7 @@ final class ReadOnlyDeckPanelController:
         let enabledModules = PanelSettings.enabledModules(on: side)
         if enabledModules.count > 1 {
             let nextItem = NSMenuItem(
-                title: "Show Next Module", action: #selector(selectNextFromMenu(_:)),
+                title: L10n.text("Show Next Module"), action: #selector(selectNextFromMenu(_:)),
                 keyEquivalent: "")
             nextItem.target = self
             menu.addItem(nextItem)
@@ -256,24 +258,29 @@ final class ReadOnlyDeckPanelController:
             menu.addItem(.separator())
             addItem(
                 to: menu,
-                title: PanelSettings.usageDisplayMode == .remaining
-                    ? "Show Used Values" : "Show Remaining Values",
+                title: L10n.text(
+                    PanelSettings.usageDisplayMode == .remaining
+                        ? "Show Used Values" : "Show Remaining Values"),
                 action: #selector(AppDelegate.toggleUsageDisplayMode(_:)))
         }
 
         if activeModule == .focusTimer {
             menu.addItem(.separator())
             let toggle = NSMenuItem(
-                title: services.focusTimer.snapshot.mode == .running ? "Pause Timer" : "Start Timer",
+                title: L10n.text(
+                    services.focusTimer.snapshot.mode == .running ? "Pause Timer" : "Start Timer"),
                 action: #selector(toggleFocusTimer(_:)), keyEquivalent: "")
             toggle.target = self
             menu.addItem(toggle)
             let reset = NSMenuItem(
-                title: "Reset Timer", action: #selector(resetFocusTimer(_:)), keyEquivalent: "")
+                title: L10n.text("Reset Timer"), action: #selector(resetFocusTimer(_:)),
+                keyEquivalent: "")
             reset.target = self
             menu.addItem(reset)
             let skip = NSMenuItem(
-                title: "Skip to \(services.focusTimer.snapshot.phase.next.title.capitalized)",
+                title: String(
+                    format: L10n.text("Skip to %@"),
+                    services.focusTimer.snapshot.phase.next.title.capitalized),
                 action: #selector(skipFocusTimer(_:)), keyEquivalent: "")
             skip.target = self
             menu.addItem(skip)
@@ -282,37 +289,39 @@ final class ReadOnlyDeckPanelController:
         if activeModule == .music {
             menu.addItem(.separator())
             addMusicItem(
-                to: menu, title: "Previous Track", action: #selector(previousMusicTrack(_:)),
+                to: menu, title: L10n.text("Previous Track"),
+                action: #selector(previousMusicTrack(_:)),
                 enabled: services.music.canControl)
             addMusicItem(
                 to: menu,
-                title: services.music.snapshot?.state.isPlaying == true ? "Pause" : "Play",
+                title: L10n.text(services.music.snapshot?.state.isPlaying == true ? "Pause" : "Play"),
                 action: #selector(toggleMusicPlayback(_:)),
                 enabled: services.music.canControl)
             addMusicItem(
-                to: menu, title: "Next Track", action: #selector(nextMusicTrack(_:)),
+                to: menu, title: L10n.text("Next Track"), action: #selector(nextMusicTrack(_:)),
                 enabled: services.music.canControl)
             if services.music.status == .permissionRequired
                 || services.music.status == .notRunning
             {
                 addMusicItem(
-                    to: menu, title: "Connect Music…",
+                    to: menu, title: L10n.text("Connect Music…"),
                     action: #selector(connectMusic(_:)))
             }
             addMusicItem(
-                to: menu, title: "Open Music",
+                to: menu, title: L10n.text("Open Music"),
                 action: #selector(openMusic(_:)))
         }
 
         menu.addItem(.separator())
         addItem(
             to: menu,
-            title: PanelSettings.panelOrder == .terminalLeft
-                ? "Move Terminal to Right" : "Move Terminal to Left",
+            title: L10n.text(
+                PanelSettings.panelOrder == .terminalLeft
+                    ? "Move Terminal to Right" : "Move Terminal to Left"),
             action: #selector(AppDelegate.swapPanelSides(_:)))
         addItem(
             to: menu,
-            title: "Refresh Modules & Layout",
+            title: L10n.text("Refresh Modules & Layout"),
             action: #selector(AppDelegate.refreshModules(_:)))
     }
 

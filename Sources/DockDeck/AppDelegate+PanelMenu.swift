@@ -11,17 +11,17 @@ extension AppDelegate {
 
         menu.addItem(
             NSMenuItem(
-                title: isExpanded ? "Return Terminal to Dock" : "Open Large Terminal",
+                title: L10n.text(isExpanded ? "Return Terminal to Dock" : "Open Large Terminal"),
                 action: #selector(toggleExpanded(_:)), keyEquivalent: "e"))
         menu.addItem(
             NSMenuItem(
-                title: "Theme: \(currentTheme.name)",
+                title: "\(L10n.text("Theme")): \(currentTheme.name)",
                 action: #selector(toggleThemePicker(_:)), keyEquivalent: "t"))
         menu.addItem(
             NSMenuItem(
-                title: "Settings…",
+                title: L10n.text("Settings…"),
                 action: #selector(toggleSettingsPanel(_:)), keyEquivalent: ""))
-        menu.addItem(withTitle: "Open Project in Terminal.app…",
+        menu.addItem(withTitle: L10n.text("Open Project in Terminal.app…"),
             action: #selector(openProjectInTerminalApp(_:)), keyEquivalent: "")
         let restartReason = NSMenuItem(title: terminalPanelController.lastRestartReason, action: nil, keyEquivalent: "")
         restartReason.isEnabled = false
@@ -31,19 +31,19 @@ extension AppDelegate {
             let modules = configuration.enabledModules(on: side)
             if modules.count > 1 {
                 let next = NSMenuItem(
-                    title: "Show Next Module",
+                    title: L10n.text("Show Next Module"),
                     action: #selector(showNextTerminalDeckModule(_:)), keyEquivalent: "")
                 next.target = self
                 menu.addItem(next)
 
-                let moduleItem = NSMenuItem(title: "Modules", action: nil, keyEquivalent: "")
-                let moduleMenu = NSMenu(title: "Modules")
+                let moduleItem = NSMenuItem(title: L10n.text("Modules"), action: nil, keyEquivalent: "")
+                let moduleMenu = NSMenu(title: L10n.text("Modules"))
                 for module in modules {
                     guard let definition = PanelModuleRegistry.definition(for: module) else {
                         continue
                     }
                     let item = NSMenuItem(
-                        title: definition.title,
+                        title: definition.displayTitle,
                         action: #selector(selectTerminalDeckModule(_:)), keyEquivalent: "")
                     item.target = self
                     item.representedObject = module.rawValue
@@ -56,21 +56,22 @@ extension AppDelegate {
         }
         menu.addItem(
             NSMenuItem(
-                title: PanelSettings.panelOrder == .terminalLeft
-                    ? "Move Terminal to Right" : "Move Terminal to Left",
+                title: L10n.text(
+                    PanelSettings.panelOrder == .terminalLeft
+                        ? "Move Terminal to Right" : "Move Terminal to Left"),
                 action: #selector(swapPanelSides(_:)), keyEquivalent: ""))
         menu.addItem(
             NSMenuItem(
-                title: "Refresh Modules & Layout",
+                title: L10n.text("Refresh Modules & Layout"),
                 action: #selector(refreshModules(_:)), keyEquivalent: "r"))
         menu.addItem(.separator())
         menu.addItem(
             NSMenuItem(
-                title: "About DockDeck",
+                title: L10n.text("About DockDeck"),
                 action: #selector(showAbout(_:)), keyEquivalent: ""))
         menu.addItem(
             NSMenuItem(
-                title: "Quit DockDeck",
+                title: L10n.text("Quit DockDeck"),
                 action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
 
         menu.popUp(positioning: nil, at: .zero, in: button)

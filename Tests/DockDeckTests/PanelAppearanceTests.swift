@@ -1173,9 +1173,9 @@ final class PanelAppearanceTests: XCTestCase {
         XCTAssertEqual(
             menu.items.filter { !$0.isSeparatorItem }.map(\.title),
             [
-                "Settings…", "Find Module…", "Open Detail…", "Show Used Values", "Move Terminal to Right",
-                "Refresh Modules & Layout",
-            ])
+                "Settings…", "Find Module…", "Open Detail…", "Show Used Values",
+                "Move Terminal to Right", "Refresh Modules & Layout",
+            ].map { L10n.text($0) })
     }
 
     func testCompactTerminalHidesIdleScrollerUntilExpanded() throws {
