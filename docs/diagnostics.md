@@ -13,10 +13,11 @@ pressed; there is no diagnostics polling timer.
 | Temperature sensor | The validated signed Stats SMC helper is available |
 | Network | macOS reports an active primary interface |
 
-CLI stdout and stderr are discarded. DockDeck records only the status, check
-time, and the last successful check in app memory; it does not display or store
-account identifiers, command output, or tokens. Each command check has a
-three-second limit. A local CLI wrapper's own directory is added to its child
+Sign-in command stdout and stderr are discarded. DockDeck records the status,
+check time, and last successful check in app memory; it does not display or store
+account identifiers, raw command output, or tokens. A failed status check can
+mean either an authentication problem or a CLI configuration error. Each command
+check has a three-second limit. A local CLI wrapper's own directory is added to its child
 `PATH`, allowing NVM and similar installations to resolve adjacent runtimes
 when DockDeck starts at login.
 
@@ -49,6 +50,42 @@ the fixed command performance counters.
 It deliberately omits diagnostic detail strings, paths, URLs, account
 identifiers, command output, and tokens. Review any clipboard content before
 sharing it.
+
+## CLI update guidance
+
+Codex, Claude Code, and GitHub CLI rows also show the installed `--version`,
+installation source, and update availability. Hover the installed version to
+see the executable path; hover the update status for the metadata check time.
+Updates are advisory and do not change the sign-in readiness badge.
+
+- npm installations compare with their package's `latest` version on the public
+  npm registry. The copied command targets the detected global prefix and Node
+  runtime, including NVM installations.
+- Homebrew installations compare with the detected cask or formula on the public
+  Homebrew API. Claude Code's `claude-code` and `claude-code@latest` casks are
+  checked separately. The command uses that Homebrew installation.
+- Native Claude Code compares with the latest published npm version. Its
+  `claude update` command follows the user's configured release channel; a newer
+  published version may not yet be offered on the stable channel.
+- App-bundled CLIs are updated through their containing app. Unknown installation
+  methods show an installation guide instead of a guessed update command.
+  Preview/custom versions are not compared with stable releases.
+
+**Copy Update Command** only copies text. Run it yourself in a terminal, then
+press **Refresh**. Commands are offered only when the matching package manager
+is present. DockDeck never installs CLI updates or changes their settings.
+Pinned versions and organization policies still apply; consult the linked
+installation guide before changing an intentionally pinned installation.
+
+Version metadata requests run only when Diagnostics opens or is refreshed,
+without authentication, cookies, or persistent response storage. Successful
+results are cached in memory for six hours, failures for five minutes. Installed
+versions are read again on every refresh. An offline or malformed response shows
+**Update check unavailable**, never **Up to date**. Each request has an eight-second
+resource timeout and a 256 KiB response limit; version commands have a three-second
+limit and 4 KiB output limit. No installed versions, local paths, or account data
+are sent to these services. Copied reports continue to omit CLI version metadata,
+paths, and update commands. DockDeck self-updates are not part of this feature.
 
 ## Module runtime
 

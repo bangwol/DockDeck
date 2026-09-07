@@ -41,7 +41,12 @@ allowlist and omit paths, URLs, account identifiers, command output, and tokens.
 
 ## Network access
 
-Network work is opt-in by module. Weather contacts Open-Meteo, Service Monitor
+Network work is opt-in by module, or by opening or refreshing Diagnostics.
+Diagnostics fetches public CLI version metadata from `registry.npmjs.org` and
+`formulae.brew.sh`; it sends no installed versions, paths, or credentials.
+See [Diagnostics](diagnostics.md#cli-update-guidance) for caching and limits.
+
+Weather contacts Open-Meteo, Service Monitor
 contacts only configured endpoints, and GitHub modules invoke authenticated
 `gh` commands. Schedule, World Clock, Music, Battery, Network counters, Focus
 Timer, and the default System Stats metrics do not contact an external service.
