@@ -29,15 +29,8 @@ struct FocusTimerPanelView: View {
                         .foregroundStyle(baseColor)
                     Spacer(minLength: 0)
                 }
-                GeometryReader { proxy in
-                    ZStack(alignment: .leading) {
-                        Capsule().fill(baseColor.opacity(0.14))
-                        Capsule()
-                            .fill(accentColor)
-                            .frame(width: proxy.size.width * store.snapshot.progress)
-                    }
-                }
-                .frame(height: 3)
+                CapsuleMeter(
+                    fraction: store.snapshot.progress, color: accentColor, baseColor: baseColor)
             }
 
             Button(action: { store.reset() }) {
@@ -97,7 +90,8 @@ struct FocusTimerModuleDetailView: View {
                 Text("Count is retained until reset. Skipped periods are not counted.")
                     .font(.caption).foregroundStyle(.secondary)
             }
-            .padding(12).frame(maxWidth: .infinity)
+            .frame(maxWidth: .infinity)
         }
+        .moduleDetailSurface()
     }
 }

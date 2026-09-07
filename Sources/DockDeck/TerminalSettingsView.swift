@@ -50,16 +50,27 @@ struct TerminalSettingsView: View {
                     }.frame(maxWidth: .infinity, alignment: .leading).padding(.top, 4)
                 }
                 GroupBox {
-                    SettingsPickerRow(title: "Font") {
-                        Picker(
-                            "Terminal font",
-                            selection: Binding(
-                                get: { model.values.terminal.fontName },
-                                set: model.setTerminalFontName)
-                        ) {
-                            ForEach(model.fontNames, id: \.self) { Text($0).tag($0) }
+                    VStack(spacing: 14) {
+                        SettingsPickerRow(title: "Font") {
+                            Picker(
+                                "Terminal font",
+                                selection: Binding(
+                                    get: { model.values.terminal.fontName },
+                                    set: model.setTerminalFontName)
+                            ) {
+                                ForEach(model.fontNames, id: \.self) { Text($0).tag($0) }
+                            }
+                            .labelsHidden()
                         }
-                        .labelsHidden()
+                        SettingsSliderRow(
+                            title: "Size",
+                            valueText: String(format: "%.0f pt", model.values.terminal.fontSize),
+                            value: Binding(
+                                get: { Double(model.values.terminal.fontSize) },
+                                set: { model.setTerminalFontSize(CGFloat($0)) }),
+                            range: Double(TerminalTheme.minimumFontSize)
+                                ... Double(TerminalTheme.maximumFontSize),
+                            step: 1)
                     }
                     .padding(.top, 4)
                 } label: {

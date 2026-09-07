@@ -295,7 +295,7 @@ final class NetworkStore: ObservableObject {
     func refresh(now: Date = Date()) {
         guard let counters = counterReader(interfaceName.isEmpty ? nil : interfaceName) else {
             previous = nil
-            snapshot = nil
+            if snapshot != nil { snapshot = nil }
             return
         }
         if historyInterfaceName != counters.interfaceName {

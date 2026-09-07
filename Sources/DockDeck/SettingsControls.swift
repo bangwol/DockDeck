@@ -47,6 +47,7 @@ struct SettingsSliderRow: View {
 /// keep their intrinsic width so every row's control shares the same right edge as the sliders.
 struct SettingsPickerRow<Content: View>: View {
     let title: String
+    var maxControlWidth: CGFloat = 260
     @ViewBuilder let content: () -> Content
 
     var body: some View {
@@ -54,7 +55,7 @@ struct SettingsPickerRow<Content: View>: View {
             Text(title)
             Spacer(minLength: 16)
             content()
-                .frame(maxWidth: 260, alignment: .trailing)
+                .frame(maxWidth: maxControlWidth, alignment: .trailing)
         }
     }
 }

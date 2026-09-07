@@ -1,4 +1,5 @@
 import Cocoa
+import Darwin
 import SwiftUI
 import XCTest
 
@@ -220,6 +221,37 @@ final class UsageProviderTests: XCTestCase {
         XCTAssertEqual(
             snapshot.windows.map(\.resetsAt),
             [Date(timeIntervalSince1970: 2_000), Date(timeIntervalSince1970: 3_000)])
+    }
+
+    func testCodexProviderReportsClosedInputPipeWithoutSIGPIPE() throws {
+        let previousSignalHandler = signal(SIGPIPE, SIG_DFL)
+        defer { _ = signal(SIGPIPE, previousSignalHandler) }
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let executable = root.appendingPathComponent("codex")
+        try Data(#"""
+            #!/bin/sh
+            IFS= read -r initialize
+            IFS= read -r initialized
+            IFS= read -r request
+            exec 0<&-
+            printf '%s\n' '{"id":2,"result":{"rateLimits":{"primary":{"usedPercent":10,"windowDurationMins":300}}}}'
+            exec /bin/sleep 10
+            """#.utf8).write(to: executable)
+        try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: executable.path)
+        let provider = CodexAppServerProvider(executableURL: executable)
+        defer { provider.stop() }
+        let failed = expectation(description: "Closed pipe reported as transport failure")
+        provider.start { [weak provider] result in
+            switch result {
+            case .success: provider?.refresh()
+            case .failure(let error):
+                guard case .transport = error else { return XCTFail("Expected EPIPE transport failure") }
+                failed.fulfill()
+            }
+        }
+        wait(for: [failed], timeout: 2)
     }
 
     func testCodexProviderHandlesNotificationsBeforeAndAfterResponse() throws {
@@ -509,6 +541,52 @@ final class UsageProviderTests: XCTestCase {
         wait(for: [finished], timeout: 2)
 
         XCTAssertLessThan(Date().timeIntervalSince(startedAt), 2)
+    }
+
+    func testClaudeCleanupRequiresOwnershipAndDoesNotFollowProjectSymlinks() throws {
+        let files = FileManager.default
+        for linkedProject in [false, true] {
+            let root = files.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+            defer { try? files.removeItem(at: root) }
+            let home = root.appendingPathComponent("home")
+            let probe = root.appendingPathComponent("probe")
+            try files.createDirectory(at: probe, withIntermediateDirectories: true)
+            let encoded = String(probe.path.unicodeScalars.map { scalar -> Character in
+                switch scalar.value {
+                case 48...57, 65...90, 97...122: Character(scalar)
+                default: "-"
+                }
+            })
+            let project = home.appendingPathComponent(".claude/projects/" + encoded)
+            try files.createDirectory(at: project.deletingLastPathComponent(), withIntermediateDirectories: true)
+            let actual = linkedProject ? root.appendingPathComponent("other-project") : project
+            try files.createDirectory(at: actual, withIntermediateDirectories: true)
+            if linkedProject { try files.createSymbolicLink(at: project, withDestinationURL: actual) }
+            let stale = UUID().uuidString.lowercased()
+            let active = UUID().uuidString.lowercased()
+            let unrelated = actual.appendingPathComponent(UUID().uuidString.lowercased() + ".jsonl")
+            let sentinel = Data("preserve user history".utf8)
+            try sentinel.write(to: unrelated)
+            for id in [stale, active] {
+                try sentinel.write(to: actual.appendingPathComponent(id + ".jsonl"))
+                try Data().write(to: probe.appendingPathComponent(".dockdeck-session-" + id))
+            }
+            let marker = probe.appendingPathComponent(".dockdeck-session-" + stale)
+            try files.setAttributes([.modificationDate: Date(timeIntervalSinceNow: -120)], ofItemAtPath: marker.path)
+            let executable = root.appendingPathComponent("claude")
+            try Data("#!/bin/sh\nprintf 'Current session\\n10%% used\\nResets in 2h\\n'\n".utf8).write(to: executable)
+            try files.setAttributes([.posixPermissions: 0o700], ofItemAtPath: executable.path)
+            let provider = ClaudeUsageCommandProvider(
+                environment: ["DOCKDECK_CLAUDE_PATH": executable.path, "PATH": "/usr/bin:/bin"],
+                homeDirectory: home, probeDirectory: probe)
+
+            guard case .success = provider.read() else { return XCTFail("Expected probe output") }
+
+            XCTAssertEqual(try? Data(contentsOf: unrelated), sentinel)
+            XCTAssertEqual(try? Data(contentsOf: actual.appendingPathComponent(active + ".jsonl")), sentinel)
+            XCTAssertEqual(files.fileExists(atPath: actual.appendingPathComponent(stale + ".jsonl").path), linkedProject)
+            XCTAssertEqual(files.fileExists(atPath: marker.path), linkedProject)
+        }
     }
 
     func testClaudeProviderRemovesLateSessionArtifact() throws {

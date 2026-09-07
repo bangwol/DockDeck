@@ -5,6 +5,7 @@ final class ThemePickerView: NSView {
     private var selectedIndex: Int
     private let rowHeight: CGFloat = 22
     private let headerHeight: CGFloat = 18
+    private let swatchSize: CGFloat = 12
 
     private struct Row {
         let theme: Theme?
@@ -39,7 +40,7 @@ final class ThemePickerView: NSView {
         }
         self.rows = rows
 
-        super.init(frame: NSRect(x: 0, y: 0, width: 190, height: y + 4))
+        super.init(frame: NSRect(x: 0, y: 0, width: 208, height: y + 4))
         wantsLayer = true
         layer?.backgroundColor = NSColor.black.withAlphaComponent(0.75).cgColor
         layer?.cornerRadius = 8
@@ -54,6 +55,11 @@ final class ThemePickerView: NSView {
 
     override var acceptsFirstResponder: Bool { true }
     override var isFlipped: Bool { true }
+
+    override func isAccessibilityElement() -> Bool { true }
+    override func accessibilityRole() -> NSAccessibility.Role? { .list }
+    override func accessibilityLabel() -> String? { L10n.text("Theme") }
+    override func accessibilityValue() -> Any? { themes[selectedIndex].name }
 
     override func draw(_ dirtyRect: NSRect) {
         let selectedID = themes[selectedIndex].id
@@ -74,15 +80,33 @@ final class ThemePickerView: NSView {
                 NSColor.white.withAlphaComponent(0.2).setFill()
                 NSBezierPath(roundedRect: rowRect, xRadius: 5, yRadius: 5).fill()
             }
+            drawSwatch(for: theme, in: rowRect)
             let attributes: [NSAttributedString.Key: Any] = [
                 .foregroundColor: NSColor.white,
                 .font: NSFont.systemFont(ofSize: 12, weight: isSelected ? .semibold : .regular),
             ]
             let textSize = theme.name.size(withAttributes: attributes)
             let origin = NSPoint(
-                x: rowRect.minX + 10, y: rowRect.minY + (rowRect.height - textSize.height) / 2)
+                x: rowRect.minX + 10 + swatchSize + 8,
+                y: rowRect.minY + (rowRect.height - textSize.height) / 2)
             theme.name.draw(at: origin, withAttributes: attributes)
         }
+    }
+
+    /// A panel-tint square with a foreground dot previews the theme before it is applied.
+    private func drawSwatch(for theme: Theme, in rowRect: NSRect) {
+        let swatch = NSRect(
+            x: rowRect.minX + 10, y: rowRect.midY - swatchSize / 2,
+            width: swatchSize, height: swatchSize)
+        let path = NSBezierPath(roundedRect: swatch, xRadius: 3, yRadius: 3)
+        theme.tintColor(opacity: 1).setFill()
+        path.fill()
+        NSColor.white.withAlphaComponent(0.3).setStroke()
+        path.lineWidth = 1
+        path.stroke()
+        let dot = NSRect(x: swatch.midX - 2, y: swatch.midY - 2, width: 4, height: 4)
+        theme.foregroundColor.setFill()
+        NSBezierPath(ovalIn: dot).fill()
     }
 
     override func keyDown(with event: NSEvent) {
@@ -98,6 +122,7 @@ final class ThemePickerView: NSView {
     private func move(_ delta: Int) {
         selectedIndex = (selectedIndex + delta + themes.count) % themes.count
         needsDisplay = true
+        NSAccessibility.post(element: self, notification: .valueChanged)
     }
 
     override func mouseDown(with event: NSEvent) {

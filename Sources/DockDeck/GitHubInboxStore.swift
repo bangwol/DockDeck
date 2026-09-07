@@ -21,9 +21,8 @@ struct GitHubInboxConfiguration: Codable, Equatable {
         Self(
             uncheckedRepository: ProjectPulseConfiguration.normalizedGitHubRepository(
                 actionsRepository),
-            refreshInterval: Self.refreshIntervals.min {
-                abs($0 - refreshInterval) < abs($1 - refreshInterval)
-            } ?? Self.defaultRefreshInterval)
+            refreshInterval: Self.refreshIntervals.nearest(to: refreshInterval)
+                ?? Self.defaultRefreshInterval)
     }
 
     private init(uncheckedRepository: String?, refreshInterval: TimeInterval) {
@@ -235,7 +234,7 @@ enum GitHubInboxParser {
 
 protocol GitHubInboxReading {
     var minimumPollInterval: TimeInterval { get }
-    func read(configuration: GitHubInboxConfiguration, now: Date) throws
+    func read(configuration: GitHubInboxConfiguration, now: Date, cancellation: Progress?) throws
         -> GitHubInboxSnapshot
 }
 
@@ -259,7 +258,7 @@ final class GitHubInboxClient: GitHubInboxReading {
     }
 
     func read(
-        configuration: GitHubInboxConfiguration, now: Date
+        configuration: GitHubInboxConfiguration, now: Date, cancellation: Progress? = nil
     ) throws -> GitHubInboxSnapshot {
         guard let gh = ProjectPulseBinaryLocator.githubCLI() else {
             throw GitHubInboxError.cliUnavailable
@@ -278,8 +277,10 @@ final class GitHubInboxClient: GitHubInboxReading {
                 arguments: arguments,
                 currentDirectoryURL: FileManager.default.homeDirectoryForCurrentUser,
                 environmentAdditions: Self.environment,
-                allowedExitStatuses: [0, 1])
+                allowedExitStatuses: [0, 1], cancellation: cancellation)
             probe = try GitHubIncludedResponseParser.parse(output)
+        } catch BoundedProcessError.cancelled {
+            throw BoundedProcessError.cancelled
         } catch {
             throw GitHubInboxError.requestFailed
         }
@@ -302,7 +303,9 @@ final class GitHubInboxClient: GitHubInboxReading {
                         ],
                         currentDirectoryURL: FileManager.default.homeDirectoryForCurrentUser,
                         environment: Self.environment,
-                        cacheKey: "inbox", cacheDuration: 30)
+                        cacheKey: "inbox", cacheDuration: 30, cancellation: cancellation)
+                } catch BoundedProcessError.cancelled {
+                    throw BoundedProcessError.cancelled
                 } catch {
                     throw GitHubInboxError.requestFailed
                 }
@@ -325,12 +328,13 @@ final class GitHubInboxClient: GitHubInboxReading {
         let repository = configuration.normalized().actionsRepository
         let failedRuns: Int?
         if let repository {
-            failedRuns = readFailedRuns(gh: gh, repository: repository, now: now)
+            failedRuns = readFailedRuns(gh: gh, repository: repository, now: now, cancellation: cancellation)
         } else {
             failedRuns = nil
         }
         let snapshot = try GitHubInboxParser.parseNotifications(
             notifications, failedRuns: failedRuns, repository: repository, observedAt: now)
+        if cancellation?.isCancelled == true { throw BoundedProcessError.cancelled }
         if cachesNotifications {
             lock.withLock {
                 cachedNotifications = notifications
@@ -367,7 +371,7 @@ final class GitHubInboxClient: GitHubInboxReading {
         return value
     }
 
-    private func readFailedRuns(gh: URL, repository: String, now: Date) -> Int? {
+    private func readFailedRuns(gh: URL, repository: String, now: Date, cancellation: Progress?) -> Int? {
         do {
             let output = try GitHubCLIRequestBroker.shared.run(
                 executableURL: gh,
@@ -377,7 +381,7 @@ final class GitHubInboxClient: GitHubInboxReading {
                 ],
                 currentDirectoryURL: FileManager.default.homeDirectoryForCurrentUser,
                 environment: Self.environment,
-                cacheKey: "failed-runs:\(repository)", cacheDuration: 30)
+                cacheKey: "failed-runs:\(repository)", cacheDuration: 30, cancellation: cancellation)
             return try GitHubInboxParser.parseFailedRuns(
                 output, since: now.addingTimeInterval(-7 * 24 * 60 * 60))
         } catch {
@@ -396,6 +400,7 @@ final class GitHubInboxStore: ObservableObject {
     private var timer: Timer?
     private var isRunning = false
     private var requestID: UUID?
+    private var activeCancellation: Progress?
     private var generation = 0
     private var refreshCadence = ModuleRefreshCadence(backgroundMultiplier: 3)
 
@@ -423,6 +428,9 @@ final class GitHubInboxStore: ObservableObject {
         guard isRunning || timer != nil else { return }
         isRunning = false
         generation += 1
+        activeCancellation?.cancel()
+        activeCancellation = nil
+        requestID = nil
         timer?.invalidate()
         timer = nil
     }
@@ -432,6 +440,9 @@ final class GitHubInboxStore: ObservableObject {
         guard self.configuration != configuration else { return }
         self.configuration = configuration
         generation += 1
+        activeCancellation?.cancel()
+        activeCancellation = nil
+        requestID = nil
         guard isRunning else { return }
         scheduleTimer()
         refresh()
@@ -452,16 +463,20 @@ final class GitHubInboxStore: ObservableObject {
         let generation = generation
         let configuration = configuration
         self.requestID = requestID
+        let cancellation = Progress(totalUnitCount: 1)
+        activeCancellation = cancellation
         if snapshot == nil { status = .loading }
 
+        let reader = reader
         queue.async { [weak self] in
-            guard let self else { return }
             let result = Result {
-                try self.reader.read(configuration: configuration, now: Date())
+                if cancellation.isCancelled { throw BoundedProcessError.cancelled }
+                return try reader.read(configuration: configuration, now: Date(), cancellation: cancellation)
             }
-            DispatchQueue.main.async {
-                guard self.requestID == requestID else { return }
+            DispatchQueue.main.async { [weak self] in
+                guard let self, self.requestID == requestID else { return }
                 self.requestID = nil
+                self.activeCancellation = nil
                 guard self.isRunning else { return }
                 guard self.generation == generation else {
                     self.refresh()
@@ -479,6 +494,11 @@ final class GitHubInboxStore: ObservableObject {
                 }
             }
         }
+    }
+
+    deinit {
+        timer?.invalidate()
+        activeCancellation?.cancel()
     }
 
     private func scheduleTimer() {

@@ -61,7 +61,9 @@ are shown as unavailable. Failed refreshes retain the previous result with an er
 DockDeck stores the selected city and coordinates in local preferences. Search
 text and coordinates are sent over HTTPS only when searching or while the
 enabled module refreshes. Requests use an ephemeral session without persistent
-caches, cookies, or credential storage.
+caches, cookies, or credential storage. Forecast and city-search response bodies
+are capped at 512 KiB while receiving data; oversized transfers are cancelled
+before decoding. Stopping the module or search cancels the current request.
 
 The built-in `api.open-meteo.com` service is keyless and limited to
 non-commercial use. Its weather and location data are

@@ -22,6 +22,8 @@ struct CustomTileConfiguration: Codable, Equatable {
     static let maximumArgumentCount = 16
     static let maximumArgumentLength = 1_024
     static let maximumShortcutNameLength = 255
+    // JSON for sixteen valid Unicode arguments can exceed 64 KiB.
+    static let maximumConfigurationBytes = 512 * 1_024
 
     var title: String
     var source: CustomTileSource
@@ -66,9 +68,8 @@ struct CustomTileConfiguration: Codable, Equatable {
         }
         value.shortcutName = Self.singleLine(
             shortcutName, limit: Self.maximumShortcutNameLength)
-        value.refreshInterval = Self.refreshIntervals.min {
-            abs($0 - refreshInterval) < abs($1 - refreshInterval)
-        } ?? Self.defaultRefreshInterval
+        value.refreshInterval =
+            Self.refreshIntervals.nearest(to: refreshInterval) ?? Self.defaultRefreshInterval
         return value
     }
 
@@ -218,6 +219,11 @@ struct CustomTileClient: CustomTileReading {
         case .shortcut:
             let path = "/usr/bin/shortcuts"
             guard FileManager.default.isExecutableFile(atPath: path) else {
+                throw CustomTileError.shortcutUnavailable
+            }
+            // Quick Actions already rejects option-like names; keep `shortcuts run` from
+            // interpreting one here.
+            guard !configuration.shortcutName.hasPrefix("-") else {
                 throw CustomTileError.shortcutUnavailable
             }
             executable = URL(fileURLWithPath: path)

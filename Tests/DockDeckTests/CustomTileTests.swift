@@ -6,6 +6,38 @@ import XCTest
 @testable import DockDeck
 
 final class CustomTileTests: XCTestCase {
+    func testUnicodeArgumentsRoundTripThroughSettings() throws {
+        let key = "DockDeck.settings.customTileConfiguration.v1"
+        let defaults = UserDefaults.standard
+        let original = defaults.object(forKey: key)
+        defer {
+            if let original { defaults.set(original, forKey: key) }
+            else { defaults.removeObject(forKey: key) }
+        }
+        let configuration = CustomTileConfiguration(executablePath: "/usr/bin/printf",
+            arguments: Array(repeating: String(repeating: "😀", count: 1_024), count: 16))
+        XCTAssertGreaterThan(try JSONEncoder().encode(configuration).count, 64 * 1_024)
+        PanelSettings.customTileConfiguration = configuration
+        XCTAssertEqual(PanelSettings.customTileConfiguration, configuration)
+
+        let oversized = CustomTileConfiguration(executablePath: "/usr/bin/printf",
+            arguments: [String(repeating: "\u{0301}", count: 300_000)])
+        XCTAssertGreaterThan(try JSONEncoder().encode(oversized).count, CustomTileConfiguration.maximumConfigurationBytes)
+        PanelSettings.customTileConfiguration = oversized
+        XCTAssertEqual(PanelSettings.customTileConfiguration, configuration)
+    }
+
+    func testShortcutNamesThatLookLikeOptionsAreRejected() {
+        let configuration = CustomTileConfiguration(
+            source: .shortcut, shortcutName: "-list", refreshInterval: 60)
+
+        XCTAssertThrowsError(
+            try CustomTileClient().read(configuration: configuration, now: Date())
+        ) { error in
+            XCTAssertEqual(error as? CustomTileError, .shortcutUnavailable)
+        }
+    }
+
     func testManualPreviewRetainsLastSuccessAndReportsFailureThenRecovery() {
         let configuration = CustomTileConfiguration(executablePath: "/usr/bin/printf")
         let store = CustomTileStore(configuration: configuration, reader: SequenceTileReader())

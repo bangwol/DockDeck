@@ -97,6 +97,7 @@ private struct ServiceMonitorEndpointRow: View {
                         get: { currentEndpoint.urlString },
                         set: { model.setServiceMonitorEndpointURL(endpoint.id, urlString: $0) }))
                     .textFieldStyle(.roundedBorder)
+                    .accessibilityLabel("URL")
                 Button {
                     model.removeServiceMonitorEndpoint(endpoint.id)
                 } label: {

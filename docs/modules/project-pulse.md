@@ -100,8 +100,9 @@ and login remain in memory only. DockDeck discards Git file names after counting
 them and does not copy, log, or store repository remote URLs, GitHub tokens, or
 command output. Authentication and token storage remain owned by GitHub CLI.
 
-Disabling the module stops its timer and subprocesses. When Project Pulse is
-enabled but another module is selected, its polling interval is multiplied by
+Disabling the module stops its timer and cancels its in-flight Git or GitHub CLI
+call. Queued calls are also cancelled, and late results are discarded. When
+Project Pulse is enabled but another module is selected, its polling interval is multiplied by
 five; macOS Low Power Mode applies an additional two-times multiplier. This
 makes My Activity refresh every 25 minutes in the background, 10 minutes while
 visible in Low Power Mode, or 50 minutes when both conditions apply. `⌘R`

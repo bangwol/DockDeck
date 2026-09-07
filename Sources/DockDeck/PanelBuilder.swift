@@ -33,7 +33,8 @@ enum PanelBuilder {
         let surfaceView = PanelSurfaceView(
             frame: NSRect(origin: .zero, size: panel.frame.size), theme: theme)
 
-        let font = TerminalTheme.font(named: PanelSettings.fontName)
+        let font = TerminalTheme.font(
+            named: PanelSettings.fontName, size: PanelSettings.terminalFontSize)
         let terminal = LocalProcessTerminalView(
             frame: TerminalLayout.contentFrame(in: surfaceView.bounds, font: font))
         terminal.autoresizingMask = [.width]

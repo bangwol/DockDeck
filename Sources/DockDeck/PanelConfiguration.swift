@@ -106,7 +106,7 @@ struct DockNotificationSettings: Codable, Equatable {
 
     private static func closest(_ value: Int, in options: [Int]) -> Int {
         let bounded = min(max(value, options[0]), options[options.count - 1])
-        return options.min { abs($0 - bounded) < abs($1 - bounded) } ?? options[0]
+        return options.nearest(to: bounded) ?? options[0]
     }
 
     private enum CodingKeys: String, CodingKey {

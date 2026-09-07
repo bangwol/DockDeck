@@ -5,6 +5,14 @@ import XCTest
 @testable import DockDeck
 
 final class PanelAppearanceTests: XCTestCase {
+    func testCapsuleMeterClampsFractionsAndIgnoresNonFiniteValues() {
+        XCTAssertEqual(CapsuleMeter.clamped(1.4), 1)
+        XCTAssertEqual(CapsuleMeter.clamped(-0.2), 0)
+        XCTAssertEqual(CapsuleMeter.clamped(0.35), 0.35)
+        XCTAssertEqual(CapsuleMeter.clamped(.nan), 0)
+        XCTAssertEqual(CapsuleMeter.clamped(.infinity), 0)
+    }
+
     func testReadableCompactTypeKeepsTenPointFloorWithoutShrinkingLargerText() {
         XCTAssertEqual(CompactReadability.size(7.5, enabled: false), 7.5)
         XCTAssertEqual(CompactReadability.size(7.5, enabled: true), 10)
@@ -1173,9 +1181,9 @@ final class PanelAppearanceTests: XCTestCase {
         XCTAssertEqual(
             menu.items.filter { !$0.isSeparatorItem }.map(\.title),
             [
-                "Settings…", "Find Module…", "Open Detail…", "Show Used Values", "Move Terminal to Right",
-                "Refresh Modules & Layout",
-            ])
+                "Settings…", "Find Module…", "Open Detail…", "Show Used Values",
+                "Move Terminal to Right", "Refresh Modules & Layout",
+            ].map { L10n.text($0) })
     }
 
     func testCompactTerminalHidesIdleScrollerUntilExpanded() throws {
@@ -1283,6 +1291,32 @@ final class PanelAppearanceTests: XCTestCase {
             services: PanelModuleServices(),
             menuTarget: NSObject(),
             side: side)
+    }
+
+    func testNearestIntervalSnapsToOptionsAndRejectsNonFiniteValues() {
+        let options: [TimeInterval] = [1, 2, 5, 10]
+
+        XCTAssertEqual(PanelSettings.nearest(4.2, in: options, default: 2), 5)
+        XCTAssertEqual(PanelSettings.nearest(0, in: options, default: 2), 1)
+        XCTAssertEqual(PanelSettings.nearest(.nan, in: options, default: 2), 2)
+        XCTAssertEqual(PanelSettings.nearest(.infinity, in: options, default: 2), 2)
+    }
+
+    func testTerminalFontSizeIsClampedAndEmitted() {
+        let model = makeSettingsModel(
+            configuration: .legacy(order: .terminalLeft, enabledPanels: .all))
+        var emitted: CGFloat?
+        model.onChange = {
+            if case .terminal(.fontSize(let size)) = $0 { emitted = size }
+        }
+
+        model.setTerminalFontSize(20)
+
+        XCTAssertEqual(model.values.terminal.fontSize, TerminalTheme.maximumFontSize)
+        XCTAssertEqual(emitted, TerminalTheme.maximumFontSize)
+        XCTAssertEqual(
+            TerminalTheme.font(named: TerminalTheme.systemFontName, size: 12).pointSize, 12)
+        XCTAssertEqual(TerminalTheme.clampedFontSize(.nan), TerminalTheme.fontSize)
     }
 
     private func makeSettingsModel(

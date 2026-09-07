@@ -103,7 +103,7 @@ enum SettingsPaneID: String, CaseIterable, Identifiable {
         case .battery: "battery.75percent"
         case .localPorts: "network.badge.shield.half.filled"
         case .projectPulse: "point.3.connected.trianglepath.dotted"
-        case .githubInbox: "bell.badge"
+        case .githubInbox: "tray.full"
         case .docker: "shippingbox"
         case .customTile, .customTile2, .customTile3: "command"
         case .focusTimer: "timer"
@@ -165,13 +165,13 @@ enum PanelModuleRegistry {
             symbolName: "battery.75percent", settingsPane: .battery),
         PanelModuleDefinition(
             id: .localPorts, title: "Local Ports", subtitle: "Loopback TCP reachability",
-            symbolName: "network", settingsPane: .localPorts),
+            symbolName: "network.badge.shield.half.filled", settingsPane: .localPorts),
         PanelModuleDefinition(
             id: .projectPulse, title: "Project Pulse", subtitle: "Git and GitHub activity",
             symbolName: "point.3.connected.trianglepath.dotted", settingsPane: .projectPulse),
         PanelModuleDefinition(
             id: .githubInbox, title: "GitHub Inbox", subtitle: "Notifications and reviews",
-            symbolName: "bell.badge", settingsPane: .githubInbox),
+            symbolName: "tray.full", settingsPane: .githubInbox),
         PanelModuleDefinition(
             id: .docker, title: "Docker", subtitle: "Containers and resources",
             symbolName: "shippingbox", settingsPane: .docker),
@@ -202,6 +202,7 @@ struct TerminalSettingsState: Equatable {
     var focusWidthMultiplier: CGFloat
     var focusHeightMultiplier: CGFloat
     var fontName: String
+    var fontSize: CGFloat = TerminalTheme.fontSize
 }
 
 struct UsageSettingsState: Equatable {
@@ -296,6 +297,7 @@ struct SettingsPanelValues: Equatable {
 enum TerminalSettingsChange {
     case focusSize(width: CGFloat, height: CGFloat)
     case font(String)
+    case fontSize(CGFloat)
 }
 
 enum UsageSettingsChange {

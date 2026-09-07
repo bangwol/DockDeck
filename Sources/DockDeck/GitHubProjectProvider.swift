@@ -9,7 +9,7 @@ final class GitHubCLIRequestBroker {
         let expiresAt: Date
     }
 
-    private let lock = NSLock()
+    private let gate = DispatchSemaphore(value: 1)
     private var cache: [String: CacheEntry] = [:]
 
     private init() {}
@@ -22,10 +22,14 @@ final class GitHubCLIRequestBroker {
         cacheKey: String? = nil,
         cacheDuration: TimeInterval = 0,
         timeout: TimeInterval = 8,
-        maximumOutputBytes: Int = BoundedProcessRunner.defaultMaximumOutputBytes
+        maximumOutputBytes: Int = BoundedProcessRunner.defaultMaximumOutputBytes,
+        cancellation: Progress? = nil
     ) throws -> Data {
-        lock.lock()
-        defer { lock.unlock() }
+        while gate.wait(timeout: .now() + 0.05) == .timedOut {
+            if cancellation?.isCancelled == true { throw BoundedProcessError.cancelled }
+        }
+        defer { gate.signal() }
+        if cancellation?.isCancelled == true { throw BoundedProcessError.cancelled }
 
         let now = Date()
         cache = cache.filter { $0.value.expiresAt > now }
@@ -39,7 +43,10 @@ final class GitHubCLIRequestBroker {
                 currentDirectoryURL: currentDirectoryURL,
                 environmentAdditions: environment,
                 timeout: timeout,
-                maximumOutputBytes: maximumOutputBytes)
+                maximumOutputBytes: maximumOutputBytes,
+                cancellation: cancellation)
+        } catch BoundedProcessError.cancelled {
+            throw BoundedProcessError.cancelled
         } catch BoundedProcessError.timedOut {
             throw ProjectPulseError.commandTimedOut
         } catch BoundedProcessError.outputTooLarge {
@@ -102,14 +109,14 @@ protocol GitHubProjectReading {
     func readRepository(
         _ nameWithOwner: String,
         includesWorkflow: Bool,
-        now: Date
+        now: Date, cancellation: Progress?
     ) throws -> GitHubProjectResult
 
-    func readActivity(now: Date) throws -> ProjectGitHubActivitySnapshot
+    func readActivity(now: Date, cancellation: Progress?) throws -> ProjectGitHubActivitySnapshot
 
     func readWorkflow(
         repository: String?,
-        currentDirectoryURL: URL
+        currentDirectoryURL: URL, cancellation: Progress?
     ) -> ProjectWorkflowSnapshot
 }
 
@@ -167,7 +174,7 @@ struct GitHubProjectClient: GitHubProjectReading, GitHubRepositoryListing {
     func readRepository(
         _ nameWithOwner: String,
         includesWorkflow: Bool,
-        now: Date
+        now: Date, cancellation: Progress? = nil
     ) throws -> GitHubProjectResult {
         guard let repository = ProjectPulseConfiguration.normalizedGitHubRepository(
             nameWithOwner)
@@ -187,13 +194,18 @@ struct GitHubProjectClient: GitHubProjectReading, GitHubRepositoryListing {
                 arguments: [
                     "api", "graphql",
                     "-f", "query=\(Self.repositoryQuery)",
-                    "-F", "owner=\(parts[0])",
-                    "-F", "name=\(parts[1])",
-                    "-F", "since=\(since)",
+                    // -f keeps these raw strings; -F would send an all-digit owner or
+                    // repository name as a JSON number and fail the String! variables.
+                    "-f", "owner=\(parts[0])",
+                    "-f", "name=\(parts[1])",
+                    "-f", "since=\(since)",
                 ],
                 currentDirectoryURL: FileManager.default.homeDirectoryForCurrentUser,
                 environment: Self.environment,
-                cacheKey: "repository:\(repository)", cacheDuration: 60)
+                cacheKey: "repository:\(repository)", cacheDuration: 60,
+                cancellation: cancellation)
+        } catch BoundedProcessError.cancelled {
+            throw BoundedProcessError.cancelled
         } catch let error as ProjectPulseError
             where error == .commandTimedOut || error == .outputTooLarge
         {
@@ -206,12 +218,14 @@ struct GitHubProjectClient: GitHubProjectReading, GitHubRepositoryListing {
         let workflow = includesWorkflow
             ? readWorkflow(
                 repository: repository,
-                currentDirectoryURL: FileManager.default.homeDirectoryForCurrentUser)
+                currentDirectoryURL: FileManager.default.homeDirectoryForCurrentUser,
+                cancellation: cancellation)
             : nil
+        if cancellation?.isCancelled == true { throw BoundedProcessError.cancelled }
         return GitHubProjectResult(repository: snapshot, workflow: workflow)
     }
 
-    func readActivity(now: Date) throws -> ProjectGitHubActivitySnapshot {
+    func readActivity(now: Date, cancellation: Progress? = nil) throws -> ProjectGitHubActivitySnapshot {
         guard let gh = ProjectPulseBinaryLocator.githubCLI() else {
             throw ProjectPulseError.githubCLIUnavailable
         }
@@ -225,12 +239,14 @@ struct GitHubProjectClient: GitHubProjectReading, GitHubRepositoryListing {
                 arguments: [
                     "api", "graphql",
                     "-f", "query=\(Self.activityQuery)",
-                    "-F", "from=\(from)",
-                    "-F", "to=\(to)",
+                    "-f", "from=\(from)",
+                    "-f", "to=\(to)",
                 ],
                 currentDirectoryURL: FileManager.default.homeDirectoryForCurrentUser,
                 environment: Self.environment,
-                cacheKey: "activity", cacheDuration: 60)
+                cacheKey: "activity", cacheDuration: 60, cancellation: cancellation)
+        } catch BoundedProcessError.cancelled {
+            throw BoundedProcessError.cancelled
         } catch let error as ProjectPulseError
             where error == .commandTimedOut || error == .outputTooLarge
         {
@@ -243,7 +259,7 @@ struct GitHubProjectClient: GitHubProjectReading, GitHubRepositoryListing {
 
     func readWorkflow(
         repository: String?,
-        currentDirectoryURL: URL
+        currentDirectoryURL: URL, cancellation: Progress? = nil
     ) -> ProjectWorkflowSnapshot {
         guard let gh = ProjectPulseBinaryLocator.githubCLI() else {
             return ProjectWorkflowSnapshot(state: .unavailable, title: "Install gh for Actions")
@@ -260,7 +276,7 @@ struct GitHubProjectClient: GitHubProjectReading, GitHubRepositoryListing {
                 currentDirectoryURL: currentDirectoryURL,
                 environment: Self.environment,
                 cacheKey: "workflow:\(repository ?? currentDirectoryURL.path)",
-                cacheDuration: 30)
+                cacheDuration: 30, cancellation: cancellation)
             return try GitHubRunParser.parse(output)
                 ?? ProjectWorkflowSnapshot(state: .neutral, title: "No workflow runs")
         } catch {
