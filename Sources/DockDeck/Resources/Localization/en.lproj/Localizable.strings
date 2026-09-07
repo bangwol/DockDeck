@@ -96,6 +96,9 @@
 "Metrics" = "Metrics";
 "Compact Layout" = "Compact Layout";
 "Choose 2–4 tiles" = "Choose 2–4 tiles";
+"Tile order (left to right)" = "Tile order (left to right)";
+"Move %@ up" = "Move %@ up";
+"Move %@ down" = "Move %@ down";
 "Network interface" = "Network interface";
 "Automatic (primary)" = "Automatic (primary)";
 "Memory" = "Memory";

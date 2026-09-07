@@ -96,6 +96,9 @@
 "Metrics" = "지표";
 "Compact Layout" = "작은 패널 배치";
 "Choose 2–4 tiles" = "타일 2–4개 선택";
+"Tile order (left to right)" = "타일 순서 (왼쪽에서 오른쪽)";
+"Move %@ up" = "%@ 위로 이동";
+"Move %@ down" = "%@ 아래로 이동";
 "Network interface" = "네트워크 인터페이스";
 "Automatic (primary)" = "자동 (주 인터페이스)";
 "Memory" = "메모리";

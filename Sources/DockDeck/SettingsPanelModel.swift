@@ -384,6 +384,16 @@ final class SettingsPanelModel: ObservableObject {
         onChange?(.systemStats(.metrics(metrics)))
     }
 
+    func moveSystemStatsMetric(_ metric: SystemStatsMetric, earlier: Bool) {
+        var metrics = values.systemStats.metrics
+        guard let index = metrics.firstIndex(of: metric) else { return }
+        let destination = index + (earlier ? -1 : 1)
+        guard metrics.indices.contains(destination) else { return }
+        metrics.swapAt(index, destination)
+        updateValues { $0.systemStats.metrics = metrics }
+        onChange?(.systemStats(.metrics(metrics)))
+    }
+
     func addServiceMonitorEndpoint() {
         guard values.serviceMonitor.endpoints.count < ServiceMonitorEndpoint.maximumCount else {
             return

@@ -5,6 +5,10 @@ metrics and a 1–10 second sampling interval under
 **Settings → System Stats**. Only selected metrics are sampled, and disabling
 the module stops all sampling.
 
+Use the up/down buttons beside selected metrics to change their order. The list
+runs from the panel's leftmost tile to its rightmost tile. The order is saved;
+newly selected metrics are appended after the existing selection.
+
 | Metric | Reading |
 | --- | --- |
 | GPU | Busiest device utilization reported by the local GPU driver, when available |

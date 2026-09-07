@@ -720,6 +720,32 @@ final class PanelAppearanceTests: XCTestCase {
         XCTAssertEqual(model.values.systemStats.metrics, [.cpu, .memory])
     }
 
+    func testSettingsModelReordersSystemStatsAndAppendsNewSelections() {
+        let model = makeSettingsModel(
+            configuration: .legacy(order: .terminalLeft, enabledPanels: .all))
+        var changes: [[SystemStatsMetric]] = []
+        model.onChange = {
+            if case .systemStats(.metrics(let metrics)) = $0 { changes.append(metrics) }
+        }
+        model.setSystemStatsMetric(.disk, enabled: false)
+        model.setSystemStatsMetric(.gpu, enabled: true)
+        for _ in 0..<3 { model.moveSystemStatsMetric(.gpu, earlier: true) }
+        for _ in 0..<2 { model.moveSystemStatsMetric(.network, earlier: true) }
+        XCTAssertEqual(model.values.systemStats.metrics, [.gpu, .network, .cpu, .memory])
+        XCTAssertEqual(changes.last, [.gpu, .network, .cpu, .memory])
+        let count = changes.count
+        model.moveSystemStatsMetric(.gpu, earlier: true)
+        model.moveSystemStatsMetric(.memory, earlier: false)
+        model.moveSystemStatsMetric(.disk, earlier: false)
+        XCTAssertEqual(changes.count, count)
+        model.moveSystemStatsMetric(.cpu, earlier: false)
+        XCTAssertEqual(model.values.systemStats.metrics, [.gpu, .network, .memory, .cpu])
+        model.setSystemStatsMetric(.memory, enabled: false)
+        model.setSystemStatsMetric(.memory, enabled: true)
+        XCTAssertEqual(model.values.systemStats.metrics, [.gpu, .network, .cpu, .memory])
+        XCTAssertEqual(changes.last, model.values.systemStats.metrics)
+    }
+
     func testSettingsModelEmitsNormalizedWeatherChanges() {
         let model = makeSettingsModel(
             configuration: .legacy(order: .terminalLeft, enabledPanels: .all))
@@ -980,15 +1006,25 @@ final class PanelAppearanceTests: XCTestCase {
             + [(.usage, usageDisabled)]
 
         for (pane, configuration) in scenarios {
+            var values = makeSettingsValues(configuration: configuration)
+            if pane == .systemStats { values.systemStats.metrics = [.gpu, .network, .cpu, .memory] }
             let view = SettingsPanelView(
                 selectedPane: pane,
-                values: makeSettingsValues(configuration: configuration),
+                values: values,
                 fontNames: ["Menlo", TerminalTheme.systemFontName])
             view.frame = NSRect(origin: .zero, size: SettingsPanelView.preferredSize)
             view.layoutSubtreeIfNeeded()
 
             let bitmap = try XCTUnwrap(view.bitmapImageRepForCachingDisplay(in: view.bounds))
             view.cacheDisplay(in: view.bounds, to: bitmap)
+
+            if pane == .systemStats,
+                let path = ProcessInfo.processInfo.environment["DOCKDECK_UI_GALLERY_DIR"] {
+                let directory = URL(fileURLWithPath: path, isDirectory: true)
+                try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+                try XCTUnwrap(bitmap.representation(using: .png, properties: [:]))
+                    .write(to: directory.appendingPathComponent("system-stats-settings.png"))
+            }
 
             XCTAssertEqual(view.frame.size, SettingsPanelView.preferredSize)
             XCTAssertGreaterThan(bitmap.pixelsWide, 0)

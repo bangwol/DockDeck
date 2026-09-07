@@ -50,15 +50,17 @@ enum SystemStatsMetric: String, CaseIterable, Codable, Identifiable {
 
     static func normalized(_ metrics: [Self]) -> [Self] {
         guard !metrics.isEmpty else { return defaultSelection }
-        let requested = Set(metrics)
-        var result = Array(allCases.filter(requested.contains).prefix(maximumSelectionCount))
+        var result: [Self] = []
+        for metric in metrics where !result.contains(metric) {
+            result.append(metric)
+            if result.count == maximumSelectionCount { break }
+        }
         for metric in defaultSelection
             where result.count < minimumSelectionCount && !result.contains(metric)
         {
             result.append(metric)
         }
-        let selected = Set(result)
-        return allCases.filter(selected.contains)
+        return result
     }
 }
 
