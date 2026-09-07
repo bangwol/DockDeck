@@ -39,23 +39,19 @@ struct DockerPanelView: View {
                 .foregroundStyle(baseColor)
                 .monospacedDigit()
                 .lineLimit(1)
-                .minimumScaleFactor(readable ? 1 : 0.58)
+                .minimumScaleFactor(readable ? 1 : 0.75)
         }
         .frame(maxWidth: .infinity)
     }
 
     private var placeholder: some View {
-        HStack(spacing: 7) {
-            if case .loading = store.status {
-                ProgressView().controlSize(.small)
-            } else {
-                Image(systemName: "shippingbox")
-            }
-            Text(placeholderText).lineLimit(2)
-        }
-        .font(.system(size: CompactReadability.size(9.5, enabled: readable), weight: .semibold, design: .rounded))
-        .foregroundStyle(baseColor.opacity(0.78))
-        .padding(.horizontal, 9)
+        CompactPlaceholder(
+            text: placeholderText, symbol: "shippingbox", baseColor: baseColor, isLoading: isLoading)
+    }
+
+    private var isLoading: Bool {
+        if case .loading = store.status { return true }
+        return false
     }
 
     private var placeholderText: String {

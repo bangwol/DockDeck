@@ -2,6 +2,8 @@ import Cocoa
 
 enum TerminalTheme {
     static let fontSize: CGFloat = 11
+    static let minimumFontSize: CGFloat = 9
+    static let maximumFontSize: CGFloat = 14
     static let padding: CGFloat = 8
     static let defaultCornerRadius: CGFloat = 12
 
@@ -29,12 +31,18 @@ enum TerminalTheme {
         name == systemFontName ? "SF Mono (System)" : name
     }
 
-    static func font(named name: String?) -> NSFont {
+    static func clampedFontSize(_ value: CGFloat) -> CGFloat {
+        guard value.isFinite else { return fontSize }
+        return min(max(value.rounded(), minimumFontSize), maximumFontSize)
+    }
+
+    static func font(named name: String?, size: CGFloat = fontSize) -> NSFont {
         let resolvedName = name ?? defaultFontName
+        let size = clampedFontSize(size)
         if resolvedName == systemFontName {
-            return NSFont.monospacedSystemFont(ofSize: fontSize, weight: .regular)
+            return NSFont.monospacedSystemFont(ofSize: size, weight: .regular)
         }
-        return NSFont(name: resolvedName, size: fontSize)
-            ?? NSFont.monospacedSystemFont(ofSize: fontSize, weight: .regular)
+        return NSFont(name: resolvedName, size: size)
+            ?? NSFont.monospacedSystemFont(ofSize: size, weight: .regular)
     }
 }

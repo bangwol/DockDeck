@@ -43,17 +43,9 @@ struct BatteryPanelView: View {
                 .lineLimit(1)
                 .minimumScaleFactor(readable ? 1 : 0.72)
 
-                GeometryReader { proxy in
-                    ZStack(alignment: .leading) {
-                        Capsule().fill(baseColor.opacity(0.14))
-                        Capsule()
-                            .fill(statusColor(snapshot))
-                            .frame(
-                                width: proxy.size.width
-                                    * CGFloat(min(max(snapshot.percent / 100, 0), 1)))
-                    }
-                }
-                .frame(height: 4)
+                CapsuleMeter(
+                    fraction: snapshot.percent / 100, color: statusColor(snapshot),
+                    baseColor: baseColor)
             }
             .frame(maxWidth: .infinity)
         }
@@ -64,13 +56,8 @@ struct BatteryPanelView: View {
     }
 
     private var noBattery: some View {
-        HStack(spacing: 7) {
-            Image(systemName: "battery.0percent")
-            Text("No internal battery")
-        }
-        .font(.system(size: CompactReadability.size(9.5, enabled: readable), weight: .semibold, design: .rounded))
-        .foregroundStyle(baseColor.opacity(0.78))
-        .accessibilityElement(children: .combine)
+        CompactPlaceholder(
+            text: "No internal battery", symbol: "battery.0percent", baseColor: baseColor)
     }
 
     private var baseColor: Color { Color(theme.foregroundColor) }
@@ -147,7 +134,7 @@ struct BatteryModuleDetailView: View {
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(12)
         }
+        .moduleDetailSurface()
     }
 }

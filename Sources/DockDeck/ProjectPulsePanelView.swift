@@ -15,12 +15,9 @@ struct ProjectPulsePanelView: View {
                 case .notConfigured:
                     placeholder("Choose a repository", symbol: "folder.badge.plus")
                 case .loading:
-                    HStack(spacing: 7) {
-                        ProgressView().controlSize(.small)
-                        Text("Reading repository…")
-                    }
-                    .font(.system(size: CompactReadability.size(10, enabled: readable), weight: .semibold, design: .rounded))
-                    .foregroundStyle(baseColor.opacity(0.78))
+                    CompactPlaceholder(
+                        text: "Reading repository…", symbol: "folder", baseColor: baseColor,
+                        isLoading: true)
                 case .failed(let message):
                     placeholder(message, symbol: "exclamationmark.triangle")
                 case .ready:
@@ -35,12 +32,7 @@ struct ProjectPulsePanelView: View {
     private var baseColor: Color { Color(theme.foregroundColor) }
 
     private func placeholder(_ title: String, symbol: String) -> some View {
-        Label(title, systemImage: symbol)
-            .font(.system(size: CompactReadability.size(10, enabled: readable), weight: .semibold, design: .rounded))
-            .foregroundStyle(baseColor.opacity(0.72))
-            .lineLimit(1)
-            .minimumScaleFactor(readable ? 1 : 0.75)
-            .padding(.horizontal, 8)
+        CompactPlaceholder(text: title, symbol: symbol, baseColor: baseColor)
     }
 }
 

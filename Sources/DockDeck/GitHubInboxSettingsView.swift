@@ -52,7 +52,6 @@ struct GitHubInboxSettingsView: View {
                                 }
                             }
                             .labelsHidden()
-                            .frame(maxWidth: 310)
                         }
 
                         HStack {

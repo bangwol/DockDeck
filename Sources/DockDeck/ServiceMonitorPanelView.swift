@@ -7,9 +7,8 @@ struct ServiceMonitorPanelView: View {
 
     var body: some View {
         if store.items.isEmpty {
-            Label("Add services in Settings", systemImage: "plus.circle")
-                .font(.system(size: CompactReadability.size(10, enabled: readable), weight: .semibold, design: .rounded))
-                .foregroundStyle(baseColor.opacity(0.78))
+            CompactPlaceholder(
+                text: "Add services in Settings", symbol: "plus.circle", baseColor: baseColor)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(Color.black.opacity(0.001))
         } else {

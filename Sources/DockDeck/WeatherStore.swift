@@ -122,6 +122,17 @@ enum WeatherCondition {
 }
 
 enum WeatherAPI {
+    /// Forecast and geocoding payloads are a few kilobytes; anything larger is not ours to parse.
+    static let maximumResponseBytes = 512 * 1_024
+
+    static func dataTask(
+        with request: URLRequest, session: URLSession,
+        completion: @escaping (Data?, URLResponse?, Error?) -> Void
+    ) -> URLSessionDataTask {
+        let task = session.dataTask(with: request)
+        task.delegate = WeatherResponseReceiver(completion: completion)
+        return task
+    }
     static let attributionURL = URL(string: "https://open-meteo.com/")!
     static let licenseURL = URL(string: "https://open-meteo.com/en/license")!
 
@@ -390,7 +401,7 @@ final class WeatherStore: ObservableObject {
         var request = URLRequest(url: url)
         request.cachePolicy = .reloadIgnoringLocalCacheData
         request.timeoutInterval = 10
-        let task = session.dataTask(with: request) { [weak self] data, response, error in
+        let task = WeatherAPI.dataTask(with: request, session: session) { [weak self] data, response, error in
             DispatchQueue.main.async {
                 self?.complete(
                     data: data, response: response, error: error,
@@ -412,7 +423,8 @@ final class WeatherStore: ObservableObject {
             return
         }
         guard let response = response as? HTTPURLResponse,
-            (200..<300).contains(response.statusCode), let data
+            (200..<300).contains(response.statusCode), let data,
+            data.count <= WeatherAPI.maximumResponseBytes
         else {
             status = .failed("Weather service unavailable")
             return
@@ -436,22 +448,20 @@ final class WeatherStore: ObservableObject {
         timer = .moduleRefreshTimer(interval: interval) { [weak self] in self?.refresh() }
     }
 
+    deinit {
+        timer?.invalidate()
+        session.invalidateAndCancel()
+    }
+
     private static func makeSession() -> URLSession {
-        let configuration = URLSessionConfiguration.ephemeral
-        configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
-        configuration.urlCache = nil
-        configuration.httpCookieStorage = nil
-        configuration.httpShouldSetCookies = false
-        configuration.urlCredentialStorage = nil
-        configuration.timeoutIntervalForRequest = 10
-        configuration.timeoutIntervalForResource = 12
-        return URLSession(configuration: configuration)
+        URLSession(configuration: .dockDeckEphemeral(requestTimeout: 10, resourceTimeout: 12))
     }
 
     private static func failureLabel(_ error: Error) -> String {
         let error = error as NSError
         guard error.domain == NSURLErrorDomain else { return "Network error" }
         switch error.code {
+        case NSURLErrorDataLengthExceedsMaximum: return "Weather response exceeds 512 KiB"
         case NSURLErrorTimedOut: return "Weather request timed out"
         case NSURLErrorNotConnectedToInternet, NSURLErrorNetworkConnectionLost: return "Offline"
         case NSURLErrorCannotFindHost, NSURLErrorDNSLookupFailed: return "Weather host not found"
@@ -463,9 +473,8 @@ final class WeatherStore: ObservableObject {
     }
 
     private static func resolvedRefreshInterval(_ value: TimeInterval) -> TimeInterval {
-        PanelSettings.weatherRefreshIntervals.min(by: {
-            abs($0 - value) < abs($1 - value)
-        }) ?? PanelSettings.defaultWeatherRefreshInterval
+        PanelSettings.nearest(
+            value, in: PanelSettings.weatherRefreshIntervals, default: PanelSettings.defaultWeatherRefreshInterval)
     }
 }
 
@@ -507,7 +516,7 @@ final class WeatherLocationSearchStore: ObservableObject {
         var request = URLRequest(url: url)
         request.cachePolicy = .reloadIgnoringLocalCacheData
         request.timeoutInterval = 10
-        let task = session.dataTask(with: request) { [weak self] data, response, error in
+        let task = WeatherAPI.dataTask(with: request, session: session) { [weak self] data, response, error in
             DispatchQueue.main.async {
                 self?.complete(
                     data: data, response: response, error: error, generation: generation)
@@ -536,6 +545,7 @@ final class WeatherLocationSearchStore: ObservableObject {
         }
         guard let response = response as? HTTPURLResponse,
             (200..<300).contains(response.statusCode), let data,
+            data.count <= WeatherAPI.maximumResponseBytes,
             let locations = try? WeatherAPI.decodeLocations(data)
         else {
             results = []
@@ -546,15 +556,44 @@ final class WeatherLocationSearchStore: ObservableObject {
         status = results.isEmpty ? .failed("No matching cities.") : .ready
     }
 
+    deinit { session.invalidateAndCancel() }
+
     private static func makeSession() -> URLSession {
-        let configuration = URLSessionConfiguration.ephemeral
-        configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
-        configuration.urlCache = nil
-        configuration.httpCookieStorage = nil
-        configuration.httpShouldSetCookies = false
-        configuration.urlCredentialStorage = nil
-        configuration.timeoutIntervalForRequest = 10
-        configuration.timeoutIntervalForResource = 12
-        return URLSession(configuration: configuration)
+        URLSession(configuration: .dockDeckEphemeral(requestTimeout: 10, resourceTimeout: 12))
+    }
+}
+
+// Weather sessions use serial delegate queues; the task retains this receiver until completion.
+private final class WeatherResponseReceiver: NSObject, URLSessionDataDelegate, @unchecked Sendable {
+    private var data = Data()
+    private var exceededLimit = false
+    private let completion: (Data?, URLResponse?, Error?) -> Void
+
+    init(completion: @escaping (Data?, URLResponse?, Error?) -> Void) {
+        self.completion = completion
+    }
+
+    func urlSession(
+        _ session: URLSession, dataTask: URLSessionDataTask, didReceive response: URLResponse,
+        completionHandler: @escaping (URLSession.ResponseDisposition) -> Void
+    ) {
+        exceededLimit = response.expectedContentLength > Int64(WeatherAPI.maximumResponseBytes)
+        completionHandler(exceededLimit ? .cancel : .allow)
+    }
+
+    func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive chunk: Data) {
+        guard !exceededLimit else { return }
+        guard chunk.count <= WeatherAPI.maximumResponseBytes - data.count else {
+            exceededLimit = true
+            data.removeAll(keepingCapacity: false)
+            dataTask.cancel()
+            return
+        }
+        data.append(chunk)
+    }
+
+    func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
+        completion(exceededLimit ? nil : data, task.response,
+            exceededLimit ? URLError(.dataLengthExceedsMaximum) : error)
     }
 }

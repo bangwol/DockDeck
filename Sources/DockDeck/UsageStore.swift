@@ -114,7 +114,9 @@ enum UsageProviderError: LocalizedError {
 final class UsageStore: ObservableObject {
     private static let refreshInterval: TimeInterval = 60
     private static let manualProbeMinimumInterval: TimeInterval = 60
-    private static let defaultClaudeProbeTimeout: TimeInterval = 30
+    // Direct (10 s + kill waits) and PTY (16 s + exit wait) attempts plus cleanup can take
+    // just over 30 s; a shorter watchdog would discard a valid late result as a timeout.
+    private static let defaultClaudeProbeTimeout: TimeInterval = 40
 
     @Published private(set) var providers: [ProviderUsage]
 
@@ -538,9 +540,12 @@ final class UsageStore: ObservableObject {
     }
 
     private func publishProviders() {
-        providers = UsageProviderID.allCases.compactMap { providerID in
+        let next = UsageProviderID.allCases.compactMap { providerID in
             enabledProviderIDs.contains(providerID) ? providerSnapshots[providerID] : nil
         }
+        // The bridge cache is re-read every minute; an unchanged file must not re-render.
+        guard next != providers else { return }
+        providers = next
     }
 
     private func scheduleRefreshTimer() {

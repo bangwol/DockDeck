@@ -37,6 +37,7 @@ struct WeatherPanelView: View {
                     .font(.system(size: CompactReadability.size(9, enabled: readable), weight: .medium, design: .rounded))
                     .foregroundStyle(baseColor.opacity(0.78))
                     .lineLimit(1)
+                    .minimumScaleFactor(readable ? 1 : 0.75)
 
                 if case .failed = store.status {
                     Image(systemName: "exclamationmark.triangle.fill")
@@ -65,23 +66,15 @@ struct WeatherPanelView: View {
         .padding(.horizontal, 9)
         .padding(.vertical, 5)
         .help(accessibilitySummary(snapshot))
-        .accessibilityElement(children: .contain)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(L10n.text("Weather"))
+        .accessibilityValue(accessibilitySummary(snapshot))
     }
 
     private var placeholder: some View {
-        HStack(spacing: 7) {
-            if store.status == .loading {
-                ProgressView().controlSize(.small)
-            } else {
-                Image(systemName: placeholderSymbol)
-            }
-            Text(placeholderText)
-                .lineLimit(2)
-        }
-        .font(.system(size: CompactReadability.size(9.5, enabled: readable), weight: .semibold, design: .rounded))
-        .foregroundStyle(baseColor.opacity(0.78))
-        .padding(.horizontal, 10)
-        .accessibilityElement(children: .combine)
+        CompactPlaceholder(
+            text: placeholderText, symbol: placeholderSymbol, baseColor: baseColor,
+            isLoading: store.status == .loading)
     }
 
     private var placeholderText: String {
@@ -177,6 +170,7 @@ struct WeatherModuleDetailView: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .moduleDetailSurface()
     }
 
     private func temperature(_ value: Double, unit: WeatherTemperatureUnit) -> String {

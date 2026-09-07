@@ -45,8 +45,9 @@ scrolling behavior unless the running application requests cursor-key handling.
 
 ## Settings and local files
 
-Use **Settings → Terminal** to configure the focused size, font, tint, and
-corner radius. The theme picker provides 20 terminal themes.
+Use **Settings → Terminal** to configure the focused size, font, and font size
+(9–14 pt); tint and corner radius live under **Settings → Appearance**. The
+theme picker provides 20 terminal themes.
 
 DockDeck writes a small zsh startup hook to:
 

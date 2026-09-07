@@ -329,6 +329,10 @@ extension AppDelegate {
             defer: false)
         settingsPanelWindow.title = pane.windowTitle
         settingsPanelWindow.contentMinSize = SettingsPanelView.preferredSize
+        // Reopen where the user left it; a first launch keeps the centered origin above.
+        let frameName = "DockDeck.Settings"
+        _ = settingsPanelWindow.setFrameUsingName(frameName)
+        settingsPanelWindow.setFrameAutosaveName(frameName)
         settingsPanelWindow.level = .floating
         settingsPanelWindow.isOpaque = true
         settingsPanelWindow.backgroundColor = .windowBackgroundColor
@@ -356,7 +360,8 @@ extension AppDelegate {
             terminal: TerminalSettingsState(
                 focusWidthMultiplier: PanelSettings.focusWidthMultiplier,
                 focusHeightMultiplier: PanelSettings.focusHeightMultiplier,
-                fontName: PanelSettings.fontName ?? TerminalTheme.defaultFontName),
+                fontName: PanelSettings.fontName ?? TerminalTheme.defaultFontName,
+                fontSize: PanelSettings.terminalFontSize),
             usage: UsageSettingsState(
                 enabledProviders: PanelSettings.enabledUsageProviders,
                 claudeRefreshMode: PanelSettings.claudeUsageRefreshMode,
@@ -436,6 +441,9 @@ extension AppDelegate {
             resizeFocusedTerminalIfNeeded()
         case .terminal(.font(let name)):
             PanelSettings.fontName = name
+            applyFont()
+        case .terminal(.fontSize(let size)):
+            PanelSettings.terminalFontSize = size
             applyFont()
         case .usage(.displayMode(let mode)):
             PanelSettings.usageDisplayMode = mode
@@ -598,7 +606,8 @@ extension AppDelegate {
     }
 
     func applyFont() {
-        let font = TerminalTheme.font(named: PanelSettings.fontName)
+        let font = TerminalTheme.font(
+            named: PanelSettings.fontName, size: PanelSettings.terminalFontSize)
         terminalView.font = font
         terminalView.frame = TerminalLayout.contentFrame(
             in: NSRect(origin: .zero, size: panel.frame.size), font: font)

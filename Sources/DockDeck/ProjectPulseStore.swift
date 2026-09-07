@@ -97,9 +97,8 @@ struct ProjectPulseConfiguration: Codable, Equatable {
         var configuration = self
         configuration.repositoryPath = Self.normalizedRepositoryPath(repositoryPath)
         configuration.githubRepository = Self.normalizedGitHubRepository(githubRepository)
-        configuration.refreshInterval = Self.refreshIntervals.min {
-            abs($0 - refreshInterval) < abs($1 - refreshInterval)
-        } ?? Self.defaultRefreshInterval
+        configuration.refreshInterval =
+            Self.refreshIntervals.nearest(to: refreshInterval) ?? Self.defaultRefreshInterval
         if configuration.source == .github, configuration.githubScope == .activity {
             configuration.refreshInterval = max(configuration.refreshInterval, 5 * 60)
         }
@@ -252,7 +251,7 @@ enum ProjectPulseError: LocalizedError, Equatable {
 }
 
 protocol ProjectPulseReading {
-    func read(configuration: ProjectPulseConfiguration) throws -> ProjectPulseSnapshot
+    func read(configuration: ProjectPulseConfiguration, cancellation: Progress?) throws -> ProjectPulseSnapshot
 }
 
 struct ProjectPulseReader: ProjectPulseReading {
@@ -262,18 +261,22 @@ struct ProjectPulseReader: ProjectPulseReading {
         self.github = github
     }
 
-    func read(configuration: ProjectPulseConfiguration) throws -> ProjectPulseSnapshot {
+    func read(configuration: ProjectPulseConfiguration, cancellation: Progress? = nil) throws -> ProjectPulseSnapshot {
+        if cancellation?.isCancelled == true { throw BoundedProcessError.cancelled }
         let configuration = configuration.normalized()
+        let snapshot: ProjectPulseSnapshot
         switch configuration.source {
         case .local:
-            return try readLocal(configuration: configuration)
+            snapshot = try readLocal(configuration: configuration, cancellation: cancellation)
         case .github:
-            return try readGitHub(configuration: configuration)
+            snapshot = try readGitHub(configuration: configuration, cancellation: cancellation)
         }
+        if cancellation?.isCancelled == true { throw BoundedProcessError.cancelled }
+        return snapshot
     }
 
     private func readLocal(
-        configuration: ProjectPulseConfiguration
+        configuration: ProjectPulseConfiguration, cancellation: Progress?
     ) throws -> ProjectPulseSnapshot {
         guard let path = configuration.repositoryPath else {
             throw ProjectPulseError.repositoryUnavailable
@@ -295,7 +298,9 @@ struct ProjectPulseReader: ProjectPulseReading {
                     "-C", path, "status", "--porcelain=v2", "--branch", "-z",
                     "--untracked-files=normal",
                 ],
-                currentDirectoryURL: repositoryURL)
+                currentDirectoryURL: repositoryURL, cancellation: cancellation)
+        } catch BoundedProcessError.cancelled {
+            throw BoundedProcessError.cancelled
         } catch BoundedProcessError.timedOut {
             throw ProjectPulseError.commandTimedOut
         } catch BoundedProcessError.outputTooLarge {
@@ -311,15 +316,15 @@ struct ProjectPulseReader: ProjectPulseReading {
         let gitSnapshot = try GitPorcelainV2Parser.parse(
             gitOutput, repositoryName: repositoryName)
         let workflow = configuration.includesGitHubActions
-            ? github.readWorkflow(repository: nil, currentDirectoryURL: repositoryURL) : nil
+            ? github.readWorkflow(repository: nil, currentDirectoryURL: repositoryURL, cancellation: cancellation) : nil
         return ProjectPulseSnapshot(git: gitSnapshot, workflow: workflow)
     }
 
     private func readGitHub(
-        configuration: ProjectPulseConfiguration
+        configuration: ProjectPulseConfiguration, cancellation: Progress?
     ) throws -> ProjectPulseSnapshot {
         if configuration.githubScope == .activity {
-            let activity = try github.readActivity(now: Date())
+            let activity = try github.readActivity(now: Date(), cancellation: cancellation)
             return ProjectPulseSnapshot(
                 git: ProjectGitSnapshot(
                     repositoryName: "@\(activity.login)",
@@ -339,7 +344,7 @@ struct ProjectPulseReader: ProjectPulseReading {
         let result = try github.readRepository(
             repository,
             includesWorkflow: configuration.includesGitHubActions,
-            now: Date())
+            now: Date(), cancellation: cancellation)
         return ProjectPulseSnapshot(
             git: ProjectGitSnapshot(
                 repositoryName: result.repository.shortName,
@@ -454,33 +459,16 @@ enum GitHubRunParser {
 
 enum ProjectPulseBinaryLocator {
     static func git() -> URL? {
-        executable(named: "git", preferredPaths: ["/usr/bin/git"])
+        ExecutableLocator.locate(name: "git", preferredPaths: ["/usr/bin/git"])
     }
 
     static func githubCLI(
         environment: [String: String] = ProcessInfo.processInfo.environment
     ) -> URL? {
-        executable(
-            named: "gh",
-            preferredPaths: [
-                environment["DOCKDECK_GH_PATH"], "/opt/homebrew/bin/gh", "/usr/local/bin/gh",
-            ].compactMap { $0 },
+        ExecutableLocator.locate(
+            name: "gh", overrideKey: "DOCKDECK_GH_PATH",
+            preferredPaths: ["/opt/homebrew/bin/gh", "/usr/local/bin/gh"],
             environment: environment)
-    }
-
-    private static func executable(
-        named name: String,
-        preferredPaths: [String],
-        environment: [String: String] = ProcessInfo.processInfo.environment
-    ) -> URL? {
-        var paths = preferredPaths
-        if let path = environment["PATH"] {
-            paths.append(contentsOf: path.split(separator: ":").map { "\($0)/\(name)" })
-        }
-        var seen: Set<String> = []
-        return paths.first {
-            seen.insert($0).inserted && FileManager.default.isExecutableFile(atPath: $0)
-        }.map(URL.init(fileURLWithPath:))
     }
 }
 
@@ -490,20 +478,23 @@ final class ProjectPulseStore: ObservableObject {
 
     private var configuration: ProjectPulseConfiguration
     private let reader: ProjectPulseReading
-    private let queue = DispatchQueue(label: "DockDeck.ProjectPulse", qos: .utility)
+    private let queue: DispatchQueue
     private var timer: Timer?
     private var isRunning = false
     private var activeReadID: UUID?
+    private var activeCancellation: Progress?
     private var generation = 0
     private var refreshCadence = ModuleRefreshCadence(backgroundMultiplier: 5)
 
     init(
         configuration: ProjectPulseConfiguration = PanelSettings.projectPulseConfiguration,
         reader: ProjectPulseReading = ProjectPulseReader(),
+        queue: DispatchQueue = DispatchQueue(label: "DockDeck.ProjectPulse", qos: .utility),
         initialSnapshot: ProjectPulseSnapshot? = nil
     ) {
         self.configuration = configuration.normalized()
         self.reader = reader
+        self.queue = queue
         snapshot = initialSnapshot
         status = initialSnapshot != nil
             ? .ready
@@ -521,6 +512,9 @@ final class ProjectPulseStore: ObservableObject {
         guard isRunning || timer != nil else { return }
         isRunning = false
         generation += 1
+        activeCancellation?.cancel()
+        activeCancellation = nil
+        activeReadID = nil
         timer?.invalidate()
         timer = nil
     }
@@ -534,6 +528,9 @@ final class ProjectPulseStore: ObservableObject {
             || self.configuration.githubRepository != configuration.githubRepository
         self.configuration = configuration
         generation += 1
+        activeCancellation?.cancel()
+        activeCancellation = nil
+        activeReadID = nil
         if repositoryChanged { snapshot = nil }
         if !configuration.isConfigured {
             status = .notConfigured
@@ -566,14 +563,20 @@ final class ProjectPulseStore: ObservableObject {
         let generation = generation
         let configuration = configuration
         activeReadID = readID
+        let cancellation = Progress(totalUnitCount: 1)
+        activeCancellation = cancellation
         if snapshot == nil { status = .loading }
 
+        let reader = reader
         queue.async { [weak self] in
-            guard let self else { return }
-            let result = Result { try self.reader.read(configuration: configuration) }
-            DispatchQueue.main.async {
-                guard self.activeReadID == readID else { return }
+            let result = Result {
+                if cancellation.isCancelled { throw BoundedProcessError.cancelled }
+                return try reader.read(configuration: configuration, cancellation: cancellation)
+            }
+            DispatchQueue.main.async { [weak self] in
+                guard let self, self.activeReadID == readID else { return }
                 self.activeReadID = nil
+                self.activeCancellation = nil
                 guard self.isRunning else { return }
                 guard self.generation == generation else {
                     self.refresh()
@@ -590,6 +593,11 @@ final class ProjectPulseStore: ObservableObject {
                 }
             }
         }
+    }
+
+    deinit {
+        timer?.invalidate()
+        activeCancellation?.cancel()
     }
 
     private func scheduleTimer() {

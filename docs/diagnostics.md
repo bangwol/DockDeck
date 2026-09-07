@@ -28,9 +28,10 @@ the app quits. Opening or refreshing Diagnostics reads these counters without
 adding a polling timer. Launch failures and oversized output are reported
 separately from timeouts.
 
-Disabling or reconfiguring Custom Tiles and Docker cancels their in-flight
-commands. DockDeck terminates only the process it launched, allows one second
-for graceful exit, then uses a bounded forced termination if needed. A custom
+Disabling or reconfiguring Custom Tiles, Docker, Project Pulse, or GitHub Inbox
+cancels their in-flight and queued commands. DockDeck terminates only the
+process it launched, allows one second for graceful exit, then uses a bounded
+forced termination if needed. A custom
 command is responsible for cleaning up any descendants it launches; avoid
 detached daemons in tiles. Late results cannot overwrite a stopped module.
 When the app quits, it stops accepting new bounded commands and spends at most

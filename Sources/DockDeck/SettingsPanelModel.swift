@@ -303,6 +303,12 @@ final class SettingsPanelModel: ObservableObject {
         onChange?(.terminal(.font(value)))
     }
 
+    func setTerminalFontSize(_ value: CGFloat) {
+        let value = TerminalTheme.clampedFontSize(value)
+        updateValues { $0.terminal.fontSize = value }
+        onChange?(.terminal(.fontSize(value)))
+    }
+
     func setUsageFontName(_ value: String) {
         updateValues { $0.usage.fontName = value }
         onChange?(.usage(.font(value)))
@@ -352,9 +358,9 @@ final class SettingsPanelModel: ObservableObject {
     }
 
     func setSystemStatsRefreshInterval(_ value: TimeInterval) {
-        let selected = PanelSettings.systemStatsRefreshIntervals.min(by: {
-            abs($0 - value) < abs($1 - value)
-        }) ?? PanelSettings.defaultSystemStatsRefreshInterval
+        let selected = PanelSettings.nearest(
+            value, in: PanelSettings.systemStatsRefreshIntervals,
+            default: PanelSettings.defaultSystemStatsRefreshInterval)
         updateValues { $0.systemStats.refreshInterval = selected }
         onChange?(.systemStats(.refreshInterval(selected)))
     }
@@ -403,9 +409,9 @@ final class SettingsPanelModel: ObservableObject {
     }
 
     func setServiceMonitorRefreshInterval(_ value: TimeInterval) {
-        let selected = PanelSettings.serviceMonitorRefreshIntervals.min(by: {
-            abs($0 - value) < abs($1 - value)
-        }) ?? PanelSettings.defaultServiceMonitorRefreshInterval
+        let selected = PanelSettings.nearest(
+            value, in: PanelSettings.serviceMonitorRefreshIntervals,
+            default: PanelSettings.defaultServiceMonitorRefreshInterval)
         updateValues { $0.serviceMonitor.refreshInterval = selected }
         onChange?(.serviceMonitor(.refreshInterval(selected)))
     }
@@ -422,9 +428,9 @@ final class SettingsPanelModel: ObservableObject {
     }
 
     func setWeatherRefreshInterval(_ value: TimeInterval) {
-        let selected = PanelSettings.weatherRefreshIntervals.min(by: {
-            abs($0 - value) < abs($1 - value)
-        }) ?? PanelSettings.defaultWeatherRefreshInterval
+        let selected = PanelSettings.nearest(
+            value, in: PanelSettings.weatherRefreshIntervals,
+            default: PanelSettings.defaultWeatherRefreshInterval)
         updateValues { $0.weather.refreshInterval = selected }
         onChange?(.weather(.refreshInterval(selected)))
     }
@@ -484,9 +490,9 @@ final class SettingsPanelModel: ObservableObject {
     }
 
     func setScheduleRefreshInterval(_ value: TimeInterval) {
-        let selected = PanelSettings.scheduleRefreshIntervals.min(by: {
-            abs($0 - value) < abs($1 - value)
-        }) ?? PanelSettings.defaultScheduleRefreshInterval
+        let selected = PanelSettings.nearest(
+            value, in: PanelSettings.scheduleRefreshIntervals,
+            default: PanelSettings.defaultScheduleRefreshInterval)
         updateValues { $0.schedule.refreshInterval = selected }
         onChange?(.schedule(.refreshInterval(selected)))
     }
@@ -515,9 +521,9 @@ final class SettingsPanelModel: ObservableObject {
     }
 
     func setBatteryRefreshInterval(_ value: TimeInterval) {
-        let selected = PanelSettings.batteryRefreshIntervals.min(by: {
-            abs($0 - value) < abs($1 - value)
-        }) ?? PanelSettings.defaultBatteryRefreshInterval
+        let selected = PanelSettings.nearest(
+            value, in: PanelSettings.batteryRefreshIntervals,
+            default: PanelSettings.defaultBatteryRefreshInterval)
         updateValues { $0.battery.refreshInterval = selected }
         onChange?(.battery(.refreshInterval(selected)))
     }

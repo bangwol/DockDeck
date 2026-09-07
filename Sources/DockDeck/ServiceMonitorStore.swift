@@ -272,14 +272,8 @@ final class ServiceMonitorStore: ObservableObject {
         configuration: URLSessionConfiguration?, delegate: ServiceMonitorProbeDelegate
     ) -> URLSession {
         let configuration = configuration ?? .ephemeral
-        configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
-        configuration.urlCache = nil
-        configuration.httpCookieStorage = nil
-        configuration.httpShouldSetCookies = false
-        configuration.urlCredentialStorage = nil
+        configuration.applyDockDeckPrivacyDefaults(requestTimeout: 8, resourceTimeout: 10)
         configuration.waitsForConnectivity = true
-        configuration.timeoutIntervalForRequest = 8
-        configuration.timeoutIntervalForResource = 10
         return URLSession(configuration: configuration, delegate: delegate, delegateQueue: nil)
     }
 
@@ -517,8 +511,7 @@ final class ServiceMonitorStore: ObservableObject {
     }
 
     private static func resolvedRefreshInterval(_ value: TimeInterval) -> TimeInterval {
-        PanelSettings.serviceMonitorRefreshIntervals.min(by: {
-            abs($0 - value) < abs($1 - value)
-        }) ?? PanelSettings.defaultServiceMonitorRefreshInterval
+        PanelSettings.nearest(
+            value, in: PanelSettings.serviceMonitorRefreshIntervals, default: PanelSettings.defaultServiceMonitorRefreshInterval)
     }
 }

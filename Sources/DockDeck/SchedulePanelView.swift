@@ -43,12 +43,9 @@ struct SchedulePanelView: View {
         let overdue = presentation.mode == .overdue
         return VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 6) {
-                Text(overdue ? "DUE" : "TODO")
-                    .font(.system(size: CompactReadability.size(7.5, enabled: readable), weight: .bold, design: .rounded))
-                    .foregroundStyle(baseColor)
-                    .padding(.horizontal, 5)
-                    .padding(.vertical, 2)
-                    .background(Capsule().fill(reminderColor(overdue: overdue).opacity(0.24)))
+                CompactBadge(
+                    text: overdue ? "DUE" : "TODO", color: reminderColor(overdue: overdue),
+                    baseColor: baseColor)
                 Text(item.title)
                     .font(.system(size: CompactReadability.size(10, enabled: readable), weight: .semibold, design: .rounded))
                     .foregroundStyle(baseColor)
@@ -60,17 +57,8 @@ struct SchedulePanelView: View {
                     .lineLimit(1)
             }
 
-            GeometryReader { proxy in
-                ZStack(alignment: .leading) {
-                    Capsule().fill(baseColor.opacity(0.14))
-                    if overdue {
-                        Capsule()
-                            .fill(reminderColor(overdue: true))
-                            .frame(width: proxy.size.width)
-                    }
-                }
-            }
-            .frame(height: 3)
+            CapsuleMeter(
+                fraction: overdue ? 1 : 0, color: reminderColor(overdue: true), baseColor: baseColor)
 
             HStack(spacing: 5) {
                 Text(reminderTimeText(item))
@@ -93,13 +81,9 @@ struct SchedulePanelView: View {
         let item = presentation.event
         return VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 6) {
-                Text(presentation.mode == .current ? "NOW" : "NEXT")
-                    .font(.system(size: CompactReadability.size(7.5, enabled: readable), weight: .bold, design: .rounded))
-                    .foregroundStyle(baseColor)
-                    .padding(.horizontal, 5)
-                    .padding(.vertical, 2)
-                    .background(
-                        Capsule().fill(badgeColor(presentation.mode).opacity(0.24)))
+                CompactBadge(
+                    text: presentation.mode == .current ? "NOW" : "NEXT",
+                    color: badgeColor(presentation.mode), baseColor: baseColor)
                 Text(item.title)
                     .font(.system(size: CompactReadability.size(10, enabled: readable), weight: .semibold, design: .rounded))
                     .foregroundStyle(baseColor)
@@ -121,18 +105,9 @@ struct SchedulePanelView: View {
                     .lineLimit(1)
             }
 
-            GeometryReader { proxy in
-                ZStack(alignment: .leading) {
-                    Capsule().fill(baseColor.opacity(0.14))
-                    Capsule()
-                        .fill(badgeColor(presentation.mode))
-                        .frame(
-                            width: proxy.size.width
-                                * CGFloat(presentation.mode == .current
-                                    ? presentation.progress : 0))
-                }
-            }
-            .frame(height: 3)
+            CapsuleMeter(
+                fraction: presentation.mode == .current ? presentation.progress : 0,
+                color: badgeColor(presentation.mode), baseColor: baseColor)
 
             HStack(spacing: 5) {
                 Text(timeText(item))
@@ -152,11 +127,7 @@ struct SchedulePanelView: View {
     }
 
     private func placeholder(text: String, symbol: String) -> some View {
-        Label(text, systemImage: symbol)
-            .font(.system(size: CompactReadability.size(9.5, enabled: readable), weight: .semibold, design: .rounded))
-            .foregroundStyle(baseColor.opacity(0.78))
-            .padding(.horizontal, 10)
-            .accessibilityElement(children: .combine)
+        CompactPlaceholder(text: text, symbol: symbol, baseColor: baseColor)
     }
 
     private var authorizationText: String {

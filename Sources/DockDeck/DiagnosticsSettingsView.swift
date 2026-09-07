@@ -23,6 +23,7 @@ struct DiagnosticsSettingsView: View {
                         }
                     }
                     .disabled(store.isRefreshing)
+                    .accessibilityLabel(L10n.text("Refresh"))
                 }
 
                 GroupBox {

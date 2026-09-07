@@ -151,3 +151,69 @@ final class PanelSurfaceView: NSView {
         }
     }
 }
+
+/// The thin progress track shared by compact panels: a faint capsule with a colored fill.
+struct CapsuleMeter: View {
+    let fraction: Double
+    let color: Color
+    let baseColor: Color
+    var height: CGFloat = 3
+
+    var body: some View {
+        GeometryReader { proxy in
+            ZStack(alignment: .leading) {
+                Capsule().fill(baseColor.opacity(0.14))
+                Capsule()
+                    .fill(color)
+                    .frame(width: proxy.size.width * CGFloat(Self.clamped(fraction)))
+            }
+        }
+        .frame(height: height)
+    }
+
+    static func clamped(_ fraction: Double) -> Double {
+        fraction.isFinite ? min(max(fraction, 0), 1) : 0
+    }
+}
+
+/// One empty, loading, or error message for a compact panel.
+struct CompactPlaceholder: View {
+    @Environment(\.compactReadable) private var readable
+    let text: String
+    let symbol: String
+    let baseColor: Color
+    var isLoading = false
+
+    var body: some View {
+        HStack(spacing: 7) {
+            if isLoading {
+                ProgressView().controlSize(.small)
+            } else {
+                Image(systemName: symbol)
+            }
+            Text(text).lineLimit(2)
+        }
+        .font(.system(size: CompactReadability.size(9.5, enabled: readable), weight: .semibold, design: .rounded))
+        .foregroundStyle(baseColor.opacity(0.78))
+        .minimumScaleFactor(readable ? 1 : 0.8)
+        .padding(.horizontal, 9)
+        .accessibilityElement(children: .combine)
+    }
+}
+
+/// The small uppercase status chip ("NOW", "DUE") that leads a compact list row.
+struct CompactBadge: View {
+    @Environment(\.compactReadable) private var readable
+    let text: String
+    let color: Color
+    let baseColor: Color
+
+    var body: some View {
+        Text(text)
+            .font(.system(size: CompactReadability.size(7.5, enabled: readable), weight: .bold, design: .rounded))
+            .foregroundStyle(baseColor)
+            .padding(.horizontal, 5)
+            .padding(.vertical, 2)
+            .background(Capsule().fill(color.opacity(0.24)))
+    }
+}

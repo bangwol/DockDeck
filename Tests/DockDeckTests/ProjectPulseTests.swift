@@ -5,6 +5,49 @@ import XCTest
 @testable import DockDeck
 
 final class ProjectPulseTests: XCTestCase {
+    func testExecutableLocatorPrefersOverrideThenKnownPathsThenPATH() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("dockdeck-locator-\(UUID().uuidString)", isDirectory: true)
+        let override = root.appendingPathComponent("override/tool")
+        let preferred = root.appendingPathComponent("preferred/tool")
+        let onPath = root.appendingPathComponent("bin/tool")
+        for url in [override, preferred, onPath] {
+            try FileManager.default.createDirectory(
+                at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try Data("#!/bin/sh\n".utf8).write(to: url)
+            try FileManager.default.setAttributes(
+                [.posixPermissions: 0o755], ofItemAtPath: url.path)
+        }
+        defer { try? FileManager.default.removeItem(at: root) }
+        let pathOnly = ["PATH": root.appendingPathComponent("bin").path]
+
+        XCTAssertEqual(
+            ExecutableLocator.locate(
+                name: "tool", overrideKey: "TOOL", preferredPaths: [preferred.path],
+                environment: pathOnly.merging(["TOOL": override.path]) { $1 })?.path,
+            override.path)
+        XCTAssertEqual(
+            ExecutableLocator.locate(
+                name: "tool", overrideKey: "TOOL", preferredPaths: [preferred.path],
+                environment: pathOnly)?.path,
+            preferred.path)
+        XCTAssertEqual(
+            ExecutableLocator.locate(
+                name: "tool", overrideKey: "TOOL", preferredPaths: ["/nonexistent/tool"],
+                environment: pathOnly)?.path,
+            onPath.path)
+        XCTAssertNil(ExecutableLocator.locate(name: "tool", environment: ["PATH": "/nonexistent"]))
+
+        let directory = root.appendingPathComponent("directory")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        XCTAssertEqual(ExecutableLocator.locate(name: "tool", overrideKey: "TOOL",
+            environment: pathOnly.merging(["TOOL": directory.path]) { $1 })?.path, onPath.path)
+        let link = root.appendingPathComponent("tool-link")
+        try FileManager.default.createSymbolicLink(at: link, withDestinationURL: onPath)
+        XCTAssertEqual(ExecutableLocator.locate(name: "tool", preferredPaths: [link.path],
+            environment: [:])?.path, link.path)
+    }
+
     func testFavoritesValidateDeduplicateAndLimitWithoutChangingOptions() {
         let local = ProjectPulseConfiguration(repositoryPath: "/tmp/project", includesGitHubActions: true)
         let github = ProjectPulseConfiguration(source: .github, githubRepository: "owner/repo")
@@ -495,7 +538,7 @@ final class ProjectPulseTests: XCTestCase {
 private struct FakeProjectPulseReader: ProjectPulseReading {
     let snapshot: ProjectPulseSnapshot
 
-    func read(configuration: ProjectPulseConfiguration) throws -> ProjectPulseSnapshot {
+    func read(configuration: ProjectPulseConfiguration, cancellation: Progress?) throws -> ProjectPulseSnapshot {
         snapshot
     }
 }
@@ -517,20 +560,20 @@ private struct FakeGitHubProjectReader: GitHubProjectReading {
     func readRepository(
         _ nameWithOwner: String,
         includesWorkflow: Bool,
-        now: Date
+        now: Date, cancellation: Progress?
     ) throws -> GitHubProjectResult {
         guard let result else { throw ProjectPulseError.githubUnavailable }
         return result
     }
 
-    func readActivity(now: Date) throws -> ProjectGitHubActivitySnapshot {
+    func readActivity(now: Date, cancellation: Progress?) throws -> ProjectGitHubActivitySnapshot {
         guard let activity else { throw ProjectPulseError.githubUnavailable }
         return activity
     }
 
     func readWorkflow(
         repository: String?,
-        currentDirectoryURL: URL
+        currentDirectoryURL: URL, cancellation: Progress?
     ) -> ProjectWorkflowSnapshot {
         result?.workflow
             ?? ProjectWorkflowSnapshot(state: .neutral, title: "No workflow runs")
