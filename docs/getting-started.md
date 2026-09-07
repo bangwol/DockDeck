@@ -7,7 +7,7 @@ Developer ID-signed and notarized stable binary is not available yet.
 
 | Requirement | Used for |
 | --- | --- |
-| Xcode Command Line Tools with Swift 5.9 or later | Building DockDeck |
+| Xcode Command Line Tools with Swift 6.0 or later | Building DockDeck and SwiftTerm |
 | Accessibility permission | Precise Dock geometry and display tracking |
 | [Codex CLI](https://github.com/openai/codex), signed in | Codex Usage values |
 | [Claude Code](https://code.claude.com/docs/en/installation), signed in | Claude Usage values |

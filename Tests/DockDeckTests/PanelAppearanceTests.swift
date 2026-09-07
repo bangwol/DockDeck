@@ -1,10 +1,23 @@
 import Cocoa
 import SwiftUI
+import SwiftTerm
 import XCTest
 
 @testable import DockDeck
 
 final class PanelAppearanceTests: XCTestCase {
+    func testTerminalFontChangesKeepColumnsConsistentWithViewResize() {
+        let size = NSSize(width: 400, height: 200)
+        let terminal = LocalProcessTerminalView(frame: NSRect(origin: .zero, size: size))
+        for fontSize in [TerminalTheme.minimumFontSize, TerminalTheme.maximumFontSize, TerminalTheme.fontSize] {
+            terminal.font = TerminalTheme.font(named: "Menlo", size: fontSize)
+            let columnsAfterFontChange = terminal.getTerminal().cols
+            terminal.setFrameSize(NSSize(width: size.width + 1, height: size.height))
+            terminal.setFrameSize(size)
+            XCTAssertEqual(terminal.getTerminal().cols, columnsAfterFontChange, "Font size: \(fontSize)")
+        }
+    }
+
     func testCapsuleMeterClampsFractionsAndIgnoresNonFiniteValues() {
         XCTAssertEqual(CapsuleMeter.clamped(1.4), 1)
         XCTAssertEqual(CapsuleMeter.clamped(-0.2), 0)

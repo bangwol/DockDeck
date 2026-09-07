@@ -11,7 +11,7 @@ let package = Package(
             name: "dockdeck-claude-bridge", targets: ["DockDeckClaudeBridge"]),
     ],
     dependencies: [
-        .package(url: "https://github.com/migueldeicaza/SwiftTerm", exact: "1.18.0")
+        .package(url: "https://github.com/migueldeicaza/SwiftTerm", exact: "1.19.0")
     ],
     targets: [
         .executableTarget(
