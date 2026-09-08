@@ -102,6 +102,24 @@ final class FocusTimerTests: XCTestCase {
         XCTAssertEqual(normalized.totalSeconds, 25 * 60)
     }
 
+    func testReplacingActiveSessionRearmsCompletionTimer() {
+        for initiallyRunning in [false, true] {
+            let now = Date()
+            let initial = initiallyRunning ? FocusTimerSession(phase: .focus, mode: .running,
+                deadline: now.addingTimeInterval(60), remainingSeconds: 60, totalSeconds: 60) : nil
+            let completed = expectation(description: "Replacement session completed")
+            let store = FocusTimerStore(session: initial, now: now, onCompletion: { _ in completed.fulfill() })
+            store.setRuntimeActivity(.background, lowPowerMode: false)
+            store.start()
+            store.replaceSession(FocusTimerSession(phase: .focus, mode: .running,
+                deadline: Date().addingTimeInterval(0.1), remainingSeconds: 1, totalSeconds: 1))
+            wait(for: [completed], timeout: 0.5)
+            XCTAssertEqual(store.snapshot.phase, .breakTime)
+            XCTAssertEqual(store.snapshot.mode, .idle)
+            store.stop()
+        }
+    }
+
     func testTimerStartsPausesAndResumesFromDeadline() {
         let now = Date(timeIntervalSince1970: 10_000)
         var persisted: [FocusTimerSession] = []

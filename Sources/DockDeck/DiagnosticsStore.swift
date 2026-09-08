@@ -51,6 +51,7 @@ struct DiagnosticCheckItem: Identifiable, Equatable {
     let detail: String
     let checkedAt: Date?
     let lastSuccessfulAt: Date?
+    var cliUpdate: CLIUpdateInfo? = nil
 }
 
 enum DiagnosticCommandResult {
@@ -58,7 +59,7 @@ enum DiagnosticCommandResult {
     var detail: String {
         switch self {
         case .ready: "Installed and signed in"
-        case .nonZeroExit: "Installed; sign-in check failed"
+        case .nonZeroExit: "Installed; status check failed (sign-in or configuration)"
         case .timedOut: "Status check timed out"
         case .outputTooLarge: "Status command output exceeded its limit"
         case .cancelled: "Status check cancelled"
@@ -148,7 +149,8 @@ enum DiagnosticsChecker {
             state: status == .ready ? .ready : .warning,
             detail: status.detail,
             checkedAt: now,
-            lastSuccessfulAt: status == .ready ? now : nil)
+            lastSuccessfulAt: status == .ready ? now : nil,
+            cliUpdate: CLIUpdateInfo.inspect(id: id, executable: executable, environment: environment))
     }
 
     private static func item(
@@ -267,15 +269,18 @@ final class DiagnosticsStore: ObservableObject {
     private let checker: () -> [DiagnosticCheckItem]
     private let runtimeProvider: () -> ModuleRuntimeDiagnostics
     private let queue: DispatchQueue
+    private let releaseChecker: CLIReleaseChecker
 
     init(
         checker: @escaping () -> [DiagnosticCheckItem] = { DiagnosticsChecker.run() },
         runtimeProvider: @escaping () -> ModuleRuntimeDiagnostics = { .empty },
+        releaseChecker: CLIReleaseChecker = CLIReleaseChecker(),
         queue: DispatchQueue = DispatchQueue(label: "DockDeck.Diagnostics", qos: .utility)
     ) {
         self.checker = checker
         self.runtimeProvider = runtimeProvider
         self.queue = queue
+        self.releaseChecker = releaseChecker
         moduleRuntime = runtimeProvider()
         items = DiagnosticCheckID.allCases.map {
             DiagnosticCheckItem(
@@ -296,7 +301,20 @@ final class DiagnosticsStore: ObservableObject {
                 self.items = Self.merging(results, previous: previous)
                 self.moduleRuntime = self.runtimeProvider()
                 self.processes = ProcessDiagnostics.shared.snapshot()
-                self.isRefreshing = false
+                Task { @MainActor in
+                    await withTaskGroup(of: (DiagnosticCheckID, CLIUpdateInfo).self) { group in
+                        for item in self.items {
+                            guard let info = item.cliUpdate else { continue }
+                            group.addTask { (item.id, await self.releaseChecker.check(info)) }
+                        }
+                        for await (id, info) in group {
+                            if let index = self.items.firstIndex(where: { $0.id == id }) {
+                                self.items[index].cliUpdate = info
+                            }
+                        }
+                    }
+                    self.isRefreshing = false
+                }
             }
         }
     }
@@ -332,7 +350,8 @@ final class DiagnosticsStore: ObservableObject {
                 detail: result.detail,
                 checkedAt: result.checkedAt,
                 lastSuccessfulAt: result.lastSuccessfulAt
-                    ?? previousByID[result.id]?.lastSuccessfulAt)
+                    ?? previousByID[result.id]?.lastSuccessfulAt,
+                cliUpdate: result.cliUpdate)
         }
     }
 

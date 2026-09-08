@@ -479,6 +479,8 @@ final class ProjectPulseStore: ObservableObject {
     private var configuration: ProjectPulseConfiguration
     private let reader: ProjectPulseReading
     private let queue: DispatchQueue
+    var nextRefreshAt: Date? { timer?.fireDate }
+
     private var timer: Timer?
     private var isRunning = false
     private var activeReadID: UUID?
@@ -548,7 +550,7 @@ final class ProjectPulseStore: ObservableObject {
         guard refreshCadence.update(activity: activity, lowPowerMode: lowPowerMode),
             isRunning
         else { return }
-        scheduleTimer()
+        scheduleTimer(preservingElapsed: true)
     }
 
     func refresh() {
@@ -600,14 +602,15 @@ final class ProjectPulseStore: ObservableObject {
         activeCancellation?.cancel()
     }
 
-    private func scheduleTimer() {
-        timer?.invalidate()
+    private func scheduleTimer(preservingElapsed: Bool = false) {
         guard isRunning, configuration.isConfigured else {
+            timer?.invalidate()
             timer = nil
             return
         }
         let interval = refreshCadence.effectiveInterval(
             configuredInterval: configuration.refreshInterval)
-        timer = .moduleRefreshTimer(interval: interval) { [weak self] in self?.refresh() }
+        timer = .moduleRefreshTimer(
+            interval: interval, replacing: timer, preservingElapsed: preservingElapsed) { [weak self] in self?.refresh() }
     }
 }

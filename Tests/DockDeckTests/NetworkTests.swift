@@ -14,6 +14,8 @@ final class NetworkTests: XCTestCase {
         })
         let stats = SystemStatsStore(metrics: [.cpu, .network], network: network)
         stats.start()
+        assertCadenceKeepsPollingDeadline(stats, interval: PanelSettings.systemStatsRefreshInterval,
+            backgroundMultiplier: 4, deadline: { stats.nextRefreshAt })
         stats.start()
         XCTAssertEqual(reads, 1)
         XCTAssertEqual(observer.startCount, 1)
@@ -35,19 +37,33 @@ final class NetworkTests: XCTestCase {
         XCTAssertEqual(observer.stopCount, 1)
     }
 
+    func testRateIgnoresSystemClockAdjustments() {
+        var bytes: UInt64 = 0
+        let store = NetworkStore(counterReader: { _ in
+            defer { bytes += 200 }
+            return NetworkCounters(interfaceName: "en0", receivedBytes: bytes, sentBytes: bytes)
+        })
+        let wall = Date(timeIntervalSince1970: 10_000)
+        store.refresh(now: wall, uptime: 10)
+        store.refresh(now: wall.addingTimeInterval(-3_600), uptime: 12)
+        XCTAssertEqual(store.snapshot?.downloadBytesPerSecond, 100)
+        store.refresh(now: wall.addingTimeInterval(3_600), uptime: 14)
+        XCTAssertEqual(store.snapshot?.downloadBytesPerSecond, 100)
+    }
+
     func testChangingInterfaceResetsBaselineAndHistory() {
         var bytes: UInt64 = 100
         let store = NetworkStore(interfaceName: "", counterReader: { name in
             defer { bytes += 100 }
             return NetworkCounters(interfaceName: name ?? "en0", receivedBytes: bytes, sentBytes: bytes)
         })
-        store.refresh(now: Date(timeIntervalSince1970: 0))
-        store.refresh(now: Date(timeIntervalSince1970: 1))
+        store.refresh(now: Date(timeIntervalSince1970: 0), uptime: 0)
+        store.refresh(now: Date(timeIntervalSince1970: 1), uptime: 1)
         XCTAssertEqual(store.snapshot?.downloadBytesPerSecond, 100)
         XCTAssertEqual(store.downloadHistory.samples.count, 1)
         store.setInterfaceName("utun0")
         XCTAssertTrue(store.downloadHistory.samples.isEmpty)
-        store.refresh(now: Date(timeIntervalSince1970: 2))
+        store.refresh(now: Date(timeIntervalSince1970: 2), uptime: 2)
         XCTAssertEqual(store.snapshot?.interfaceName, "utun0")
         XCTAssertNil(store.snapshot?.downloadBytesPerSecond)
         XCTAssertEqual(store.measurementStatus, "Measuring rate")
@@ -61,12 +77,12 @@ final class NetworkTests: XCTestCase {
             defer { bytes += 100 }
             return NetworkCounters(interfaceName: name, receivedBytes: bytes, sentBytes: bytes)
         })
-        store.refresh(now: Date(timeIntervalSince1970: 0))
-        store.refresh(now: Date(timeIntervalSince1970: 1))
+        store.refresh(now: Date(timeIntervalSince1970: 0), uptime: 0)
+        store.refresh(now: Date(timeIntervalSince1970: 1), uptime: 1)
         name = ""
-        store.refresh(now: Date(timeIntervalSince1970: 1.5))
+        store.refresh(now: Date(timeIntervalSince1970: 1.5), uptime: 1.5)
         name = "utun0"
-        store.refresh(now: Date(timeIntervalSince1970: 2))
+        store.refresh(now: Date(timeIntervalSince1970: 2), uptime: 2)
         XCTAssertTrue(store.downloadHistory.samples.isEmpty)
         XCTAssertNil(store.snapshot?.downloadBytesPerSecond)
     }

@@ -29,6 +29,15 @@ final class BatteryTests: XCTestCase {
         }
     }
 
+    func testActivityChangesKeepBatteryPollingScheduled() {
+        let store = BatteryStore(refreshInterval: 60)
+        store.start()
+        assertCadenceKeepsPollingDeadline(store, interval: 60,
+            backgroundMultiplier: 4, deadline: { store.nextRefreshAt })
+        store.stop()
+        XCTAssertNil(store.nextRefreshAt)
+    }
+
     func testPanelRendersAtCompactSize() throws {
         let store = BatteryStore(
             refreshInterval: 60,

@@ -33,7 +33,29 @@ final class ModuleGalleryTests: XCTestCase {
         try profiles.save(name: "Focus", configuration: .init(left: [.focusTimer], right: [.clock], enabled: [.focusTimer, .clock]), autoSlide: .init())
         let login = LoginItemStore(service: GalleryLoginItem())
         ProcessDiagnostics.shared.record(source: .customTile, duration: 0.024, failure: .cancelled)
-        let diagnostics = DiagnosticsStore(checker: { [] })
+        let diagnostics = DiagnosticsStore(checker: { () -> [DiagnosticCheckItem] in
+            [DiagnosticCheckID.codex, .claude, .github].map { id -> DiagnosticCheckItem in
+                let version = id == .codex ? "0.145.0" : id == .claude ? "2.1.236" : "2.96.0"
+                let installation: CLIInstallation = id == .codex
+                    ? .npm(prefix: "/usr/local", package: "@openai/codex")
+                    : .homebrew(prefix: "/opt/homebrew", package: id == .claude ? "claude-code" : "gh", cask: id == .claude)
+                let update = CLIUpdateInfo(installedVersion: CLIVersion(version), installation: installation,
+                    executablePath: "/example/bin/cli", command: "example update")
+                return DiagnosticCheckItem(id: id, title: id.title, symbolName: id.symbolName,
+                    state: .ready, detail: "Installed and signed in", checkedAt: Date(), lastSuccessfulAt: Date(),
+                    cliUpdate: update)
+            }
+        }, releaseChecker: CLIReleaseChecker(fetch: { url in
+            if url.path.contains("formula/gh") { throw URLError(.notConnectedToInternet) }
+            return Data((url.host == "registry.npmjs.org"
+                ? #"{"version":"0.153.4"}"# : #"{"version":"2.1.236"}"#).utf8)
+        }))
+        diagnostics.refresh()
+        let deadline = Date().addingTimeInterval(3)
+        while diagnostics.isRefreshing, Date() < deadline {
+            RunLoop.current.run(until: Date().addingTimeInterval(0.01))
+        }
+        XCTAssertFalse(diagnostics.isRefreshing)
 
         for (themeName, theme) in [
             ("dark", Theme.theme(id: "")),
@@ -156,7 +178,7 @@ final class ModuleGalleryTests: XCTestCase {
                     receivedBytes: networkSample * networkSample * 600_000,
                     sentBytes: networkSample * networkSample * 90_000)
             })
-        for offset in [-2.0, -1.0, 0.0] { network.refresh(now: now.addingTimeInterval(offset)) }
+        for offset in [-2.0, -1.0, 0.0] { network.refresh(now: now.addingTimeInterval(offset), uptime: offset + 2) }
         let stats = SystemStatsStore(
             metrics: [.cpu, .memory, .network, .gpu],
             initialSnapshot: SystemStatsSnapshot(

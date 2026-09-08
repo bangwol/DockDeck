@@ -241,7 +241,7 @@ final class NetworkStore: ObservableObject {
     private(set) var interfaceName: String
     private let counterReader: (String?) -> NetworkCounters?
     private var historyInterfaceName: String?
-    private var previous: (counters: NetworkCounters, date: Date)?
+    private var previous: (counters: NetworkCounters, uptime: TimeInterval)?
     private var isActive = false
     private let pathObserver: NetworkPathObserving
 
@@ -292,7 +292,7 @@ final class NetworkStore: ObservableObject {
         snapshot = nil
     }
 
-    func refresh(now: Date = Date()) {
+    func refresh(now: Date = Date(), uptime: TimeInterval = ProcessInfo.processInfo.systemUptime) {
         guard let counters = counterReader(interfaceName.isEmpty ? nil : interfaceName) else {
             previous = nil
             if snapshot != nil { snapshot = nil }
@@ -305,7 +305,7 @@ final class NetworkStore: ObservableObject {
         }
         let rates: (download: Double?, upload: Double?)
         if let previous, previous.counters.interfaceName == counters.interfaceName {
-            let elapsed = now.timeIntervalSince(previous.date)
+            let elapsed = uptime - previous.uptime
             rates = (
                 NetworkRateCalculator.rate(
                     previous: previous.counters.receivedBytes,
@@ -318,7 +318,7 @@ final class NetworkStore: ObservableObject {
         } else {
             rates = (nil, nil)
         }
-        previous = (counters, now)
+        previous = (counters, uptime)
         downloadHistory.append(rates.download, at: now)
         uploadHistory.append(rates.upload, at: now)
         observedAt = now

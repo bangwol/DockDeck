@@ -10,6 +10,9 @@ Service Monitor sends a `HEAD` request every 15–120 seconds to up to four URLs
 If a server rejects `HEAD` with 405 or 501, DockDeck retries with a `GET` request
 containing `Range: bytes=0-0`. Probes finish when headers arrive and cancel body
 transfer, including when a server ignores Range.
+Only one probe batch runs at a time. Additional refresh requests during that
+batch use its result instead of starting another batch. Reconfiguration and
+stopping the module still cancel outstanding requests.
 Public endpoints must use HTTPS. Plain HTTP is accepted only for local names and
 private or loopback addresses. This also applies to IPv6 literals, IPv4-mapped
 IPv6 addresses, and alternate numeric IPv4 spellings. The packaged app declares
@@ -57,6 +60,13 @@ Weather for current conditions and up to 12 hourly temperature, condition, and
 precipitation-probability forecasts, displayed in the selected city's time zone.
 Hourly fields use the same forecast request and polling interval; missing values
 are shown as unavailable. Failed refreshes retain the previous result with an error.
+
+The foreground refresh interval is 15, 30 (default), or 60 minutes. Background
+modules use twice that interval; Low Power Mode or serious thermal pressure
+doubles it again. Switching decks or auto-sliding changes the interval while
+keeping elapsed time since the last request, so repeated switches cannot keep
+postponing a refresh. Manual refreshes start a new interval. After display sleep
+or session inactivity, Weather requests fresh data when the module resumes.
 
 DockDeck stores the selected city and coordinates in local preferences. Search
 text and coordinates are sent over HTTPS only when searching or while the
@@ -130,6 +140,9 @@ a dated session history. Optional automatic phase advance is off by default.
 After sleep or restart, it counts one completed phase and starts the next from
 the current time, without replaying missed cycles. A running timer uses an absolute deadline, so it continues while
 another module is selected and resumes correctly after DockDeck restarts.
+
+Replacing a saved session re-arms its completion timer immediately, including
+when the previous session was idle.
 
 DockDeck writes the phase, deadline, and remaining duration only when timer
 state changes, not every second. The visible countdown refreshes once per second;

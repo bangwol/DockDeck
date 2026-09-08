@@ -261,6 +261,8 @@ final class CustomTileStore: ObservableObject {
     private var configuration: CustomTileConfiguration
     private let reader: CustomTileReading
     private let queue: DispatchQueue
+    var nextRefreshAt: Date? { timer?.fireDate }
+
     private var timer: Timer?
     private var delayedRefresh: DispatchWorkItem?
     private var isRunning = false
@@ -352,7 +354,7 @@ final class CustomTileStore: ObservableObject {
         guard refreshCadence.update(activity: activity, lowPowerMode: lowPowerMode),
             isRunning
         else { return }
-        scheduleTimer()
+        scheduleTimer(preservingElapsed: true)
     }
 
     func refresh() { refresh(allowsStopped: false) }
@@ -400,14 +402,15 @@ final class CustomTileStore: ObservableObject {
         }
     }
 
-    private func scheduleTimer() {
-        timer?.invalidate()
+    private func scheduleTimer(preservingElapsed: Bool = false) {
         guard isRunning, configuration.isConfigured else {
+            timer?.invalidate()
             timer = nil
             return
         }
         let interval = refreshCadence.effectiveInterval(
             configuredInterval: configuration.refreshInterval)
-        timer = .moduleRefreshTimer(interval: interval) { [weak self] in self?.refresh() }
+        timer = .moduleRefreshTimer(
+            interval: interval, replacing: timer, preservingElapsed: preservingElapsed) { [weak self] in self?.refresh() }
     }
 }

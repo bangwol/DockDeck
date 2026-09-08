@@ -39,6 +39,9 @@ struct DiagnosticsSettingsView: View {
                         .font(.headline)
                 }
 
+                Text(L10n.text("CLI updates are advisory and separate from sign-in status. Copy a command and run it yourself; DockDeck does not install updates."))
+                    .font(.caption).foregroundStyle(.secondary)
+
                 if !store.processes.isEmpty {
                     GroupBox("Command performance (this session)") {
                         VStack(alignment: .leading, spacing: 10) {
@@ -161,30 +164,31 @@ private struct DiagnosticSettingsRow: View {
     let item: DiagnosticCheckItem
 
     var body: some View {
-        HStack(spacing: 12) {
-            Image(systemName: item.symbolName)
-                .foregroundStyle(statusColor)
-                .frame(width: 22)
-            VStack(alignment: .leading, spacing: 3) {
-                Text(item.title)
-                    .fontWeight(.medium)
-                Text(item.detail)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-            Spacer()
-            VStack(alignment: .trailing, spacing: 3) {
-                Text(statusTitle)
-                    .font(.caption.weight(.semibold))
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 12) {
+                Image(systemName: item.symbolName)
                     .foregroundStyle(statusColor)
-                Text(lastSuccessText)
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
-                    .monospacedDigit()
+                    .frame(width: 22)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(item.title).fontWeight(.medium)
+                    Text(L10n.text(item.detail))
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+                Spacer()
+                VStack(alignment: .trailing, spacing: 3) {
+                    Text(statusTitle)
+                        .font(.caption.weight(.semibold)).foregroundStyle(statusColor)
+                    Text(lastSuccessText)
+                        .font(.caption2).foregroundStyle(.tertiary).monospacedDigit()
+                }
+            }
+            .accessibilityElement(children: .combine)
+            if let info = item.cliUpdate {
+                CLIUpdateSettingsRow(info: info, id: item.id)
+                    .padding(.leading, 34)
             }
         }
         .padding(.vertical, 9)
-        .accessibilityElement(children: .combine)
     }
 
     private var statusTitle: String {
@@ -208,5 +212,52 @@ private struct DiagnosticSettingsRow: View {
     private var lastSuccessText: String {
         guard let date = item.lastSuccessfulAt else { return "No successful check" }
         return "Last OK " + date.formatted(date: .omitted, time: .shortened)
+    }
+}
+
+private struct CLIUpdateSettingsRow: View {
+    let info: CLIUpdateInfo
+    let id: DiagnosticCheckID
+    @State private var copied = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Text(String(format: L10n.text("Installed: %@ · %@"), info.installedVersion?.text ?? "—", info.installation.title))
+                .foregroundStyle(.secondary)
+                .help(info.executablePath)
+            Text(info.status)
+                .foregroundStyle(info.updateAvailable ? .orange : .secondary)
+                .help(info.checkedAt.map {
+                    String(format: L10n.text("Release metadata checked: %@"), $0.formatted(date: .abbreviated, time: .shortened))
+                } ?? info.status)
+            HStack(spacing: 10) {
+                if let command = info.command {
+                    Button {
+                        let pasteboard = NSPasteboard.general
+                        pasteboard.clearContents()
+                        copied = pasteboard.setString(command, forType: .string)
+                    } label: {
+                        Label(L10n.text(copied ? "Copied" : "Copy Update Command"), systemImage: "doc.on.doc")
+                    }
+                    .controlSize(.small)
+                    .help(command)
+                    .accessibilityLabel(String(format: L10n.text("Copy update command for %@"), id.title))
+                    .onChange(of: command) { _ in copied = false }
+                }
+                if let guideURL {
+                    Link(L10n.text("Installation Guide"), destination: guideURL)
+                }
+            }
+        }
+        .font(.caption)
+    }
+
+    private var guideURL: URL? {
+        switch id {
+        case .codex: URL(string: "https://github.com/openai/codex#installing-and-running-codex-cli")
+        case .claude: URL(string: "https://code.claude.com/docs/en/installation#update-claude-code")
+        case .github: URL(string: "https://github.com/cli/cli#installation")
+        default: nil
+        }
     }
 }

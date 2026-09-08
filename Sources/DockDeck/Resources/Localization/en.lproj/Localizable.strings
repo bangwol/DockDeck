@@ -96,6 +96,9 @@
 "Metrics" = "Metrics";
 "Compact Layout" = "Compact Layout";
 "Choose 2–4 tiles" = "Choose 2–4 tiles";
+"Tile order (left to right)" = "Tile order (left to right)";
+"Move %@ up" = "Move %@ up";
+"Move %@ down" = "Move %@ down";
 "Network interface" = "Network interface";
 "Automatic (primary)" = "Automatic (primary)";
 "Memory" = "Memory";
@@ -152,3 +155,43 @@
 "Next Track" = "Next Track";
 "Connect Music…" = "Connect Music…";
 "Open Music" = "Open Music";
+
+"Native installer" = "Native installer";
+
+"App-bundled CLI" = "App-bundled CLI";
+
+"Unknown installation" = "Unknown installation";
+
+"Installed version unavailable" = "Installed version unavailable";
+
+"Preview or custom version" = "Preview or custom version";
+
+"Update through the containing app" = "Update through the containing app";
+
+"Check the installation guide for updates" = "Check the installation guide for updates";
+
+"Checking published version…" = "Checking published version…";
+
+"Update check unavailable" = "Update check unavailable";
+
+"Update available: %@" = "Update available: %@";
+
+"Ahead of published version" = "Ahead of published version";
+
+"Up to date" = "Up to date";
+
+"Installed: %@ · %@" = "Installed: %@ · %@";
+
+"Release metadata checked: %@" = "Release metadata checked: %@";
+
+"Copy Update Command" = "Copy Update Command";
+
+"Copy update command for %@" = "Copy update command for %@";
+
+"Installation Guide" = "Installation Guide";
+
+"CLI updates are advisory and separate from sign-in status. Copy a command and run it yourself; DockDeck does not install updates." = "CLI updates are advisory and separate from sign-in status. Copy a command and run it yourself; DockDeck does not install updates.";
+
+"Installed; status check failed (sign-in or configuration)" = "Installed; status check failed (sign-in or configuration)";
+
+"Copied" = "Copied";

@@ -343,6 +343,7 @@ final class ClaudeUsageCommandProvider: ClaudeUsageCommandReading {
     private let fileManager: FileManager
     private let environment: [String: String]
     private let homeDirectory: URL
+    private let uptime: () -> TimeInterval
     private let probeDirectory: URL
     private let lock = NSLock()
     private var operationID: UUID?
@@ -353,9 +354,11 @@ final class ClaudeUsageCommandProvider: ClaudeUsageCommandReading {
         fileManager: FileManager = .default,
         environment: [String: String] = ProcessInfo.processInfo.environment,
         homeDirectory: URL = FileManager.default.homeDirectoryForCurrentUser,
-        probeDirectory: URL? = nil
+        probeDirectory: URL? = nil,
+        uptime: @escaping () -> TimeInterval = { ProcessInfo.processInfo.systemUptime }
     ) {
         self.fileManager = fileManager
+        self.uptime = uptime
         self.environment = environment
         self.homeDirectory = homeDirectory
         self.probeDirectory = probeDirectory
@@ -505,10 +508,10 @@ final class ClaudeUsageCommandProvider: ClaudeUsageCommandReading {
             clear(terminal, operation: operation)
         }
 
-        let startedAt = Date()
-        var commandSentAt: Date?
-        var parsedAt: Date?
-        while Date().timeIntervalSince(startedAt) < Self.ptyTimeout {
+        let startedAt = uptime()
+        var commandSent = false
+        var parsedAt: TimeInterval?
+        while uptime() - startedAt < Self.ptyTimeout {
             guard isCurrent(operation) else { throw ProbeFailure.cancelled }
             let screen = queue.sync {
                 terminal.terminal.getBufferAsData()
@@ -525,17 +528,17 @@ final class ClaudeUsageCommandProvider: ClaudeUsageCommandReading {
                 throw UsageProviderError.authenticationRequired("Sign in to Claude Code")
             }
 
-            if commandSentAt == nil,
-                text.contains("❯") || Date().timeIntervalSince(startedAt) >= 3
+            if !commandSent,
+                text.contains("❯") || uptime() - startedAt >= 3
             {
                 terminal.send("/usage\r")
-                commandSentAt = Date()
+                commandSent = true
             }
-            if commandSentAt != nil,
+            if commandSent,
                 (try? ClaudeUsageCommandParser.parse(screen)) != nil
             {
-                if parsedAt == nil { parsedAt = Date() }
-                if Date().timeIntervalSince(parsedAt!) >= 0.6 {
+                if parsedAt == nil { parsedAt = uptime() }
+                if uptime() - parsedAt! >= 0.6 {
                     terminal.send(data: [0x1b][...])
                     Thread.sleep(forTimeInterval: 0.15)
                     terminal.send("/exit\r")

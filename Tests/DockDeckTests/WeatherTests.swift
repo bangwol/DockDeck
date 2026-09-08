@@ -199,6 +199,81 @@ final class WeatherTests: XCTestCase {
         WeatherURLProtocol.handler = nil
     }
 
+    func testAutoSlideKeepsWeatherDeadlineAnchoredAcrossCadenceChanges() throws {
+        let session = makeSession()
+        WeatherURLProtocol.handler = { _ in (200, self.forecastData()) }
+        let store = WeatherStore(location: fixtureLocation(), refreshInterval: 900, session: session)
+        defer {
+            store.stop()
+            session.invalidateAndCancel()
+            WeatherURLProtocol.handler = nil
+        }
+        store.start()
+        let firstDeadline = try XCTUnwrap(store.nextRefreshAt)
+        for _ in 0..<20 {
+            store.setRuntimeActivity(.background, lowPowerMode: false)
+            XCTAssertEqual(store.nextRefreshAt, firstDeadline.addingTimeInterval(900))
+            store.setRuntimeActivity(.visible, lowPowerMode: false)
+            XCTAssertEqual(store.nextRefreshAt, firstDeadline)
+        }
+        store.setRuntimeActivity(.visible, lowPowerMode: true)
+        XCTAssertEqual(store.nextRefreshAt, firstDeadline.addingTimeInterval(900))
+        store.setRuntimeActivity(.background, lowPowerMode: true)
+        XCTAssertEqual(store.nextRefreshAt, firstDeadline.addingTimeInterval(2_700))
+        store.setRuntimeActivity(.visible, lowPowerMode: false)
+        XCTAssertEqual(store.nextRefreshAt, firstDeadline)
+        store.stop()
+        XCTAssertNil(store.nextRefreshAt)
+    }
+
+    func testRefreshFailureAndResumeKeepWeatherScheduled() throws {
+        let session = makeSession()
+        WeatherURLProtocol.handler = { _ in (200, self.forecastData()) }
+        let store = WeatherStore(location: fixtureLocation(), refreshInterval: 900, session: session)
+        defer {
+            store.stop()
+            session.invalidateAndCancel()
+            WeatherURLProtocol.handler = nil
+        }
+        let loaded = expectation(description: "Initial weather")
+        let observation = store.$status.dropFirst().first(where: { $0 == .ready }).sink { _ in loaded.fulfill() }
+        store.start()
+        wait(for: [loaded], timeout: 1)
+        observation.cancel()
+        let firstSnapshot = try XCTUnwrap(store.snapshot)
+        let firstDeadline = try XCTUnwrap(store.nextRefreshAt)
+
+        WeatherURLProtocol.handler = { _ in (503, Data()) }
+        let failed = expectation(description: "Refresh failed")
+        let failureObservation = store.$status.first(where: {
+            if case .failed = $0 { return true }
+            return false
+        }).sink { _ in failed.fulfill() }
+        store.refresh()
+        let retryDeadline = try XCTUnwrap(store.nextRefreshAt)
+        wait(for: [failed], timeout: 1)
+        failureObservation.cancel()
+        XCTAssertGreaterThan(retryDeadline, firstDeadline)
+        XCTAssertEqual(store.snapshot?.receivedAt, firstSnapshot.receivedAt)
+        store.setRuntimeActivity(.background, lowPowerMode: false)
+        XCTAssertEqual(store.nextRefreshAt, retryDeadline.addingTimeInterval(900))
+        store.stop()
+        XCTAssertNil(store.nextRefreshAt)
+
+        WeatherURLProtocol.handler = { _ in (200, self.forecastData()) }
+        let resumed = expectation(description: "Weather after resume")
+        let resumeObservation = store.$status.first(where: { $0 == .ready }).sink { _ in resumed.fulfill() }
+        store.start()
+        wait(for: [resumed], timeout: 1)
+        resumeObservation.cancel()
+        XCTAssertGreaterThan(try XCTUnwrap(store.nextRefreshAt), retryDeadline.addingTimeInterval(900))
+        XCTAssertGreaterThan(try XCTUnwrap(store.snapshot?.receivedAt), firstSnapshot.receivedAt)
+        store.updateConfiguration(location: nil, unit: .celsius, refreshInterval: 900)
+        XCTAssertNil(store.nextRefreshAt)
+        XCTAssertNil(store.snapshot)
+        XCTAssertEqual(store.status, .idle)
+    }
+
     func testLocationSearchPublishesResultsOnlyOnRequest() throws {
         let session = makeSession()
         WeatherURLProtocol.handler = { request in

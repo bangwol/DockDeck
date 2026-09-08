@@ -5,6 +5,10 @@ metrics and a 1–10 second sampling interval under
 **Settings → System Stats**. Only selected metrics are sampled, and disabling
 the module stops all sampling.
 
+Use the up/down buttons beside selected metrics to change their order. The list
+runs from the panel's leftmost tile to its rightmost tile. The order is saved;
+newly selected metrics are appended after the existing selection.
+
 | Metric | Reading |
 | --- | --- |
 | GPU | Busiest device utilization reported by the local GPU driver, when available |
@@ -21,7 +25,10 @@ color-coded thermal-pressure bar.
 
 CPU, GPU, memory, and network histories cover only the latest 15 minutes and at most
 900 samples. They stay in memory, reset when DockDeck exits, and are discarded
-if the system clock moves backwards. System Stats detail keeps distinct download and upload histories under the same limits.
+if the system clock moves backwards. Transfer-rate intervals and temperature
+sampling cooldowns use monotonic uptime, so changing the system clock does not
+distort transfer speeds or stall temperature sampling. System Stats detail keeps
+distinct download and upload histories under the same limits.
 
 ## Memory semantics on macOS
 

@@ -104,13 +104,35 @@ final class SystemStatsTests: XCTestCase {
 
     func testMetricSelectionUsesStableTwoToFourTileBounds() {
         XCTAssertEqual(SystemStatsMetric.normalized([]), [.cpu, .memory, .disk, .network])
-        XCTAssertEqual(SystemStatsMetric.normalized([.thermal]), [.cpu, .thermal])
+        XCTAssertEqual(SystemStatsMetric.normalized([.thermal]), [.thermal, .cpu])
         XCTAssertEqual(
             SystemStatsMetric.normalized(SystemStatsMetric.allCases),
             [.cpu, .memory, .disk, .network])
         XCTAssertEqual(
             SystemStatsMetric.normalized([.thermal, .network, .network]),
-            [.network, .thermal])
+            [.thermal, .network])
+        XCTAssertEqual(
+            SystemStatsMetric.normalized([.gpu, .network, .gpu, .cpu, .memory, .disk]),
+            [.gpu, .network, .cpu, .memory])
+    }
+
+    func testMetricOrderSurvivesPreferencesAndStoreUpdates() {
+        let defaults = UserDefaults.standard
+        let key = "DockDeck.settings.systemStatsMetrics"
+        let previous = defaults.object(forKey: key)
+        defer {
+            if let previous { defaults.set(previous, forKey: key) }
+            else { defaults.removeObject(forKey: key) }
+        }
+        let metrics: [SystemStatsMetric] = [.gpu, .network, .cpu, .memory]
+        PanelSettings.systemStatsMetrics = metrics
+        XCTAssertEqual(PanelSettings.systemStatsMetrics, metrics)
+        let store = SystemStatsStore(metrics: PanelSettings.systemStatsMetrics)
+        XCTAssertEqual(store.selectedMetrics, metrics)
+        store.setMetrics([.network, .gpu])
+        XCTAssertEqual(store.selectedMetrics, [.network, .gpu])
+        defaults.set(["gpu", "future-metric", "network", "gpu"], forKey: key)
+        XCTAssertEqual(PanelSettings.systemStatsMetrics, [.gpu, .network])
     }
 
     func testCPUPercentUsesCounterDeltas() throws {

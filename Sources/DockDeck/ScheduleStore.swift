@@ -398,6 +398,8 @@ final class ScheduleStore: ObservableObject {
     private var includeAllDay: Bool
     private var includeReminders: Bool
     private var refreshInterval: TimeInterval
+    var nextRefreshAt: Date? { timer?.fireDate }
+
     private var timer: Timer?
     private var generation = 0
     private var storeChangeRefresh: DispatchWorkItem?
@@ -423,6 +425,11 @@ final class ScheduleStore: ObservableObject {
         authorization = provider.authorizationState
         reminderAuthorization = provider.reminderAuthorizationState
         provider.onStoreChanged = { [weak self] in self?.scheduleStoreChangeRefresh() }
+    }
+
+    deinit {
+        timer?.invalidate()
+        storeChangeRefresh?.cancel()
     }
 
     var canReadAnySource: Bool {
@@ -515,7 +522,7 @@ final class ScheduleStore: ObservableObject {
         guard refreshCadence.update(activity: activity, lowPowerMode: lowPowerMode),
             isRunning, canReadAnySource
         else { return }
-        scheduleTimer()
+        scheduleTimer(preservingElapsed: true)
     }
 
     /// EventKit posts bursts of change notifications while syncing; fetch once they settle.
@@ -561,15 +568,16 @@ final class ScheduleStore: ObservableObject {
         }
     }
 
-    private func scheduleTimer() {
-        timer?.invalidate()
+    private func scheduleTimer(preservingElapsed: Bool = false) {
         guard isRunning, canReadAnySource else {
+            timer?.invalidate()
             timer = nil
             return
         }
         let interval = refreshCadence.effectiveInterval(
             configuredInterval: refreshInterval)
-        timer = .moduleRefreshTimer(interval: interval) { [weak self] in self?.refresh() }
+        timer = .moduleRefreshTimer(
+            interval: interval, replacing: timer, preservingElapsed: preservingElapsed) { [weak self] in self?.refresh() }
     }
 
     private func resumeAfterAuthorizationChange() {

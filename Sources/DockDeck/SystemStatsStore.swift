@@ -50,15 +50,17 @@ enum SystemStatsMetric: String, CaseIterable, Codable, Identifiable {
 
     static func normalized(_ metrics: [Self]) -> [Self] {
         guard !metrics.isEmpty else { return defaultSelection }
-        let requested = Set(metrics)
-        var result = Array(allCases.filter(requested.contains).prefix(maximumSelectionCount))
+        var result: [Self] = []
+        for metric in metrics where !result.contains(metric) {
+            result.append(metric)
+            if result.count == maximumSelectionCount { break }
+        }
         for metric in defaultSelection
             where result.count < minimumSelectionCount && !result.contains(metric)
         {
             result.append(metric)
         }
-        let selected = Set(result)
-        return allCases.filter(selected.contains)
+        return result
     }
 }
 
@@ -178,12 +180,14 @@ final class SystemStatsStore: ObservableObject {
     @Published private(set) var selectedMetrics: [SystemStatsMetric]
     private(set) var histories: [SystemStatsMetric: MetricHistory] = [:]
 
+    var nextRefreshAt: Date? { timer?.fireDate }
+
     private var timer: Timer?
     private var previousCPU: CPUCounters?
     let network: NetworkStore
     private let gpuReader: () -> Double?
     private var cachedTemperatureCelsius: Double?
-    private var lastTemperatureAttempt: Date?
+    private var lastTemperatureAttempt: TimeInterval?
     private var temperatureReadInFlight = false
     private var temperatureReadGeneration = 0
     private var refreshInterval: TimeInterval
@@ -234,8 +238,7 @@ final class SystemStatsStore: ObservableObject {
         guard refreshCadence.update(activity: activity, lowPowerMode: lowPowerMode),
             timer != nil
         else { return }
-        timer?.invalidate()
-        scheduleTimer()
+        scheduleTimer(preservingElapsed: true)
     }
 
     func setMetrics(_ metrics: [SystemStatsMetric]) {
@@ -300,7 +303,7 @@ final class SystemStatsStore: ObservableObject {
                 ? nil : totalNetworkRate,
             at: now)
         snapshot = nextSnapshot
-        if metrics.contains(.thermal) { refreshTemperatureIfNeeded(now: now) }
+        if metrics.contains(.thermal) { refreshTemperatureIfNeeded(uptime: ProcessInfo.processInfo.systemUptime) }
     }
 
     func history(for metric: SystemStatsMetric) -> MetricHistory {
@@ -314,10 +317,11 @@ final class SystemStatsStore: ObservableObject {
         histories[metric] = history
     }
 
-    private func scheduleTimer() {
+    private func scheduleTimer(preservingElapsed: Bool = false) {
         let interval = refreshCadence.effectiveInterval(
             configuredInterval: refreshInterval)
-        timer = .moduleRefreshTimer(interval: interval) { [weak self] in self?.refresh() }
+        timer = .moduleRefreshTimer(
+            interval: interval, replacing: timer, preservingElapsed: preservingElapsed) { [weak self] in self?.refresh() }
     }
 
     private static func percent(used: UInt64?, total: UInt64?) -> Double? {
@@ -325,14 +329,14 @@ final class SystemStatsStore: ObservableObject {
         return SystemStatsCalculator.boundedPercent(used: used, total: total)
     }
 
-    private func refreshTemperatureIfNeeded(now: Date) {
+    private func refreshTemperatureIfNeeded(uptime: TimeInterval) {
         guard !temperatureReadInFlight,
             lastTemperatureAttempt.map({
-                now.timeIntervalSince($0) >= Self.temperatureRefreshInterval
+                uptime - $0 >= Self.temperatureRefreshInterval
             }) ?? true
         else { return }
 
-        lastTemperatureAttempt = now
+        lastTemperatureAttempt = uptime
         temperatureReadInFlight = true
         let generation = temperatureReadGeneration
         DispatchQueue.global(qos: .utility).async { [weak self] in

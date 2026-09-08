@@ -102,6 +102,8 @@ final class ClockStore: ObservableObject {
         self.now = now
     }
 
+    deinit { timer?.invalidate() }
+
     func start() {
         guard timer == nil else { return }
         now = Date()

@@ -96,6 +96,9 @@
 "Metrics" = "지표";
 "Compact Layout" = "작은 패널 배치";
 "Choose 2–4 tiles" = "타일 2–4개 선택";
+"Tile order (left to right)" = "타일 순서 (왼쪽에서 오른쪽)";
+"Move %@ up" = "%@ 위로 이동";
+"Move %@ down" = "%@ 아래로 이동";
 "Network interface" = "네트워크 인터페이스";
 "Automatic (primary)" = "자동 (주 인터페이스)";
 "Memory" = "메모리";
@@ -152,3 +155,43 @@
 "Next Track" = "다음 트랙";
 "Connect Music…" = "음악 연결…";
 "Open Music" = "음악 열기";
+
+"Native installer" = "네이티브 설치";
+
+"App-bundled CLI" = "앱에 포함된 CLI";
+
+"Unknown installation" = "설치 방식 확인 불가";
+
+"Installed version unavailable" = "설치 버전 확인 불가";
+
+"Preview or custom version" = "프리뷰 또는 사용자 지정 버전";
+
+"Update through the containing app" = "CLI가 포함된 앱에서 업데이트하세요";
+
+"Check the installation guide for updates" = "업데이트 방법은 설치 가이드를 확인하세요";
+
+"Checking published version…" = "배포 버전 확인 중…";
+
+"Update check unavailable" = "업데이트 확인 불가";
+
+"Update available: %@" = "업데이트 가능: %@";
+
+"Ahead of published version" = "배포 버전보다 최신";
+
+"Up to date" = "최신 버전";
+
+"Installed: %@ · %@" = "설치 버전: %@ · %@";
+
+"Release metadata checked: %@" = "배포 버전 확인 시각: %@";
+
+"Copy Update Command" = "업데이트 명령어 복사";
+
+"Copy update command for %@" = "%@ 업데이트 명령어 복사";
+
+"Installation Guide" = "설치 가이드";
+
+"CLI updates are advisory and separate from sign-in status. Copy a command and run it yourself; DockDeck does not install updates." = "CLI 업데이트 안내는 로그인 상태와 별개입니다. 명령어를 복사해 직접 실행하세요. DockDeck은 업데이트를 설치하지 않습니다.";
+
+"Installed; status check failed (sign-in or configuration)" = "설치됨; 상태 확인 실패 (로그인 또는 설정)";
+
+"Copied" = "복사됨";

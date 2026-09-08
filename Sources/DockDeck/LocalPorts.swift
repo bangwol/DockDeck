@@ -114,6 +114,8 @@ final class LocalPortsStore: ObservableObject, PanelModuleRuntime {
     private let queue = DispatchQueue(label: "DockDeck.LocalPorts", qos: .utility)
     private var cadence = ModuleRefreshCadence(backgroundMultiplier: 3)
     private var request: Progress?
+    var nextRefreshAt: Date? { timer?.fireDate }
+
     private var timer: Timer?
     private var generation = 0
     private var running = false
@@ -140,7 +142,7 @@ final class LocalPortsStore: ObservableObject, PanelModuleRuntime {
         if running { schedule(); refresh() }
     }
     func setRuntimeActivity(_ activity: ModuleRuntimeActivity, lowPowerMode: Bool) {
-        if cadence.update(activity: activity, lowPowerMode: lowPowerMode), running { schedule() }
+        if cadence.update(activity: activity, lowPowerMode: lowPowerMode), running { schedule(preservingElapsed: true) }
     }
     func refresh() {
         guard running, !isRefreshing else { return }
@@ -166,9 +168,10 @@ final class LocalPortsStore: ObservableObject, PanelModuleRuntime {
             }
         }
     }
-    private func schedule() {
-        timer?.invalidate()
-        timer = .moduleRefreshTimer(interval: cadence.effectiveInterval(configuredInterval: configuration.refreshInterval)) { [weak self] in self?.refresh() }
+    private func schedule(preservingElapsed: Bool = false) {
+        timer = .moduleRefreshTimer(
+            interval: cadence.effectiveInterval(configuredInterval: configuration.refreshInterval),
+            replacing: timer, preservingElapsed: preservingElapsed) { [weak self] in self?.refresh() }
     }
 }
 

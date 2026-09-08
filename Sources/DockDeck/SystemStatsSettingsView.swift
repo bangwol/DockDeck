@@ -38,27 +38,13 @@ struct SystemStatsSettingsView: View {
                                 .foregroundStyle(.secondary)
                         }
 
-                        LazyVGrid(
-                            columns: [
-                                GridItem(.flexible(), alignment: .leading),
-                                GridItem(.flexible(), alignment: .leading),
-                            ],
-                            alignment: .leading,
-                            spacing: 10
-                        ) {
-                            ForEach(SystemStatsMetric.allCases) { metric in
-                                let enabled = model.isSystemStatsMetricEnabled(metric)
-                                Toggle(
-                                    isOn: Binding(
-                                        get: { model.isSystemStatsMetricEnabled(metric) },
-                                        set: { model.setSystemStatsMetric(metric, enabled: $0) })
-                                ) {
-                                    Label(metric.title, systemImage: metric.symbolName)
-                                }
-                                .toggleStyle(.checkbox)
-                                .disabled(
-                                    !model.canSetSystemStatsMetric(metric, enabled: !enabled))
-                            }
+                        Text(L10n.text("Tile order (left to right)"))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        ForEach(model.values.systemStats.metrics + SystemStatsMetric.allCases.filter {
+                            !model.isSystemStatsMetricEnabled($0)
+                        }) { metric in
+                            metricRow(metric)
                         }
 
                         Divider()
@@ -118,6 +104,37 @@ struct SystemStatsSettingsView: View {
             .padding(24)
         }
     }
+
+    private func metricRow(_ metric: SystemStatsMetric) -> some View {
+        HStack {
+            Toggle(isOn: Binding(
+                get: { model.isSystemStatsMetricEnabled(metric) },
+                set: { model.setSystemStatsMetric(metric, enabled: $0) })
+            ) {
+                Label(L10n.text(metric.title), systemImage: metric.symbolName)
+            }
+            .toggleStyle(.checkbox)
+            .disabled(!model.canSetSystemStatsMetric(
+                metric, enabled: !model.isSystemStatsMetricEnabled(metric)))
+            Spacer()
+            if let index = model.values.systemStats.metrics.firstIndex(of: metric) {
+                let moveUp = String(format: L10n.text("Move %@ up"), L10n.text(metric.title))
+                let moveDown = String(format: L10n.text("Move %@ down"), L10n.text(metric.title))
+                Button { model.moveSystemStatsMetric(metric, earlier: true) } label: {
+                    Label(moveUp, systemImage: "chevron.up").labelStyle(.iconOnly)
+                }
+                .help(moveUp)
+                .disabled(index == 0)
+                Button { model.moveSystemStatsMetric(metric, earlier: false) } label: {
+                    Label(moveDown, systemImage: "chevron.down").labelStyle(.iconOnly)
+                }
+                .help(moveDown)
+                .disabled(index == model.values.systemStats.metrics.count - 1)
+            }
+        }
+        .controlSize(.small)
+    }
+
     private var availableInterfaces: [String] {
         var names = NetworkCounterReader.availableInterfaces()
         let selected = model.values.systemStats.networkInterfaceName

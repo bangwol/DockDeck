@@ -171,6 +171,23 @@ final class ProjectPulseTests: XCTestCase {
         XCTAssertNil(try GitHubRunParser.parse(Data("[]".utf8)))
     }
 
+    func testGitHubCacheExpiresAndRejectsClockRollback() throws {
+        var now = Date(timeIntervalSince1970: 10_000)
+        let broker = GitHubCLIRequestBroker(now: { now })
+        func read(_ text: String) throws -> String {
+            String(decoding: try broker.run(executableURL: URL(fileURLWithPath: "/usr/bin/printf"),
+                arguments: [text], currentDirectoryURL: FileManager.default.temporaryDirectory,
+                environment: [:], cacheKey: "clock-test", cacheDuration: 60), as: UTF8.self)
+        }
+        XCTAssertEqual(try read("first"), "first")
+        now = now.addingTimeInterval(59)
+        XCTAssertEqual(try read("second"), "first")
+        now = now.addingTimeInterval(1)
+        XCTAssertEqual(try read("second"), "second")
+        now = now.addingTimeInterval(-3_600)
+        XCTAssertEqual(try read("third"), "third")
+    }
+
     func testGitHubRequestBrokerSharesShortLivedSuccessfulResponses() throws {
         let cacheKey = "test-\(UUID().uuidString)"
         let directory = FileManager.default.temporaryDirectory
@@ -312,6 +329,8 @@ final class ProjectPulseTests: XCTestCase {
         }
 
         store.start()
+        assertCadenceKeepsPollingDeadline(store, interval: ProjectPulseConfiguration(repositoryPath: "/tmp").refreshInterval,
+            backgroundMultiplier: 5, deadline: { store.nextRefreshAt })
         wait(for: [completed], timeout: 1)
 
         XCTAssertEqual(store.snapshot, snapshot)
