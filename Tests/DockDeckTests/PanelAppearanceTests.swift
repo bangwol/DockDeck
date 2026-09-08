@@ -1252,6 +1252,28 @@ final class PanelAppearanceTests: XCTestCase {
         XCTAssertTrue(scroller.isHidden)
     }
 
+    func testDeckPanelsUseNormalWindowLevelWithoutFullScreenOverlay() {
+        let theme = Theme.theme(id: "")
+        let terminal = TerminalPanelController(
+            initialFrame: NSRect(x: 0, y: 0, width: 214, height: 59),
+            theme: theme, menuTarget: NSObject(),
+            menuAction: #selector(NSObject.isEqual(_:)))
+        let readOnly = makeReadOnlyDeckController(side: .right)
+        let hint = FallbackHintPanel.make(
+            message: "Permission hint", width: 300, theme: theme,
+            cornerRadius: 8, tintOpacity: nil, font: .systemFont(ofSize: 12),
+            target: NSObject(), action: #selector(NSObject.isEqual(_:))).panel
+        for panel in [terminal.panel, readOnly.panel, hint] {
+            XCTAssertEqual(panel.level, .normal)
+            XCTAssertFalse(panel.isFloatingPanel)
+            XCTAssertFalse(panel.collectionBehavior.contains(.fullScreenAuxiliary))
+            XCTAssertTrue(panel.collectionBehavior.contains(.canJoinAllSpaces))
+            XCTAssertFalse(panel.hidesOnDeactivate)
+        }
+        XCTAssertTrue(terminal.panel.canBecomeKey)
+        XCTAssertFalse(readOnly.panel.canBecomeKey)
+    }
+
     func testReadOnlyDeckRebuildsOnlyWhenActiveModuleChanges() {
         let previousConfiguration = PanelSettings.deckConfiguration
         let previousRight = PanelSettings.activeModule(on: .right)

@@ -195,7 +195,7 @@ extension AppDelegate {
             if panel.isVisible { panel.orderOut(nil) }
             return
         }
-        if !panel.isVisible { panel.orderFrontRegardless() }
+        if !panel.isVisible { panel.orderBack(nil) }
         applyFrame(frame, animated: animated)
     }
 
@@ -208,7 +208,7 @@ extension AppDelegate {
             return
         }
         controller.synchronizeActiveModule()
-        if !controller.panel.isVisible { controller.panel.orderFrontRegardless() }
+        if !controller.panel.isVisible { controller.panel.orderBack(nil) }
         applyReadOnlyDeckFrame(frame, on: side)
     }
 

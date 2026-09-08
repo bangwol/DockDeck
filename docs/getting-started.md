@@ -107,6 +107,12 @@ respected.
 
 ## Panel controls
 
+Decks use normal window stacking: they remain visible in the free space beside
+the Dock, and other app windows can cover them. Automatic layout and module
+changes do not raise decks over the active app, including full-screen and
+presentation windows. Settings and the theme picker also use normal window levels
+and stay in their own desktop Space.
+
 | Action | Result |
 | --- | --- |
 | Scroll over a compact Deck | Select the previous or next enabled module |

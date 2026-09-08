@@ -51,11 +51,11 @@ extension AppDelegate {
             backing: .buffered,
             defer: false
         )
-        pickerPanel.level = NSWindow.Level(rawValue: Int(kCGDockWindowLevel) + 2)
+        pickerPanel.level = .normal
         pickerPanel.isOpaque = false
         pickerPanel.backgroundColor = .clear
         pickerPanel.hidesOnDeactivate = false
-        pickerPanel.collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle]
+        pickerPanel.collectionBehavior = [.stationary, .fullScreenNone, .ignoresCycle]
         pickerPanel.contentView = picker
 
         pickerPanel.makeKeyAndOrderFront(nil)

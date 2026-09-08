@@ -1,5 +1,4 @@
 import Cocoa
-import CoreGraphics
 import SwiftTerm
 
 enum PanelBuilder {
@@ -18,7 +17,7 @@ enum PanelBuilder {
             backing: .buffered,
             defer: false
         )
-        panel.level = NSWindow.Level(rawValue: Int(kCGDockWindowLevel) + 1)
+        panel.level = .normal
         panel.title = "DockDeck Terminal"
         panel.setAccessibilityLabel("DockDeck Terminal")
         panel.isOpaque = false
@@ -26,7 +25,7 @@ enum PanelBuilder {
         panel.hasShadow = false
         panel.isMovable = false
         panel.collectionBehavior = [
-            .canJoinAllSpaces, .stationary, .fullScreenAuxiliary, .ignoresCycle,
+            .canJoinAllSpaces, .stationary, .fullScreenNone, .ignoresCycle,
         ]
         panel.hidesOnDeactivate = false
 
