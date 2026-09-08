@@ -82,6 +82,19 @@ final class CLIUpdateTests: XCTestCase {
         XCTAssertNil(CLIReleaseChecker.parseMetadata(Data(repeating: 32, count: 256 * 1_024 + 1)))
     }
 
+    func testClockRollbackInvalidatesReleaseCache() async {
+        var now = Date(timeIntervalSince1970: 10_000)
+        var requests = 0
+        let checker = CLIReleaseChecker(fetch: { _ in
+            requests += 1
+            return Data(#"{"version":"0.153.4"}"#.utf8)
+        }, now: { now })
+        _ = await checker.check(info(version: "0.145.0"))
+        now = now.addingTimeInterval(-3_600)
+        _ = await checker.check(info(version: "0.145.0"))
+        XCTAssertEqual(requests, 2)
+    }
+
     func testReleaseCacheExpiresAndFailureDoesNotClaimCurrent() async {
         var now = Date(timeIntervalSince1970: 1_000)
         var requests = 0

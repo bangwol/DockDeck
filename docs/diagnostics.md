@@ -79,8 +79,9 @@ installation guide before changing an intentionally pinned installation.
 
 Version metadata requests run only when Diagnostics opens or is refreshed,
 without authentication, cookies, or persistent response storage. Successful
-results are cached in memory for six hours, failures for five minutes. Installed
-versions are read again on every refresh. An offline or malformed response shows
+results are cached in memory for six hours, failures for five minutes. A system
+clock rollback invalidates cached results. Installed versions are read again on
+every refresh. An offline or malformed response shows
 **Update check unavailable**, never **Up to date**. Each request has an eight-second
 resource timeout and a 256 KiB response limit; version commands have a three-second
 limit and 4 KiB output limit. No installed versions, local paths, or account data

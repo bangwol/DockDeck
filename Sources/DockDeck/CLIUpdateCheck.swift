@@ -195,7 +195,7 @@ actor CLIReleaseChecker {
             let url = info.installation.metadataURL else { return info }
         let date = now()
         let result: Result
-        if let cached = cache[url],
+        if let cached = cache[url], date >= cached.checkedAt,
             date.timeIntervalSince(cached.checkedAt) < (cached.version == nil ? 300 : 21_600)
         {
             result = cached

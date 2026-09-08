@@ -6,13 +6,16 @@ final class GitHubCLIRequestBroker {
 
     private struct CacheEntry {
         let data: Data
+        let createdAt: Date
         let expiresAt: Date
     }
 
     private let gate = DispatchSemaphore(value: 1)
     private var cache: [String: CacheEntry] = [:]
 
-    private init() {}
+    private let now: () -> Date
+
+    init(now: @escaping () -> Date = Date.init) { self.now = now }
 
     func run(
         executableURL: URL,
@@ -31,8 +34,8 @@ final class GitHubCLIRequestBroker {
         defer { gate.signal() }
         if cancellation?.isCancelled == true { throw BoundedProcessError.cancelled }
 
-        let now = Date()
-        cache = cache.filter { $0.value.expiresAt > now }
+        let now = now()
+        cache = cache.filter { $0.value.createdAt <= now && $0.value.expiresAt > now }
         if let cacheKey, let cached = cache[cacheKey] { return cached.data }
 
         let data: Data
@@ -56,7 +59,7 @@ final class GitHubCLIRequestBroker {
         }
         if let cacheKey, cacheDuration > 0 {
             cache[cacheKey] = CacheEntry(
-                data: data, expiresAt: now.addingTimeInterval(cacheDuration))
+                data: data, createdAt: now, expiresAt: now.addingTimeInterval(cacheDuration))
         }
         return data
     }
