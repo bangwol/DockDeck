@@ -141,6 +141,9 @@ After sleep or restart, it counts one completed phase and starts the next from
 the current time, without replaying missed cycles. A running timer uses an absolute deadline, so it continues while
 another module is selected and resumes correctly after DockDeck restarts.
 
+Replacing a saved session re-arms its completion timer immediately, including
+when the previous session was idle.
+
 DockDeck writes the phase, deadline, and remaining duration only when timer
 state changes, not every second. The visible countdown refreshes once per second;
 while hidden it uses a coarser cadence plus a separate one-shot completion

@@ -187,6 +187,7 @@ final class FocusTimerStore: ObservableObject {
         self.session = (session ?? .idle(settings: settings)).normalized(settings: settings, now: now)
         persistSession()
         refresh(now: now)
+        scheduleTimers(now: now)
     }
 
     func setRuntimeActivity(
