@@ -264,6 +264,8 @@ final class MusicStore: ObservableObject {
 
     private let provider: MusicAutomationProviding
     private let queue: DispatchQueue
+    var nextRefreshAt: Date? { timer?.fireDate }
+
     private var timer: Timer?
     private var isRunning = false
     private var requestID: UUID?
@@ -310,7 +312,7 @@ final class MusicStore: ObservableObject {
         guard refreshCadence.update(activity: activity, lowPowerMode: lowPowerMode),
             isRunning
         else { return }
-        scheduleTimer()
+        scheduleTimer(preservingElapsed: true)
     }
 
     func refresh() {
@@ -443,14 +445,15 @@ final class MusicStore: ObservableObject {
 
     deinit { timer?.invalidate() }
 
-    private func scheduleTimer() {
-        timer?.invalidate()
+    private func scheduleTimer(preservingElapsed: Bool = false) {
         guard isRunning else {
+            timer?.invalidate()
             timer = nil
             return
         }
         let interval = refreshCadence.effectiveInterval(
             configuredInterval: Self.refreshInterval)
-        timer = .moduleRefreshTimer(interval: interval) { [weak self] in self?.refresh() }
+        timer = .moduleRefreshTimer(
+            interval: interval, replacing: timer, preservingElapsed: preservingElapsed) { [weak self] in self?.refresh() }
     }
 }

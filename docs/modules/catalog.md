@@ -58,6 +58,13 @@ precipitation-probability forecasts, displayed in the selected city's time zone.
 Hourly fields use the same forecast request and polling interval; missing values
 are shown as unavailable. Failed refreshes retain the previous result with an error.
 
+The foreground refresh interval is 15, 30 (default), or 60 minutes. Background
+modules use twice that interval; Low Power Mode or serious thermal pressure
+doubles it again. Switching decks or auto-sliding changes the interval while
+keeping elapsed time since the last request, so repeated switches cannot keep
+postponing a refresh. Manual refreshes start a new interval. After display sleep
+or session inactivity, Weather requests fresh data when the module resumes.
+
 DockDeck stores the selected city and coordinates in local preferences. Search
 text and coordinates are sent over HTTPS only when searching or while the
 enabled module refreshes. Requests use an ephemeral session without persistent

@@ -94,6 +94,8 @@ final class DockerTests: XCTestCase {
         }
 
         store.start()
+        assertCadenceKeepsPollingDeadline(store, interval: DockerConfiguration.defaultRefreshInterval,
+            backgroundMultiplier: 4, deadline: { store.nextRefreshAt })
         wait(for: [loaded], timeout: 2)
 
         let size = NSSize(width: 214, height: 59)

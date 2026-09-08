@@ -20,6 +20,8 @@ final class LocalPortsTests: XCTestCase {
         let reader = BlockingPortReader(started: started)
         let store = LocalPortsStore(reader: reader)
         store.start()
+        assertCadenceKeepsPollingDeadline(store, interval: store.configuration.refreshInterval,
+            backgroundMultiplier: 3, deadline: { store.nextRefreshAt })
         wait(for: [started], timeout: 1)
         store.stop()
         reader.gate.signal()

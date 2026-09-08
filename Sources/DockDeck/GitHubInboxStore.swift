@@ -397,6 +397,8 @@ final class GitHubInboxStore: ObservableObject {
     private var configuration: GitHubInboxConfiguration
     private let reader: GitHubInboxReading
     private let queue: DispatchQueue
+    var nextRefreshAt: Date? { timer?.fireDate }
+
     private var timer: Timer?
     private var isRunning = false
     private var requestID: UUID?
@@ -454,7 +456,7 @@ final class GitHubInboxStore: ObservableObject {
         guard refreshCadence.update(activity: activity, lowPowerMode: lowPowerMode),
             isRunning
         else { return }
-        scheduleTimer()
+        scheduleTimer(preservingElapsed: true)
     }
 
     func refresh() {
@@ -501,15 +503,16 @@ final class GitHubInboxStore: ObservableObject {
         activeCancellation?.cancel()
     }
 
-    private func scheduleTimer() {
-        timer?.invalidate()
+    private func scheduleTimer(preservingElapsed: Bool = false) {
         guard isRunning else {
+            timer?.invalidate()
             timer = nil
             return
         }
         let interval = refreshCadence.effectiveInterval(
             configuredInterval: max(
                 configuration.refreshInterval, reader.minimumPollInterval))
-        timer = .moduleRefreshTimer(interval: interval) { [weak self] in self?.refresh() }
+        timer = .moduleRefreshTimer(
+            interval: interval, replacing: timer, preservingElapsed: preservingElapsed) { [weak self] in self?.refresh() }
     }
 }

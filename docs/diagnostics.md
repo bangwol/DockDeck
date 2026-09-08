@@ -103,3 +103,9 @@ slowing eligible timers. The terminal preserves its shell across display sleep
 while read-only modules suspend. This snapshot is refreshed with the diagnostic
 checks and does not add a runtime polling loop. Hover a module state to see when
 its current state began; the timestamp is also included in a copied report.
+
+Activity and power-state changes retain elapsed time in a module's polling
+interval. Repeated deck switches therefore cannot postpone a poll indefinitely;
+a poll that is already due runs when the main run loop can handle it. Explicit
+reconfiguration and resuming a stopped module start a new polling interval.
+In-flight work keeps each module's existing cancellation and timeout limits.

@@ -14,6 +14,8 @@ final class NetworkTests: XCTestCase {
         })
         let stats = SystemStatsStore(metrics: [.cpu, .network], network: network)
         stats.start()
+        assertCadenceKeepsPollingDeadline(stats, interval: PanelSettings.systemStatsRefreshInterval,
+            backgroundMultiplier: 4, deadline: { stats.nextRefreshAt })
         stats.start()
         XCTAssertEqual(reads, 1)
         XCTAssertEqual(observer.startCount, 1)

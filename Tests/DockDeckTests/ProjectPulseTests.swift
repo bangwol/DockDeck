@@ -312,6 +312,8 @@ final class ProjectPulseTests: XCTestCase {
         }
 
         store.start()
+        assertCadenceKeepsPollingDeadline(store, interval: ProjectPulseConfiguration(repositoryPath: "/tmp").refreshInterval,
+            backgroundMultiplier: 5, deadline: { store.nextRefreshAt })
         wait(for: [completed], timeout: 1)
 
         XCTAssertEqual(store.snapshot, snapshot)

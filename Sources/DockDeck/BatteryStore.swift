@@ -91,6 +91,8 @@ enum BatteryReader {
 final class BatteryStore: ObservableObject {
     @Published private(set) var snapshot: BatterySnapshot?
 
+    var nextRefreshAt: Date? { timer?.fireDate }
+
     private var timer: Timer?
     private var refreshInterval: TimeInterval
     private var refreshCadence = ModuleRefreshCadence(backgroundMultiplier: 4)
@@ -102,6 +104,8 @@ final class BatteryStore: ObservableObject {
         self.refreshInterval = Self.resolvedRefreshInterval(refreshInterval)
         snapshot = initialSnapshot
     }
+
+    deinit { timer?.invalidate() }
 
     func start() {
         guard timer == nil else { return }
@@ -129,8 +133,7 @@ final class BatteryStore: ObservableObject {
         guard refreshCadence.update(activity: activity, lowPowerMode: lowPowerMode),
             timer != nil
         else { return }
-        timer?.invalidate()
-        scheduleTimer()
+        scheduleTimer(preservingElapsed: true)
     }
 
     func refresh() {
@@ -138,10 +141,11 @@ final class BatteryStore: ObservableObject {
         if next != snapshot { snapshot = next }
     }
 
-    private func scheduleTimer() {
+    private func scheduleTimer(preservingElapsed: Bool = false) {
         let interval = refreshCadence.effectiveInterval(
             configuredInterval: refreshInterval)
-        timer = .moduleRefreshTimer(interval: interval) { [weak self] in self?.refresh() }
+        timer = .moduleRefreshTimer(
+            interval: interval, replacing: timer, preservingElapsed: preservingElapsed) { [weak self] in self?.refresh() }
     }
 
     private static func resolvedRefreshInterval(_ interval: TimeInterval) -> TimeInterval {

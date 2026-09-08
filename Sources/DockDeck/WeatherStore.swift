@@ -309,10 +309,13 @@ final class WeatherStore: ObservableObject {
     @Published private(set) var snapshot: WeatherSnapshot?
     @Published private(set) var status: WeatherLoadStatus = .idle
 
+    var nextRefreshAt: Date? { timer?.fireDate }
+
     private var location: WeatherLocation?
     private var unit: WeatherTemperatureUnit
     private var refreshInterval: TimeInterval
     private var timer: Timer?
+    private var lastRefreshAt: Date?
     private var task: URLSessionDataTask?
     private var generation = 0
     private var isRunning = false
@@ -338,12 +341,12 @@ final class WeatherStore: ObservableObject {
         guard !isRunning else { return }
         isRunning = true
         refresh()
-        scheduleTimer()
     }
 
     func stop() {
         guard isRunning || timer != nil || task != nil else { return }
         isRunning = false
+        lastRefreshAt = nil
         generation += 1
         timer?.invalidate()
         timer = nil
@@ -368,7 +371,6 @@ final class WeatherStore: ObservableObject {
         generation += 1
         task?.cancel()
         task = nil
-        scheduleTimer()
         refresh()
     }
 
@@ -383,6 +385,8 @@ final class WeatherStore: ObservableObject {
 
     func refresh() {
         guard isRunning else { return }
+        timer?.invalidate()
+        timer = nil
         guard let location else {
             snapshot = nil
             status = .idle
@@ -394,6 +398,7 @@ final class WeatherStore: ObservableObject {
             return
         }
 
+        lastRefreshAt = Date()
         generation += 1
         let generation = generation
         task?.cancel()
@@ -410,6 +415,7 @@ final class WeatherStore: ObservableObject {
         }
         self.task = task
         task.resume()
+        scheduleTimer()
     }
 
     private func complete(
@@ -439,13 +445,15 @@ final class WeatherStore: ObservableObject {
 
     private func scheduleTimer() {
         timer?.invalidate()
-        guard isRunning, location != nil else {
+        guard isRunning, location != nil, let lastRefreshAt else {
             timer = nil
             return
         }
         let interval = refreshCadence.effectiveInterval(
             configuredInterval: refreshInterval)
         timer = .moduleRefreshTimer(interval: interval) { [weak self] in self?.refresh() }
+        // Auto-slide changes cadence often. Keep elapsed time instead of restarting the countdown.
+        timer?.fireDate = lastRefreshAt.addingTimeInterval(interval)
     }
 
     deinit {

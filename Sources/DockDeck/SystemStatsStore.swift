@@ -180,6 +180,8 @@ final class SystemStatsStore: ObservableObject {
     @Published private(set) var selectedMetrics: [SystemStatsMetric]
     private(set) var histories: [SystemStatsMetric: MetricHistory] = [:]
 
+    var nextRefreshAt: Date? { timer?.fireDate }
+
     private var timer: Timer?
     private var previousCPU: CPUCounters?
     let network: NetworkStore
@@ -236,8 +238,7 @@ final class SystemStatsStore: ObservableObject {
         guard refreshCadence.update(activity: activity, lowPowerMode: lowPowerMode),
             timer != nil
         else { return }
-        timer?.invalidate()
-        scheduleTimer()
+        scheduleTimer(preservingElapsed: true)
     }
 
     func setMetrics(_ metrics: [SystemStatsMetric]) {
@@ -316,10 +317,11 @@ final class SystemStatsStore: ObservableObject {
         histories[metric] = history
     }
 
-    private func scheduleTimer() {
+    private func scheduleTimer(preservingElapsed: Bool = false) {
         let interval = refreshCadence.effectiveInterval(
             configuredInterval: refreshInterval)
-        timer = .moduleRefreshTimer(interval: interval) { [weak self] in self?.refresh() }
+        timer = .moduleRefreshTimer(
+            interval: interval, replacing: timer, preservingElapsed: preservingElapsed) { [weak self] in self?.refresh() }
     }
 
     private static func percent(used: UInt64?, total: UInt64?) -> Double? {

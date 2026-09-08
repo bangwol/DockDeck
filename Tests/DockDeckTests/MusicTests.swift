@@ -88,6 +88,8 @@ final class MusicTests: XCTestCase {
         }
 
         store.start()
+        assertCadenceKeepsPollingDeadline(store, interval: MusicStore.refreshInterval,
+            backgroundMultiplier: 6, lowPowerMultiplier: 3, deadline: { store.nextRefreshAt })
         wait(for: [permissionRequired], timeout: 2)
         XCTAssertEqual(provider.authorizationPrompts, [false])
 

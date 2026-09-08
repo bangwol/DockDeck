@@ -133,6 +133,8 @@ final class UsageStore: ObservableObject {
     private var claudeCommandSnapshot: UsageProviderSnapshot?
     private var claudeProbeError: UsageProviderError?
     private var enabledProviderIDs = Set(UsageProviderID.allCases)
+    var nextRefreshAt: Date? { refreshTimer?.fireDate }
+
     private var refreshTimer: Timer?
     private var claudeProbeTimer: Timer?
     private var claudeProbeWatchdogTimer: Timer?
@@ -174,6 +176,8 @@ final class UsageStore: ObservableObject {
         self.uptime = uptime
         self.logger = logger
     }
+
+    deinit { stop() }
 
     func start() {
         guard !started else { return }
@@ -294,7 +298,7 @@ final class UsageStore: ObservableObject {
         guard refreshCadence.update(activity: activity, lowPowerMode: lowPowerMode),
             started
         else { return }
-        scheduleRefreshTimer()
+        scheduleRefreshTimer(preservingElapsed: true)
     }
 
     private func startCodex() {
@@ -548,15 +552,16 @@ final class UsageStore: ObservableObject {
         providers = next
     }
 
-    private func scheduleRefreshTimer() {
-        refreshTimer?.invalidate()
+    private func scheduleRefreshTimer(preservingElapsed: Bool = false) {
         guard started, systemRefreshActive else {
+            refreshTimer?.invalidate()
             refreshTimer = nil
             return
         }
         let interval = refreshCadence.effectiveInterval(
             configuredInterval: Self.refreshInterval)
-        refreshTimer = .moduleRefreshTimer(interval: interval) { [weak self] in
+        refreshTimer = .moduleRefreshTimer(
+            interval: interval, replacing: refreshTimer, preservingElapsed: preservingElapsed) { [weak self] in
             guard let self, self.systemRefreshActive else { return }
             if self.enabledProviderIDs.contains(.codex) { self.codexProvider.refresh() }
             if self.enabledProviderIDs.contains(.claude) { self.refreshClaudeBridge() }

@@ -184,6 +184,8 @@ final class ScheduleTests: XCTestCase {
             refreshInterval: 300, provider: provider)
 
         store.start()
+        assertCadenceKeepsPollingDeadline(store, interval: 300,
+            backgroundMultiplier: 1, deadline: { store.nextRefreshAt })
 
         XCTAssertEqual(provider.lastSelectedCalendarIDs, ["work"])
         XCTAssertTrue(provider.lastIncludeAllDay)

@@ -254,6 +254,8 @@ final class ServiceMonitorTests: XCTestCase {
         }
 
         store.start()
+        assertCadenceKeepsPollingDeadline(store, interval: 120,
+            backgroundMultiplier: 1, deadline: { store.nextRefreshAt })
         wait(for: [completed], timeout: 1)
 
         XCTAssertEqual(methods, ["HEAD", "GET"])

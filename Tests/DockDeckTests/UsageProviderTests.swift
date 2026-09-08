@@ -833,6 +833,8 @@ final class UsageProviderTests: XCTestCase {
         }
 
         store.start()
+        assertCadenceKeepsPollingDeadline(store, interval: 60,
+            backgroundMultiplier: 5, deadline: { store.nextRefreshAt })
         wait(for: [loaded], timeout: 2)
         XCTAssertEqual(command.readCount, 1)
 

@@ -163,6 +163,8 @@ final class CustomTileTests: XCTestCase {
         }
 
         store.start()
+        assertCadenceKeepsPollingDeadline(store, interval: CustomTileConfiguration().refreshInterval,
+            backgroundMultiplier: 3, deadline: { store.nextRefreshAt })
         wait(for: [loaded], timeout: 2)
 
         let size = NSSize(width: 214, height: 59)

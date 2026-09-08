@@ -241,6 +241,8 @@ final class ServiceMonitorStore: ObservableObject {
 
     private var endpoints: [ServiceMonitorEndpoint]
     private var refreshInterval: TimeInterval
+    var nextRefreshAt: Date? { timer?.fireDate }
+
     private var timer: Timer?
     private var tasks: [UUID: URLSessionDataTask] = [:]
     private var consecutiveFailures: [UUID: Int] = [:]
@@ -266,7 +268,11 @@ final class ServiceMonitorStore: ObservableObject {
         session = Self.makeSession(configuration: sessionConfiguration, delegate: delegate)
     }
 
-    deinit { session.invalidateAndCancel() }
+    deinit {
+        timer?.invalidate()
+        delayedRefresh?.cancel()
+        session.invalidateAndCancel()
+    }
 
     private static func makeSession(
         configuration: URLSessionConfiguration?, delegate: ServiceMonitorProbeDelegate
@@ -337,7 +343,7 @@ final class ServiceMonitorStore: ObservableObject {
         guard refreshCadence.update(activity: activity, lowPowerMode: lowPowerMode),
             isRunning
         else { return }
-        scheduleTimer()
+        scheduleTimer(preservingElapsed: true)
     }
 
     func refresh() {
@@ -451,15 +457,16 @@ final class ServiceMonitorStore: ObservableObject {
         latencyHistories[endpointID] ?? MetricHistory()
     }
 
-    private func scheduleTimer() {
-        timer?.invalidate()
+    private func scheduleTimer(preservingElapsed: Bool = false) {
         guard isRunning else {
+            timer?.invalidate()
             timer = nil
             return
         }
         let interval = refreshCadence.effectiveInterval(
             configuredInterval: refreshInterval)
-        timer = .moduleRefreshTimer(interval: interval) { [weak self] in self?.refresh() }
+        timer = .moduleRefreshTimer(
+            interval: interval, replacing: timer, preservingElapsed: preservingElapsed) { [weak self] in self?.refresh() }
     }
 
     private func scheduleConfigurationRefresh() {

@@ -163,6 +163,8 @@ final class GitHubInboxTests: XCTestCase {
         }
 
         store.start()
+        assertCadenceKeepsPollingDeadline(store, interval: GitHubInboxConfiguration.defaultRefreshInterval,
+            backgroundMultiplier: 3, deadline: { store.nextRefreshAt })
         wait(for: [loaded], timeout: 2)
 
         let size = NSSize(width: 214, height: 59)

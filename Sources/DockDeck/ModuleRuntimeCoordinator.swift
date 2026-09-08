@@ -56,11 +56,18 @@ struct ModuleRefreshCadence: Equatable {
 
 extension Timer {
     /// Repeating main-run-loop timer with 10% tolerance so macOS can coalesce module
-    /// wakeups. Rate math in the stores uses measured elapsed time, not this interval.
+    /// wakeups. Activity changes preserve the current interval's elapsed time; explicit
+    /// restarts begin a new interval. Rate math uses measured time, not this interval.
     static func moduleRefreshTimer(
-        interval: TimeInterval, _ handler: @escaping () -> Void
+        interval: TimeInterval, replacing previous: Timer? = nil,
+        preservingElapsed: Bool = false,
+        _ handler: @escaping () -> Void
     ) -> Timer {
+        let fireDate = preservingElapsed && previous?.isValid == true
+            ? previous.map { $0.fireDate.addingTimeInterval(interval - $0.timeInterval) } : nil
+        previous?.invalidate()
         let timer = Timer(timeInterval: interval, repeats: true) { _ in handler() }
+        if let fireDate { timer.fireDate = fireDate }
         timer.tolerance = interval * 0.1
         RunLoop.main.add(timer, forMode: .common)
         return timer
