@@ -33,14 +33,17 @@ final class ModuleGalleryTests: XCTestCase {
         try profiles.save(name: "Focus", configuration: .init(left: [.focusTimer], right: [.clock], enabled: [.focusTimer, .clock]), autoSlide: .init())
         let login = LoginItemStore(service: GalleryLoginItem())
         ProcessDiagnostics.shared.record(source: .customTile, duration: 0.024, failure: .cancelled)
-        let diagnostics = DiagnosticsStore(checker: {
-            [DiagnosticCheckID.codex, .claude, .github].map { id in
-                DiagnosticCheckItem(id: id, title: id.title, symbolName: id.symbolName,
+        let diagnostics = DiagnosticsStore(checker: { () -> [DiagnosticCheckItem] in
+            [DiagnosticCheckID.codex, .claude, .github].map { id -> DiagnosticCheckItem in
+                let version = id == .codex ? "0.145.0" : id == .claude ? "2.1.236" : "2.96.0"
+                let installation: CLIInstallation = id == .codex
+                    ? .npm(prefix: "/usr/local", package: "@openai/codex")
+                    : .homebrew(prefix: "/opt/homebrew", package: id == .claude ? "claude-code" : "gh", cask: id == .claude)
+                let update = CLIUpdateInfo(installedVersion: CLIVersion(version), installation: installation,
+                    executablePath: "/example/bin/cli", command: "example update")
+                return DiagnosticCheckItem(id: id, title: id.title, symbolName: id.symbolName,
                     state: .ready, detail: "Installed and signed in", checkedAt: Date(), lastSuccessfulAt: Date(),
-                    cliUpdate: CLIUpdateInfo(installedVersion: CLIVersion(id == .codex ? "0.145.0" : id == .claude ? "2.1.236" : "2.96.0"),
-                        installation: id == .codex ? .npm(prefix: "/usr/local", package: "@openai/codex")
-                            : .homebrew(prefix: "/opt/homebrew", package: id == .claude ? "claude-code" : "gh", cask: id == .claude),
-                        executablePath: "/example/bin/cli", command: "example update"))
+                    cliUpdate: update)
             }
         }, releaseChecker: CLIReleaseChecker(fetch: { url in
             if url.path.contains("formula/gh") { throw URLError(.notConnectedToInternet) }
