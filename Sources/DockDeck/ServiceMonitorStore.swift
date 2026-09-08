@@ -347,7 +347,7 @@ final class ServiceMonitorStore: ObservableObject {
     }
 
     func refresh() {
-        guard isRunning else { return }
+        guard isRunning, tasks.isEmpty else { return }
         generation += 1
         let generation = generation
         delayedRefresh?.cancel()

@@ -228,6 +228,38 @@ final class ServiceMonitorTests: XCTestCase {
         ServiceMonitorURLProtocol.handler = nil
     }
 
+    func testRefreshDoesNotCancelAnUnfinishedProbe() {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [ServiceMonitorURLProtocol.self]
+        let started = expectation(description: "Probe started")
+        let completed = expectation(description: "Slow probe completed")
+        let gate = DispatchSemaphore(value: 0)
+        var requests = 0
+        ServiceMonitorURLProtocol.handler = { request in
+            requests += 1
+            if requests == 1 {
+                started.fulfill()
+                _ = gate.wait(timeout: .now() + 1)
+            }
+            return HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
+        }
+        let store = ServiceMonitorStore(endpoints: [
+            ServiceMonitorEndpoint(name: "Slow", urlString: "https://status.example.com/health")
+        ], sessionConfiguration: configuration)
+        let observation = store.$items.first(where: {
+            if case .up = $0.first?.state { return true }
+            return false
+        }).sink { _ in completed.fulfill() }
+        defer { store.stop(); observation.cancel(); ServiceMonitorURLProtocol.handler = nil }
+        store.start()
+        wait(for: [started], timeout: 1)
+        store.refresh()
+        store.refresh()
+        gate.signal()
+        wait(for: [completed], timeout: 1)
+        XCTAssertEqual(requests, 1)
+    }
+
     func testStoreFallsBackToBoundedGetWhenHeadIsUnsupported() throws {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [ServiceMonitorURLProtocol.self]

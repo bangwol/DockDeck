@@ -10,6 +10,9 @@ Service Monitor sends a `HEAD` request every 15–120 seconds to up to four URLs
 If a server rejects `HEAD` with 405 or 501, DockDeck retries with a `GET` request
 containing `Range: bytes=0-0`. Probes finish when headers arrive and cancel body
 transfer, including when a server ignores Range.
+Only one probe batch runs at a time. Additional refresh requests during that
+batch use its result instead of starting another batch. Reconfiguration and
+stopping the module still cancel outstanding requests.
 Public endpoints must use HTTPS. Plain HTTP is accepted only for local names and
 private or loopback addresses. This also applies to IPv6 literals, IPv4-mapped
 IPv6 addresses, and alternate numeric IPv4 spellings. The packaged app declares
