@@ -175,7 +175,7 @@ final class ModuleGalleryTests: XCTestCase {
                     receivedBytes: networkSample * networkSample * 600_000,
                     sentBytes: networkSample * networkSample * 90_000)
             })
-        for offset in [-2.0, -1.0, 0.0] { network.refresh(now: now.addingTimeInterval(offset)) }
+        for offset in [-2.0, -1.0, 0.0] { network.refresh(now: now.addingTimeInterval(offset), uptime: offset + 2) }
         let stats = SystemStatsStore(
             metrics: [.cpu, .memory, .network, .gpu],
             initialSnapshot: SystemStatsSnapshot(

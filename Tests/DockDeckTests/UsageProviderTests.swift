@@ -474,6 +474,39 @@ final class UsageProviderTests: XCTestCase {
         XCTAssertEqual(snapshot.windows.map(\.usedPercent), [10, 20, 30])
     }
 
+    func testClaudePTYTimeoutUsesMonotonicElapsedTime() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let executable = root.appendingPathComponent("claude")
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        try Data("""
+            #!/bin/sh
+            case " $* " in
+              *" /usage "*) echo "direct mode unavailable"; exit 0 ;;
+            esac
+            printf '❯ '
+            while IFS= read -r line; do :; done
+            """.utf8).write(to: executable)
+        try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: executable.path)
+        var uptime: TimeInterval = 0
+        let provider = ClaudeUsageCommandProvider(
+            environment: ["DOCKDECK_CLAUDE_PATH": executable.path, "PATH": "/usr/bin:/bin"],
+            homeDirectory: root, probeDirectory: root.appendingPathComponent("probe"),
+            uptime: { uptime += 20; return uptime })
+        let completed = expectation(description: "PTY timeout")
+        let queue = DispatchQueue(label: "DockDeckTests.MonotonicPTY")
+        var result: Result<UsageProviderSnapshot, UsageProviderError>?
+        queue.async {
+            result = provider.read(now: Date(timeIntervalSince1970: 2_000))
+            completed.fulfill()
+        }
+        wait(for: [completed], timeout: 3)
+        provider.cancel()
+        queue.sync {}
+        guard case .failure(let error) = result else { return XCTFail("Expected timeout") }
+        XCTAssertTrue(error.localizedDescription.contains("PTY /usage timed out"))
+    }
+
     func testClaudeProviderReturnsWithoutWaitingForInheritedPipeWriters() throws {
         let fileManager = FileManager.default
         let root = fileManager.temporaryDirectory

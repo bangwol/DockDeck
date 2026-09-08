@@ -109,3 +109,9 @@ interval. Repeated deck switches therefore cannot postpone a poll indefinitely;
 a poll that is already due runs when the main run loop can handle it. Explicit
 reconfiguration and resuming a stopped module start a new polling interval.
 In-flight work keeps each module's existing cancellation and timeout limits.
+
+Process timeouts, terminal restart throttling, and network rate measurements use
+monotonic elapsed time. System clock changes cannot extend those timeouts or
+distort the measured rates. Public CLI release metadata and shared GitHub
+response caches are invalidated when the system clock moves backwards. Calendar
+events, quota reset times, and saved Focus Timer deadlines remain absolute dates.

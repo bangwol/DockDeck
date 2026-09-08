@@ -187,7 +187,7 @@ final class SystemStatsStore: ObservableObject {
     let network: NetworkStore
     private let gpuReader: () -> Double?
     private var cachedTemperatureCelsius: Double?
-    private var lastTemperatureAttempt: Date?
+    private var lastTemperatureAttempt: TimeInterval?
     private var temperatureReadInFlight = false
     private var temperatureReadGeneration = 0
     private var refreshInterval: TimeInterval
@@ -303,7 +303,7 @@ final class SystemStatsStore: ObservableObject {
                 ? nil : totalNetworkRate,
             at: now)
         snapshot = nextSnapshot
-        if metrics.contains(.thermal) { refreshTemperatureIfNeeded(now: now) }
+        if metrics.contains(.thermal) { refreshTemperatureIfNeeded(uptime: ProcessInfo.processInfo.systemUptime) }
     }
 
     func history(for metric: SystemStatsMetric) -> MetricHistory {
@@ -329,14 +329,14 @@ final class SystemStatsStore: ObservableObject {
         return SystemStatsCalculator.boundedPercent(used: used, total: total)
     }
 
-    private func refreshTemperatureIfNeeded(now: Date) {
+    private func refreshTemperatureIfNeeded(uptime: TimeInterval) {
         guard !temperatureReadInFlight,
             lastTemperatureAttempt.map({
-                now.timeIntervalSince($0) >= Self.temperatureRefreshInterval
+                uptime - $0 >= Self.temperatureRefreshInterval
             }) ?? true
         else { return }
 
-        lastTemperatureAttempt = now
+        lastTemperatureAttempt = uptime
         temperatureReadInFlight = true
         let generation = temperatureReadGeneration
         DispatchQueue.global(qos: .utility).async { [weak self] in

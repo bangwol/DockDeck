@@ -125,16 +125,16 @@ struct ShellRestartPolicy {
     static let rapidExitThreshold: TimeInterval = 2
     static let maximumRapidRestarts = 2
 
-    private(set) var startedAt: Date?
+    private(set) var startedAt: TimeInterval?
     private(set) var rapidExitCount = 0
 
-    mutating func recordStart(at date: Date) {
-        startedAt = date
+    mutating func recordStart(at uptime: TimeInterval) {
+        startedAt = uptime
     }
 
-    mutating func shouldRestart(afterExitAt date: Date) -> Bool {
+    mutating func shouldRestart(afterExitAt uptime: TimeInterval) -> Bool {
         guard let startedAt else { return false }
-        if date.timeIntervalSince(startedAt) < Self.rapidExitThreshold {
+        if uptime - startedAt < Self.rapidExitThreshold {
             rapidExitCount += 1
         } else {
             rapidExitCount = 0
@@ -247,7 +247,7 @@ final class TerminalPanelController: NSObject, LocalProcessTerminalViewDelegate 
         guard automaticallyRestartsShell, !terminalView.process.running else { return }
         scheduledRestart = nil
         terminalView.terminal.resetToInitialState()
-        restartPolicy.recordStart(at: Date())
+        restartPolicy.recordStart(at: ProcessInfo.processInfo.systemUptime)
         terminalView.startProcess(
             executable: ShellEnvironment.executable,
             args: ["-l"],
@@ -266,7 +266,7 @@ final class TerminalPanelController: NSObject, LocalProcessTerminalViewDelegate 
         guard automaticallyRestartsShell else { return }
         lastRestartReason = "Previous shell exited with status \(exitCode.map(String.init) ?? "unknown")"
         onShellEvent("shell exited with status \(exitCode.map(String.init) ?? "unknown")")
-        guard restartPolicy.shouldRestart(afterExitAt: Date()) else {
+        guard restartPolicy.shouldRestart(afterExitAt: ProcessInfo.processInfo.systemUptime) else {
             lastRestartReason += "; stopped after repeated rapid exits"
             terminalView.feed(
                 text: "\r\nDockDeck shell stopped. Click the terminal to start a new session.\r\n")

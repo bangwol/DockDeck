@@ -1184,20 +1184,20 @@ final class PanelAppearanceTests: XCTestCase {
 
     func testShellRestartPolicyStopsARepeatedExitLoop() {
         var policy = ShellRestartPolicy()
-        let start = Date(timeIntervalSince1970: 100)
+        let start: TimeInterval = 100
 
         policy.recordStart(at: start)
-        XCTAssertTrue(policy.shouldRestart(afterExitAt: start.addingTimeInterval(3)))
+        XCTAssertTrue(policy.shouldRestart(afterExitAt: start + 3))
         for offset in 4...5 {
-            let nextStart = start.addingTimeInterval(TimeInterval(offset))
+            let nextStart = start + TimeInterval(offset)
             policy.recordStart(at: nextStart)
             XCTAssertTrue(
-                policy.shouldRestart(afterExitAt: nextStart.addingTimeInterval(0.5)))
+                policy.shouldRestart(afterExitAt: nextStart + 0.5))
         }
-        let finalStart = start.addingTimeInterval(6)
+        let finalStart = start + 6
         policy.recordStart(at: finalStart)
         XCTAssertFalse(
-            policy.shouldRestart(afterExitAt: finalStart.addingTimeInterval(0.5)))
+            policy.shouldRestart(afterExitAt: finalStart + 0.5))
     }
 
     func testReadableTerminalUsesStrongerTintThanCompactPanels() {

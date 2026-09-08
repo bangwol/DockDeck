@@ -25,7 +25,10 @@ color-coded thermal-pressure bar.
 
 CPU, GPU, memory, and network histories cover only the latest 15 minutes and at most
 900 samples. They stay in memory, reset when DockDeck exits, and are discarded
-if the system clock moves backwards. System Stats detail keeps distinct download and upload histories under the same limits.
+if the system clock moves backwards. Transfer-rate intervals and temperature
+sampling cooldowns use monotonic uptime, so changing the system clock does not
+distort transfer speeds or stall temperature sampling. System Stats detail keeps
+distinct download and upload histories under the same limits.
 
 ## Memory semantics on macOS
 
