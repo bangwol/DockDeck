@@ -21,6 +21,7 @@ extension AppDelegate {
     }
 
     @objc func toggleThemePicker(_ sender: Any?) {
+        guard !hidePanelsForPresentationIfNeeded() else { return }
         if let pickerPanel = themePickerPanel {
             pickerPanel.orderOut(nil)
             themePickerPanel = nil

@@ -577,7 +577,9 @@ extension AppDelegate {
 
         guard restoreTerminalFocus, panel.isVisible else { return }
         DispatchQueue.main.async { [weak self] in
-            guard let self else { return }
+            guard let self, self.settingsPanel == nil, self.panel.isVisible,
+                !self.hidePanelsForPresentationIfNeeded()
+            else { return }
             self.panel.makeKeyAndOrderFront(nil)
             self.panel.makeFirstResponder(self.terminalView)
         }

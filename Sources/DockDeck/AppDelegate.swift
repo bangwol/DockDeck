@@ -78,7 +78,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         docker: dockerStore,
         customTile: customTileStore,
         focusTimer: focusTimerStore)
-    let notificationCoordinator = DockNotificationCoordinator(
+    lazy var notificationCoordinator = DockNotificationCoordinator(
         settings: PanelSettings.notifications)
     lazy var dockCoordinator = DockCoordinator { [weak self] channel, message in
         self?.debugLog(channel, message)

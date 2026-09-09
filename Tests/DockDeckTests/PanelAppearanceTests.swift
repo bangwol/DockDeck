@@ -1287,6 +1287,61 @@ final class PanelAppearanceTests: XCTestCase {
         }
     }
 
+    func testPresentationHidesAllDeckWindowsWithoutHidingSettings() {
+        let app = makeWindowPolicyDelegate()
+        let frame = NSRect(x: -10_000, y: -10_000, width: 100, height: 100)
+        let settings = KeyablePanel(contentRect: frame, styleMask: [.titled], backing: .buffered, defer: false)
+        let picker = KeyablePanel(contentRect: frame, styleMask: [.borderless], backing: .buffered, defer: false)
+        let hint = NSPanel(contentRect: frame, styleMask: [.borderless], backing: .buffered, defer: false)
+        app.settingsPanel = settings
+        app.themePickerPanel = picker
+        app.hintPanel = hint
+        app.terminalPanelMode = .large
+        app.isFrozen = true
+        let decks: [NSPanel] = [app.panel] + app.readOnlyDeckPanels + [picker, hint]
+        for window in decks + [settings] { window.orderBack(nil) }
+        defer { for window in decks + [settings] { window.orderOut(nil) } }
+        XCTAssertTrue(decks.allSatisfy(\.isVisible))
+
+        XCTAssertTrue(app.hidePanelsForPresentationIfNeeded(options: .fullScreen))
+
+        XCTAssertTrue(decks.allSatisfy { !$0.isVisible })
+        XCTAssertTrue(settings.isVisible)
+        XCTAssertNil(app.themePickerPanel)
+        XCTAssertFalse(app.hidePanelsForPresentationIfNeeded(options: .autoHideDock))
+    }
+
+    func testClosingSettingsDoesNotReshowTerminalHiddenBeforeFocusRestores() {
+        let app = makeWindowPolicyDelegate()
+        let settings = KeyablePanel(contentRect: .zero, styleMask: [.titled], backing: .buffered, defer: false)
+        app.settingsPanel = settings
+        app.settingsPanelRestoresTerminalFocus = true
+        app.panel.orderBack(nil)
+        defer { app.panel.orderOut(nil) }
+        XCTAssertTrue(app.panel.isVisible)
+
+        app.settingsPanelDidClose(settings)
+        app.panel.orderOut(nil)
+        let restored = expectation(description: "Deferred focus restoration drained")
+        DispatchQueue.main.async { restored.fulfill() }
+        wait(for: [restored], timeout: 1)
+
+        XCTAssertFalse(app.panel.isVisible)
+    }
+
+    private func makeWindowPolicyDelegate() -> AppDelegate {
+        let app = AppDelegate()
+        app.usageDisplayAwake = false
+        app.terminalPanelController = TerminalPanelController(
+            initialFrame: NSRect(x: -10_000, y: -10_000, width: 214, height: 59),
+            theme: Theme.theme(id: ""), menuTarget: NSObject(),
+            menuAction: #selector(NSObject.isEqual(_:)))
+        app.leftReadOnlyDeckPanelController = makeReadOnlyDeckController(side: .left)
+        app.rightReadOnlyDeckPanelController = makeReadOnlyDeckController(side: .right)
+        for window in app.readOnlyDeckPanels { window.setFrameOrigin(NSPoint(x: -10_000, y: -10_000)) }
+        return app
+    }
+
     func testReadOnlyDeckRebuildsOnlyWhenActiveModuleChanges() {
         let previousConfiguration = PanelSettings.deckConfiguration
         let previousRight = PanelSettings.activeModule(on: .right)
