@@ -51,7 +51,7 @@ extension AppDelegate {
             backing: .buffered,
             defer: false
         )
-        pickerPanel.level = .normal
+        pickerPanel.level = DockWindowPolicy.level
         pickerPanel.isOpaque = false
         pickerPanel.backgroundColor = .clear
         pickerPanel.hidesOnDeactivate = false

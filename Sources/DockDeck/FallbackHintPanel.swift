@@ -31,7 +31,7 @@ enum FallbackHintPanel {
         panel.backgroundColor = .clear
         panel.hasShadow = false
         panel.isMovable = false
-        panel.level = .normal
+        panel.level = DockWindowPolicy.level
         panel.collectionBehavior = [
             .canJoinAllSpaces, .stationary, .fullScreenNone, .ignoresCycle,
         ]

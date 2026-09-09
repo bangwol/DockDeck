@@ -78,8 +78,22 @@ extension AppDelegate {
 
     var isHeld: Bool { (panel.isKeyWindow || isExpanded) && isFrozen }
 
+    @discardableResult
+    func hidePanelsForPresentationIfNeeded(
+        options: NSApplication.PresentationOptions = NSApp.currentSystemPresentationOptions
+    ) -> Bool {
+        guard DockWindowPolicy.hidesDecks(for: options) else { return false }
+        if panel.isVisible { panel.orderOut(nil) }
+        hideReadOnlyDecks()
+        hintPanel?.orderOut(nil)
+        themePickerPanel?.orderOut(nil)
+        themePickerPanel = nil
+        return true
+    }
+
     func runEvaluation() {
         defer { updateFallbackHintVisibility() }
+        guard !hidePanelsForPresentationIfNeeded() else { return }
         guard let presence = resolveDockPresence() else {
             debugLog("screens", "no screen at all; falling back\(isHeld ? " (held)" : "")")
             lastPresenceUntracked = true
@@ -97,6 +111,7 @@ extension AppDelegate {
 
     func evaluate(_ presence: DockPresence) {
         defer { updateFallbackHintVisibility() }
+        guard !hidePanelsForPresentationIfNeeded() else { return }
         let exempt = panel.isKeyWindow || isExpanded
         lastPresenceUntracked = presence.isUntracked
 
@@ -187,6 +202,7 @@ extension AppDelegate {
     }
 
     func showTerminal(_ frame: NSRect, animated: Bool = false) {
+        guard !hidePanelsForPresentationIfNeeded() else { return }
         let configuration = PanelSettings.deckConfiguration
         guard configuration.contains(.terminal),
             let side = configuration.side(containing: .terminal),
@@ -200,6 +216,7 @@ extension AppDelegate {
     }
 
     func showReadOnlyDeck(on side: PanelSide, frame: NSRect) {
+        guard !hidePanelsForPresentationIfNeeded() else { return }
         let controller = readOnlyDeckPanelController(on: side)
         guard let activeModule = PanelSettings.activeModule(on: side),
             activeModule != .terminal

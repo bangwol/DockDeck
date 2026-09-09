@@ -1252,7 +1252,7 @@ final class PanelAppearanceTests: XCTestCase {
         XCTAssertTrue(scroller.isHidden)
     }
 
-    func testDeckPanelsUseNormalWindowLevelWithoutFullScreenOverlay() {
+    func testDeckPanelsUseDockLevelWithoutFullScreenOverlay() {
         let theme = Theme.theme(id: "")
         let terminal = TerminalPanelController(
             initialFrame: NSRect(x: 0, y: 0, width: 214, height: 59),
@@ -1264,7 +1264,8 @@ final class PanelAppearanceTests: XCTestCase {
             cornerRadius: 8, tintOpacity: nil, font: .systemFont(ofSize: 12),
             target: NSObject(), action: #selector(NSObject.isEqual(_:))).panel
         for panel in [terminal.panel, readOnly.panel, hint] {
-            XCTAssertEqual(panel.level, .normal)
+            XCTAssertEqual(panel.level.rawValue, Int(CGWindowLevelForKey(.dockWindow)))
+            XCTAssertGreaterThan(panel.level.rawValue, NSWindow.Level.normal.rawValue)
             XCTAssertFalse(panel.isFloatingPanel)
             XCTAssertFalse(panel.collectionBehavior.contains(.fullScreenAuxiliary))
             XCTAssertTrue(panel.collectionBehavior.contains(.canJoinAllSpaces))
@@ -1272,6 +1273,18 @@ final class PanelAppearanceTests: XCTestCase {
         }
         XCTAssertTrue(terminal.panel.canBecomeKey)
         XCTAssertFalse(readOnly.panel.canBecomeKey)
+    }
+
+    func testPresentationHidesDecksButOrdinaryDockAutoHideDoesNot() {
+        for options: NSApplication.PresentationOptions in [
+            .fullScreen, .hideDock, [.hideDock, .hideMenuBar],
+            [.autoHideDock, .autoHideMenuBar], [.fullScreen, .autoHideDock],
+        ] {
+            XCTAssertTrue(DockWindowPolicy.hidesDecks(for: options))
+        }
+        for options: NSApplication.PresentationOptions in [[], .autoHideDock, .autoHideMenuBar] {
+            XCTAssertFalse(DockWindowPolicy.hidesDecks(for: options))
+        }
     }
 
     func testReadOnlyDeckRebuildsOnlyWhenActiveModuleChanges() {

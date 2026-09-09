@@ -107,11 +107,13 @@ respected.
 
 ## Panel controls
 
-Decks use normal window stacking: they remain visible in the free space beside
-the Dock, and other app windows can cover them. Automatic layout and module
-changes do not raise decks over the active app, including full-screen and
-presentation windows. Settings and the theme picker also use normal window levels
-and stay in their own desktop Space.
+Decks use the Dock's window level so normal app windows and their shadows do not
+cover the modules. When macOS reports full-screen or presentation mode (the Dock
+is disabled, or both the Dock and menu bar are automatically hidden), decks and
+their permission hint hide until that mode ends. Terminal sessions keep running.
+Ordinary Dock auto-hide still follows the Dock. Settings uses a normal window
+level and stays in its own desktop Space. The theme picker opens above the deck
+and closes when full-screen or presentation mode starts.
 
 | Action | Result |
 | --- | --- |

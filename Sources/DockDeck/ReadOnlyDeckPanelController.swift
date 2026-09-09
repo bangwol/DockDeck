@@ -64,7 +64,7 @@ final class ReadOnlyDeckPanelController:
             styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered,
             defer: false)
-        panel.level = .normal
+        panel.level = DockWindowPolicy.level
         panel.isOpaque = false
         panel.backgroundColor = .clear
         panel.hasShadow = false

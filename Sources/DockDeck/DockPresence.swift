@@ -1,5 +1,14 @@
 import Cocoa
 
+enum DockWindowPolicy {
+    static let level = NSWindow.Level(rawValue: Int(CGWindowLevelForKey(.dockWindow)))
+
+    static func hidesDecks(for options: NSApplication.PresentationOptions) -> Bool {
+        options.contains(.fullScreen) || options.contains(.hideDock)
+            || (options.contains(.autoHideDock) && options.contains(.autoHideMenuBar))
+    }
+}
+
 enum DockPresence {
     case revealed(tray: NSRect, host: NSScreen)
     case concealed(host: NSScreen)

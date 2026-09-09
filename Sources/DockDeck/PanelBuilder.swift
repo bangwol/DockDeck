@@ -17,7 +17,7 @@ enum PanelBuilder {
             backing: .buffered,
             defer: false
         )
-        panel.level = .normal
+        panel.level = DockWindowPolicy.level
         panel.title = "DockDeck Terminal"
         panel.setAccessibilityLabel("DockDeck Terminal")
         panel.isOpaque = false
