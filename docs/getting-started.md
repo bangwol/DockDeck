@@ -107,6 +107,14 @@ respected.
 
 ## Panel controls
 
+Decks use the Dock's window level so normal app windows and their shadows do not
+cover the modules. When macOS reports full-screen or presentation mode (the Dock
+is disabled, or both the Dock and menu bar are automatically hidden), decks and
+their permission hint hide until that mode ends. Terminal sessions keep running.
+Ordinary Dock auto-hide still follows the Dock. Settings uses a normal window
+level and stays in its own desktop Space. The theme picker opens above the deck
+and closes when full-screen or presentation mode starts.
+
 | Action | Result |
 | --- | --- |
 | Scroll over a compact Deck | Select the previous or next enabled module |

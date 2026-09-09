@@ -31,9 +31,9 @@ enum FallbackHintPanel {
         panel.backgroundColor = .clear
         panel.hasShadow = false
         panel.isMovable = false
-        panel.level = NSWindow.Level(rawValue: Int(kCGDockWindowLevel) + 1)
+        panel.level = DockWindowPolicy.level
         panel.collectionBehavior = [
-            .canJoinAllSpaces, .stationary, .fullScreenAuxiliary, .ignoresCycle,
+            .canJoinAllSpaces, .stationary, .fullScreenNone, .ignoresCycle,
         ]
         panel.hidesOnDeactivate = false
 

@@ -50,7 +50,7 @@ extension AppDelegate {
         if hint.parent !== panel {
             panel.addChildWindow(hint, ordered: .below)
         }
-        hint.orderFront(nil)
+        if !hint.isVisible { hint.orderBack(nil) }
     }
 
     func positionFallbackHint() {

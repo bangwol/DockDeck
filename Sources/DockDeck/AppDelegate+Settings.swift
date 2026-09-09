@@ -232,7 +232,7 @@ extension AppDelegate {
             activeModule: { PanelSettings.activeModule(on: $0) })
     }
 
-    /// The accessory app may be inactive while its floating panel stays visible, in which
+    /// The accessory app may be inactive while its settings window stays visible, in which
     /// case ordering front alone leaves keyboard focus in the previous application.
     private func focusSettingsPanel(_ settingsPanel: NSWindow) {
         (settingsPanel.contentView as? SettingsPanelView)?.setValues(currentSettingsValues)
@@ -333,11 +333,11 @@ extension AppDelegate {
         let frameName = "DockDeck.Settings"
         _ = settingsPanelWindow.setFrameUsingName(frameName)
         settingsPanelWindow.setFrameAutosaveName(frameName)
-        settingsPanelWindow.level = .floating
+        settingsPanelWindow.level = .normal
         settingsPanelWindow.isOpaque = true
         settingsPanelWindow.backgroundColor = .windowBackgroundColor
         settingsPanelWindow.hidesOnDeactivate = false
-        settingsPanelWindow.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        settingsPanelWindow.collectionBehavior = [.managed, .fullScreenNone]
         settingsPanelWindow.isReleasedWhenClosed = false
         settingsPanelWindow.delegate = self
         settingsPanelWindow.contentView = view
@@ -577,7 +577,9 @@ extension AppDelegate {
 
         guard restoreTerminalFocus, panel.isVisible else { return }
         DispatchQueue.main.async { [weak self] in
-            guard let self else { return }
+            guard let self, self.settingsPanel == nil, self.panel.isVisible,
+                !self.hidePanelsForPresentationIfNeeded()
+            else { return }
             self.panel.makeKeyAndOrderFront(nil)
             self.panel.makeFirstResponder(self.terminalView)
         }

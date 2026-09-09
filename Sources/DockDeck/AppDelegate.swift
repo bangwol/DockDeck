@@ -78,7 +78,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         docker: dockerStore,
         customTile: customTileStore,
         focusTimer: focusTimerStore)
-    let notificationCoordinator = DockNotificationCoordinator(
+    lazy var notificationCoordinator = DockNotificationCoordinator(
         settings: PanelSettings.notifications)
     lazy var dockCoordinator = DockCoordinator { [weak self] channel, message in
         self?.debugLog(channel, message)
@@ -217,6 +217,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             })
         panel.delegate = self
         configureNotifications()
+        NSApp.publisher(for: \.currentSystemPresentationOptions)
+            .map { DockWindowPolicy.hidesDecks(for: $0) }
+            .removeDuplicates()
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in
+                self?.refreshCoarseCaches()
+                self?.runEvaluation()
+            }
+            .store(in: &notificationCancellables)
         registerModuleRuntimes()
         synchronizeModuleRuntimes()
 

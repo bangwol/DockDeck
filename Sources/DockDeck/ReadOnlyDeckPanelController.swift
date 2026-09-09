@@ -64,13 +64,13 @@ final class ReadOnlyDeckPanelController:
             styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered,
             defer: false)
-        panel.level = NSWindow.Level(rawValue: Int(kCGDockWindowLevel) + 1)
+        panel.level = DockWindowPolicy.level
         panel.isOpaque = false
         panel.backgroundColor = .clear
         panel.hasShadow = false
         panel.isMovable = false
         panel.collectionBehavior = [
-            .canJoinAllSpaces, .stationary, .fullScreenAuxiliary, .ignoresCycle,
+            .canJoinAllSpaces, .stationary, .fullScreenNone, .ignoresCycle,
         ]
         panel.hidesOnDeactivate = false
         panel.ignoresMouseEvents = false

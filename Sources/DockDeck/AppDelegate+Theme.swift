@@ -21,6 +21,7 @@ extension AppDelegate {
     }
 
     @objc func toggleThemePicker(_ sender: Any?) {
+        guard !hidePanelsForPresentationIfNeeded() else { return }
         if let pickerPanel = themePickerPanel {
             pickerPanel.orderOut(nil)
             themePickerPanel = nil
@@ -51,11 +52,11 @@ extension AppDelegate {
             backing: .buffered,
             defer: false
         )
-        pickerPanel.level = NSWindow.Level(rawValue: Int(kCGDockWindowLevel) + 2)
+        pickerPanel.level = DockWindowPolicy.level
         pickerPanel.isOpaque = false
         pickerPanel.backgroundColor = .clear
         pickerPanel.hidesOnDeactivate = false
-        pickerPanel.collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle]
+        pickerPanel.collectionBehavior = [.stationary, .fullScreenNone, .ignoresCycle]
         pickerPanel.contentView = picker
 
         pickerPanel.makeKeyAndOrderFront(nil)
