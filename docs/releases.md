@@ -21,8 +21,8 @@ settings, refresh scheduling, and window behavior improvements.
 - SwiftTerm is updated to 1.19.0. Preview binaries retain native Apple silicon
   and Intel support, localized resources, and App Intents metadata.
 
-The public preview tag is `v0.1.4-preview.1`. See the
-[GitHub Release](https://github.com/bangwol/DockDeck/releases/tag/v0.1.4-preview.1)
+The public preview tag is `v0.1.4-preview.2`. See the
+[GitHub Release](https://github.com/bangwol/DockDeck/releases/tag/v0.1.4-preview.2)
 for the app ZIP, checksum, and changes since the previous public preview.
 The app remains ad-hoc signed and unnotarized.
 
