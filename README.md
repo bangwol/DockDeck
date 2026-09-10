@@ -44,7 +44,7 @@ sources, refresh behavior, and privacy details.
 ## Install
 
 DockDeck is a technical preview for macOS 13 or later. Download the
-[0.1.4 universal preview](https://github.com/bangwol/DockDeck/releases/tag/v0.1.4-preview.1)
+[0.1.4 universal preview](https://github.com/bangwol/DockDeck/releases/tag/v0.1.4-preview.2)
 or build from source below. The downloaded app is ad-hoc signed and unnotarized;
 see the [preview installation notes](docs/releases.md#preview-artifacts).
 Apple silicon is the primary target; Intel compatibility remains in the

@@ -60,11 +60,13 @@ jobs:
           test -f "$CHECKSUM"
           shasum -a 256 -c "$CHECKSUM"
           codesign --verify --deep --strict .build/release-dist/DockDeck.app
+          # Drain codesign output to avoid SIGPIPE under pipefail.
           codesign -dvvv .build/release-dist/DockDeck.app 2>&1 \
-            | grep -q '^Signature=adhoc$'
+            | grep '^Signature=adhoc$' > /dev/null
           codesign -d --entitlements :- .build/release-dist/DockDeck.app 2>/dev/null \
-            | plutil -p - \
-            | grep -Fq '"com.apple.security.automation.apple-events" => true'
+            > "$RUNNER_TEMP/preview-entitlements.plist"
+          test "$(plutil -extract 'com\.apple\.security\.automation\.apple-events' raw -expect bool \
+            "$RUNNER_TEMP/preview-entitlements.plist")" = true
 
       - name: Attest preview provenance
         uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
