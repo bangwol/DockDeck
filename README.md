@@ -43,10 +43,13 @@ sources, refresh behavior, and privacy details.
 
 ## Install
 
-DockDeck currently ships as a source-installed preview for macOS 13 or later.
+DockDeck is a technical preview for macOS 13 or later. Download the
+[0.1.4 universal preview](https://github.com/bangwol/DockDeck/releases/tag/v0.1.4-preview.1)
+or build from source below. The downloaded app is ad-hoc signed and unnotarized;
+see the [preview installation notes](docs/releases.md#preview-artifacts).
 Apple silicon is the primary target; Intel compatibility remains in the
 universal preview. See the [architecture policy](docs/releases.md#architecture-support).
-Install Xcode Command Line Tools, then run:
+For the recommended source installation, install Xcode Command Line Tools, then run:
 
 ```bash
 git clone https://github.com/bangwol/DockDeck.git

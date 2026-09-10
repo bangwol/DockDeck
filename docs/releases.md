@@ -4,6 +4,28 @@ DockDeck is a pre-1.0 project. Public binaries are technical previews until a
 Developer ID-signed and notarized build is available. The root `VERSION` file is
 the single source of truth for the app's three-part version.
 
+## 0.1.4 preview integration
+
+This patch includes the 0.1.3 integration below and the subsequent controls,
+settings, refresh scheduling, and window behavior improvements.
+
+- Decks use the Dock's window level and hide during full-screen apps and
+  presentations. Terminal sessions keep running; closing Settings cannot
+  restore a terminal that has since been hidden.
+- Module refresh deadlines survive activity and power changes. Elapsed-time
+  calculations, in-flight probes, and replacement Focus Timer sessions are
+  more reliable, with less redundant background work.
+- Settings preserve the selected System Stats metric order and show CLI update
+  guidance for the detected installation. Terminal controls, compact panels,
+  themes, and accessibility are refined.
+- SwiftTerm is updated to 1.19.0. Preview binaries retain native Apple silicon
+  and Intel support, localized resources, and App Intents metadata.
+
+The public preview tag is `v0.1.4-preview.1`. See the
+[GitHub Release](https://github.com/bangwol/DockDeck/releases/tag/v0.1.4-preview.1)
+for the app ZIP, checksum, and changes since the previous public preview.
+The app remains ad-hoc signed and unnotarized.
+
 ## 0.1.3 integration
 
 This patch combines the completed stability review and module/workflow updates.
@@ -46,7 +68,7 @@ versioning are separate:
 Use one branch and one PR per user-visible goal. Related features, module
 updates, UI work, and fixes stay on that branch as separately tested local
 commits. Do not create a branch or PR for every module or commit. Start a new
-goal from synchronized `main`; use `codex/<goal>` for Codex-created branches.
+goal from synchronized `main`; use `<type>/<short-kebab-case-goal>` branches.
 Split only for a requested or independently deliverable scope.
 
 Before pushing, review the accumulated diff and prepare a single Conventional
@@ -76,7 +98,7 @@ Developer ID-signed, notarized distribution path.
 ## Architecture support
 
 Apple silicon is the primary development and runtime validation target. Keep
-native Intel compatibility in the 0.1.3 universal preview: both DockDeck and its
+native Intel compatibility in the universal preview: both DockDeck and its
 bundled Claude bridge contain `arm64` and `x86_64` slices. The package check
 rejects a missing slice. Source installation builds for the current Mac and
 rejects a translated terminal to avoid installing an Intel-only app on Apple
@@ -111,6 +133,12 @@ The app ZIP is not notarized. macOS may require **System Settings → Privacy &
 Security → Open Anyway**, and an update may require Accessibility approval
 again. Installing from source with `./scripts/install.sh` remains the preferred
 preview path.
+
+To use a downloaded preview, verify its checksum, quit DockDeck, extract the ZIP,
+and replace `~/Applications/DockDeck.app` with the included app. Open it from
+that location, then check Accessibility and **Settings → Startup**. Replacing
+the app leaves existing preferences and saved deck profiles in place. Xcode
+Command Line Tools are needed only when building from source.
 
 A DMG is intentionally deferred. It would improve presentation but would not
 remove Gatekeeper warnings from an ad-hoc signed app. Add DMG packaging only

@@ -1,7 +1,8 @@
 # Getting started
 
-DockDeck is currently a source-installed preview for macOS 13 or later. A
-Developer ID-signed and notarized stable binary is not available yet.
+DockDeck is a technical preview for macOS 13 or later. Build from source below,
+or use the [downloaded preview](releases.md#preview-artifacts). A Developer
+ID-signed and notarized stable binary is not available yet.
 
 ## Requirements
 
@@ -15,8 +16,8 @@ Developer ID-signed and notarized stable binary is not available yet.
 | Docker CLI and a running local engine | Docker module |
 | Built-in macOS Music app | Music module |
 
-Only the build tools are required to launch DockDeck. Each optional integration
-can remain disabled until its dependency is ready.
+The build tools are required only for source installation. Each optional
+integration can remain disabled until its dependency is ready.
 
 ## Install and start at login
 
