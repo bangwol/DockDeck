@@ -271,6 +271,8 @@ final class MusicStore: ObservableObject {
     private var requestID: UUID?
     private var isConnecting = false
     private var generation = 0
+    private var cancellation = Progress(totalUnitCount: 1)
+    private var commandInFlight = false
     private var lastCommandUptime: TimeInterval?
     private var refreshCadence = ModuleRefreshCadence(
         backgroundMultiplier: 6, lowPowerMultiplier: 3)
@@ -292,6 +294,7 @@ final class MusicStore: ObservableObject {
     func start() {
         guard !isRunning else { return }
         isRunning = true
+        cancellation = Progress(totalUnitCount: 1)
         refresh()
         scheduleTimer()
     }
@@ -300,6 +303,8 @@ final class MusicStore: ObservableObject {
         guard isRunning || timer != nil || requestID != nil || isConnecting else { return }
         isRunning = false
         generation += 1
+        cancellation.cancel()
+        commandInFlight = false
         requestID = nil
         isConnecting = false
         timer?.invalidate()
@@ -319,11 +324,12 @@ final class MusicStore: ObservableObject {
         guard isRunning, requestID == nil, !isConnecting else { return }
         let requestID = UUID()
         let generation = generation
+        let cancellation = cancellation
         self.requestID = requestID
         if snapshot == nil, status == .ready { status = .checking }
 
         queue.async { [weak self] in
-            guard let self else { return }
+            guard let self, !cancellation.isCancelled else { return }
             let result = self.readResult(prompt: false)
             DispatchQueue.main.async {
                 guard self.requestID == requestID else { return }
@@ -338,13 +344,18 @@ final class MusicStore: ObservableObject {
         guard isRunning, !isConnecting else { return }
         isConnecting = true
         generation += 1
+        cancellation.cancel()
+        cancellation = Progress(totalUnitCount: 1)
+        commandInFlight = false
         requestID = nil
         status = .checking
         let generation = generation
+        let cancellation = cancellation
 
         let authorize = { [weak self] in
             guard let self else { return }
             self.queue.async {
+                guard !cancellation.isCancelled else { return }
                 let result = self.readResult(prompt: true)
                 DispatchQueue.main.async {
                     guard self.isRunning, self.generation == generation else { return }
@@ -385,16 +396,18 @@ final class MusicStore: ObservableObject {
         _ command: MusicCommand,
         at currentUptime: TimeInterval = ProcessInfo.processInfo.systemUptime
     ) -> Bool {
-        guard canControl, !isConnecting else { return false }
+        guard canControl, !isConnecting, !commandInFlight else { return false }
         if let lastCommandUptime,
             currentUptime - lastCommandUptime < Self.commandDebounce
         {
             return false
         }
         lastCommandUptime = currentUptime
+        commandInFlight = true
         let generation = generation
+        let cancellation = cancellation
         queue.async { [weak self] in
-            guard let self else { return }
+            guard let self, !cancellation.isCancelled else { return }
             let succeeded: Bool
             do {
                 try self.provider.send(command)
@@ -404,6 +417,7 @@ final class MusicStore: ObservableObject {
             }
             DispatchQueue.main.async {
                 guard self.isRunning, self.generation == generation else { return }
+                self.commandInFlight = false
                 guard succeeded else {
                     self.status = .unavailable
                     return

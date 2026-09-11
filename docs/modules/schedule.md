@@ -50,7 +50,9 @@ and Reminders switches, and refresh interval; event and Reminder contents are
 never persisted, logged, or sent over the network.
 
 Disabling Schedule stops its timer, removes its EventKit observer, releases the
-event store, and clears both in-memory item lists. Hidden Schedule panels keep
+event store, cancels an outstanding Reminder fetch, and clears both in-memory
+item lists. At most one query is in flight; repeated refreshes are combined into
+one follow-up using the latest source selection. Hidden Schedule panels keep
 the selected polling interval so EventKit changes remain timely; macOS Low Power
 Mode doubles that interval.
 

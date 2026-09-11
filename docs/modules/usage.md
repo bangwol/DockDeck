@@ -45,6 +45,11 @@ subprocess. Rate-limit notifications update the displayed values even when no
 refresh request is pending. Unrelated notifications are ignored. It does not
 read browser cookies or browser credential stores.
 
+Transport input is consumed in bounded chunks on a serial queue, with a 1 MiB
+message limit; a fast writer cannot accumulate an unbounded queue of output.
+Stopping the provider cleans up its process group before launching a replacement.
+Cleanup runs off the main thread and participates in the app's bounded shutdown.
+
 ## Claude
 
 Choose a source under **Settings → Usage → Claude Refresh**:

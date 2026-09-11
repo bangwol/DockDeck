@@ -1329,6 +1329,58 @@ final class PanelAppearanceTests: XCTestCase {
         XCTAssertFalse(app.panel.isVisible)
     }
 
+    func testHiddenDeckUsesBackgroundCadenceWhileDetailsStayVisible() {
+        let previousConfiguration = PanelSettings.deckConfiguration
+        let previousRight = PanelSettings.activeModule(on: .right)
+        PanelSettings.deckConfiguration = PanelDeckConfiguration(
+            left: [], right: [.systemStats], enabled: [.systemStats])
+        PanelSettings.setActiveModule(.systemStats, on: .right)
+        let app = makeWindowPolicyDelegate()
+        app.usageDisplayAwake = true
+        app.moduleRuntimeCoordinator.register(.systemStats, start: {}, stop: {})
+        defer {
+            app.trackingTimer?.invalidate()
+            app.deckAutoSlideTimer?.invalidate()
+            app.rightReadOnlyDeckPanelController.detailWindowForTesting?.close()
+            app.rightReadOnlyDeckPanelController.panel.orderOut(nil)
+            PanelSettings.deckConfiguration = previousConfiguration
+            PanelSettings.setActiveModule(previousRight, on: .right)
+        }
+        app.synchronizeModuleRuntimes()
+        XCTAssertEqual(app.moduleRuntimeCoordinator.state(for: .systemStats), .background)
+        app.showReadOnlyDeck(on: .right, frame: app.rightReadOnlyDeckPanelController.panel.frame)
+        XCTAssertEqual(app.moduleRuntimeCoordinator.state(for: .systemStats), .visible)
+        app.hideReadOnlyDeck(on: .right)
+        XCTAssertEqual(app.moduleRuntimeCoordinator.state(for: .systemStats), .background)
+        app.rightReadOnlyDeckPanelController.showDetail()
+        app.synchronizeModuleRuntimes()
+        XCTAssertEqual(app.moduleRuntimeCoordinator.state(for: .systemStats), .visible)
+        app.rightReadOnlyDeckPanelController.detailWindowForTesting?.close()
+        app.synchronizeModuleRuntimes()
+        XCTAssertEqual(app.moduleRuntimeCoordinator.state(for: .systemStats), .background)
+    }
+
+    func testTrackingTimerStopsWhenDisplayOrSessionIsInactive() {
+        let app = AppDelegate()
+        defer { app.trackingTimer?.invalidate() }
+        app.startTrackingTimer()
+        let first = app.trackingTimer
+        XCTAssertNotNil(first)
+        app.startTrackingTimer()
+        XCTAssertTrue(first === app.trackingTimer)
+        app.usageDisplayAwake = false
+        app.startTrackingTimer()
+        XCTAssertNil(app.trackingTimer)
+        XCTAssertFalse(first?.isValid ?? true)
+        app.usageDisplayAwake = true
+        app.usageSessionActive = false
+        app.startTrackingTimer()
+        XCTAssertNil(app.trackingTimer)
+        app.usageSessionActive = true
+        app.startTrackingTimer()
+        XCTAssertTrue(app.trackingTimer?.isValid == true)
+    }
+
     private func makeWindowPolicyDelegate() -> AppDelegate {
         let app = AppDelegate()
         app.usageDisplayAwake = false

@@ -30,11 +30,12 @@ adding a polling timer. Launch failures and oversized output are reported
 separately from timeouts.
 
 Disabling or reconfiguring Custom Tiles, Docker, Project Pulse, or GitHub Inbox
-cancels their in-flight and queued commands. DockDeck terminates only the
-process it launched, allows one second for graceful exit, then uses a bounded
-forced termination if needed. A custom
-command is responsible for cleaning up any descendants it launches; avoid
-detached daemons in tiles. Late results cannot overwrite a stopped module.
+cancels their in-flight and queued commands. DockDeck allows one second for
+graceful exit, then forcibly terminates remaining processes in the command's
+verified process group, including children whose parent already exited.
+It never targets its own process group. Detached daemons that create another
+process group remain the command's responsibility; avoid them in tiles.
+Late results cannot overwrite a stopped module.
 When the app quits, it stops accepting new bounded commands and spends at most
 two seconds terminating and collecting existing ones. This also covers explicit
 Quick Actions and diagnostic commands that are still running during shutdown.
@@ -94,8 +95,8 @@ The same page reports the latest runtime state for every registered module:
 
 | State | Meaning |
 | --- | --- |
-| `VISIBLE` | Selected on a visible Deck and using its foreground cadence |
-| `BACKGROUND` | Enabled behind another module and using its background cadence |
+| `VISIBLE` | Selected on a visible Deck or open detail window and using its foreground cadence |
+| `BACKGROUND` | Enabled with both its Deck content and detail window hidden, using its background cadence |
 | `PAUSED` | Enabled but suspended because the display or login session is inactive |
 | `DISABLED` | Stopped; owned requests and subprocesses are being cancelled within their cleanup limits |
 
@@ -104,6 +105,8 @@ slowing eligible timers. The terminal preserves its shell across display sleep
 while read-only modules suspend. This snapshot is refreshed with the diagnostic
 checks and does not add a runtime polling loop. Hover a module state to see when
 its current state began; the timestamp is also included in a copied report.
+Dock geometry polling also stops while the display or login session is inactive
+and resumes when both are active.
 
 Activity and power-state changes retain elapsed time in a module's polling
 interval. Repeated deck switches therefore cannot postpone a poll indefinitely;

@@ -158,6 +158,46 @@ final class ScheduleTests: XCTestCase {
         XCTAssertEqual(reminderPresentation.mode, .upcoming)
     }
 
+    func testSlowRefreshesCoalesceAndUseTheLatestConfiguration() {
+        let provider = FakeScheduleProvider(authorization: .granted)
+        provider.delaysFetch = true
+        let store = ScheduleStore(provider: provider)
+        defer { store.stop() }
+        store.start()
+        for _ in 0..<50 { store.refresh() }
+        store.updateConfiguration(selectedCalendarIDs: ["personal"], selectedReminderListIDs: [],
+            includeAllDay: false, includeReminders: false, refreshInterval: 300)
+        XCTAssertEqual(provider.fetchCount, 1)
+        XCTAssertEqual(provider.pendingFetches.count, 1)
+
+        provider.pendingFetches.removeFirst()()
+        XCTAssertTrue(store.events.isEmpty, "The obsolete configuration must not publish")
+        XCTAssertEqual(provider.fetchCount, 2)
+        XCTAssertEqual(provider.lastSelectedCalendarIDs, ["personal"])
+        provider.pendingFetches.removeFirst()()
+        XCTAssertEqual(store.status, .ready)
+        XCTAssertEqual(provider.fetchCount, 2)
+        XCTAssertTrue(provider.pendingFetches.isEmpty)
+    }
+
+    func testStopAndRestartDoNotOverlapAnUnfinishedScheduleRead() {
+        let provider = FakeScheduleProvider(authorization: .granted)
+        provider.delaysFetch = true
+        let store = ScheduleStore(provider: provider)
+        store.start()
+        store.stop()
+        store.start()
+        XCTAssertEqual(provider.fetchCount, 1)
+        provider.pendingFetches.removeFirst()()
+        XCTAssertEqual(provider.fetchCount, 2)
+        XCTAssertTrue(store.events.isEmpty)
+        store.stop()
+        provider.pendingFetches.removeFirst()()
+        XCTAssertEqual(store.status, .idle)
+        XCTAssertTrue(store.events.isEmpty)
+        XCTAssertEqual(provider.fetchCount, 2)
+    }
+
     func testStoreDoesNotFetchOrRequestBeforeExplicitAccessAction() {
         let provider = FakeScheduleProvider(authorization: .notDetermined)
         let store = ScheduleStore(provider: provider)
@@ -363,6 +403,8 @@ final class ScheduleTests: XCTestCase {
 }
 
 private final class FakeScheduleProvider: ScheduleEventProviding {
+    var delaysFetch = false
+    var pendingFetches: [() -> Void] = []
     var authorizationState: ScheduleAuthorizationState
     var reminderAuthorizationState: ScheduleAuthorizationState
     var onStoreChanged: (() -> Void)?
@@ -418,6 +460,11 @@ private final class FakeScheduleProvider: ScheduleEventProviding {
         lastSelectedReminderListIDs = selectedReminderListIDs
         lastIncludeAllDay = includeAllDay
         lastIncludeReminders = includeReminders
+        let deliver = completion
+        let completion: (ScheduleFetchResult) -> Void = { result in
+            if self.delaysFetch { self.pendingFetches.append { deliver(result) } }
+            else { deliver(result) }
+        }
         let now = Date()
         completion(
             ScheduleFetchResult(

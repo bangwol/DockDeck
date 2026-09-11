@@ -4,6 +4,42 @@ import XCTest
 @testable import DockDeck
 
 final class BoundedProcessRunnerTests: XCTestCase {
+    func testTimeoutCancellationAndShutdownRemoveStubbornDescendants() throws {
+        for mode in ["timeout", "cancel", "shutdown"] {
+            let marker = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+            defer { try? FileManager.default.removeItem(at: marker) }
+            let cancellation = Progress(totalUnitCount: 1)
+            let lifetime = BoundedProcessLifetime()
+            defer { cancellation.cancel(); lifetime.shutdown() }
+            let finished = expectation(description: "Descendant cleaned up after \(mode)")
+            DispatchQueue.global().async {
+                do {
+                    _ = try BoundedProcessRunner.run(
+                        executableURL: URL(fileURLWithPath: "/bin/sh"),
+                        arguments: ["-c", #"/bin/sh -c 'trap "" TERM; printf "%s" $$ > "$1"; exec /bin/sleep 20' sh "$1" & wait"#, "sh", marker.path],
+                        timeout: mode == "timeout" ? 0.3 : 10, cancellation: cancellation, lifetime: lifetime)
+                    XCTFail("Expected command cancellation or timeout")
+                } catch {
+                    XCTAssertEqual(error as? BoundedProcessError, mode == "timeout" ? .timedOut : .cancelled)
+                }
+                finished.fulfill()
+            }
+            let deadline = Date(timeIntervalSinceNow: 2)
+            var observedPID: Int32?
+            while observedPID == nil, Date() < deadline {
+                observedPID = (try? String(contentsOf: marker, encoding: .utf8)).flatMap(Int32.init)
+                if observedPID == nil { Thread.sleep(forTimeInterval: 0.01) }
+            }
+            let pid = try XCTUnwrap(observedPID)
+            defer { if kill(pid, 0) == 0 { kill(pid, SIGKILL) } }
+            if mode == "cancel" { cancellation.cancel() }
+            if mode == "shutdown" { lifetime.shutdown() }
+            wait(for: [finished], timeout: 4)
+            XCTAssertEqual(kill(pid, 0), -1, "Surviving child after \(mode)")
+            XCTAssertEqual(errno, ESRCH)
+        }
+    }
+
     func testCancelledRequestNeverLaunches() {
         let cancellation = Progress(totalUnitCount: 1)
         cancellation.cancel()
