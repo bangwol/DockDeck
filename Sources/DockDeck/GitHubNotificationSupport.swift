@@ -14,7 +14,9 @@ enum GitHubNotificationURLResolver {
             components.user == nil, components.password == nil
         else { return repositoryURL }
 
-        let parts = url.pathComponents.filter { $0 != "/" }
+        // Split before decoding so an encoded slash never becomes a path separator.
+        let parts = components.percentEncodedPath.split(separator: "/")
+            .map { String($0).removingPercentEncoding ?? "" }
         guard parts.count >= 5, parts[0] == "repos",
             "\(parts[1])/\(parts[2])".caseInsensitiveCompare(repository) == .orderedSame
         else { return repositoryURL }
