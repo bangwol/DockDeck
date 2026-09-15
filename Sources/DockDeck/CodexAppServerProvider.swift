@@ -155,9 +155,12 @@ final class CodexAppServerProvider {
     private let restartDelays: [TimeInterval] = [60, 120, 300]
 
     private var process: Process?
+    private var processGroupID: pid_t?
     private var inputHandle: FileHandle?
     private var outputHandle: FileHandle?
     private var errorHandle: FileHandle?
+    private var outputSource: DispatchSourceRead?
+    private var errorSource: DispatchSourceRead?
     private var outputBuffer = Data()
     private var handler: UpdateHandler?
     private var pendingRateLimitID: Int?
@@ -197,16 +200,14 @@ final class CodexAppServerProvider {
     }
 
     func stop() {
-        queue.sync {
+        // Cleanup stays on the transport queue, ahead of the next start, so an
+        // unresponsive child cannot freeze the main thread or overlap a replacement.
+        queue.async {
             self.active = false
             self.restartWorkItem?.cancel()
             self.restartWorkItem = nil
-            self.pendingTimeout?.cancel()
-            self.pendingTimeout = nil
-            self.pendingRateLimitID = nil
-            let process = self.process
+            self.handler = nil
             self.clearProcessState()
-            if process?.isRunning == true { process?.terminate() }
         }
     }
 
@@ -218,11 +219,14 @@ final class CodexAppServerProvider {
         }
 
         let process = Process()
+        guard BoundedProcessLifetime.shared.register(process) else { return }
         let inputPipe = Pipe()
         let outputPipe = Pipe()
         let errorPipe = Pipe()
         // A dead app-server must surface as EPIPE in send(), not as SIGPIPE ending DockDeck.
         _ = fcntl(inputPipe.fileHandleForWriting.fileDescriptor, F_SETNOSIGPIPE, 1)
+        let inputFD = inputPipe.fileHandleForWriting.fileDescriptor
+        _ = fcntl(inputFD, F_SETFL, fcntl(inputFD, F_GETFL) | O_NONBLOCK)
         process.executableURL = executableURL
         process.arguments = ["app-server"]
         process.environment = CodexBinaryLocator.launchEnvironment(for: executableURL)
@@ -231,16 +235,7 @@ final class CodexAppServerProvider {
         process.standardError = errorPipe
 
         let outputHandle = outputPipe.fileHandleForReading
-        outputHandle.readabilityHandler = { [weak self] handle in
-            let data = handle.availableData
-            self?.queue.async {
-                self?.consume(data, from: handle)
-            }
-        }
         let errorHandle = errorPipe.fileHandleForReading
-        errorHandle.readabilityHandler = { handle in
-            if handle.availableData.isEmpty { handle.readabilityHandler = nil }
-        }
         process.terminationHandler = { [weak self, weak process] terminated in
             guard let process else { return }
             self?.queue.async {
@@ -252,11 +247,15 @@ final class CodexAppServerProvider {
         inputHandle = inputPipe.fileHandleForWriting
         self.outputHandle = outputHandle
         self.errorHandle = errorHandle
+        outputSource = makeReader(outputHandle, capturesOutput: true)
+        errorSource = makeReader(errorHandle, capturesOutput: false)
         outputBuffer.removeAll(keepingCapacity: true)
         nextRequestID = 1
 
         do {
             try process.run()
+            processGroupID = OwnedProcessCleanup.groupID(for: process)
+            BoundedProcessLifetime.shared.didLaunch(process, groupID: processGroupID)
             try send([
                 "method": "initialize",
                 "id": nextID(),
@@ -273,6 +272,27 @@ final class CodexAppServerProvider {
         } catch {
             failTransport("Could not start Codex app-server: \(error.localizedDescription)")
         }
+    }
+
+    private func makeReader(_ handle: FileHandle, capturesOutput: Bool) -> DispatchSourceRead {
+        let descriptor = handle.fileDescriptor
+        _ = fcntl(descriptor, F_SETFL, fcntl(descriptor, F_GETFL) | O_NONBLOCK)
+        let source = DispatchSource.makeReadSource(fileDescriptor: descriptor, queue: queue)
+        source.setEventHandler { [weak self] in
+            guard let self, handle === (capturesOutput ? self.outputHandle : self.errorHandle) else { return }
+            // Read on the consumer queue: the pipe supplies backpressure instead of
+            // accumulating unbounded Data closures behind a slow JSON parser.
+            var bytes = [UInt8](repeating: 0, count: 16_384)
+            let count = Darwin.read(descriptor, &bytes, bytes.count)
+            if count > 0 {
+                if capturesOutput { self.consume(Data(bytes.prefix(count)), from: handle) }
+            } else if count == 0 || (errno != EAGAIN && errno != EWOULDBLOCK && errno != EINTR) {
+                (capturesOutput ? self.outputSource : self.errorSource)?.cancel()
+            }
+        }
+        source.setCancelHandler { try? handle.close() }
+        source.resume()
+        return source
     }
 
     private func sendRateLimitReadIfNeeded() {
@@ -306,10 +326,6 @@ final class CodexAppServerProvider {
     private func consume(_ data: Data, from handle: FileHandle) {
         // A callback from a replaced process must not feed the current one's buffer.
         guard handle === outputHandle else { return }
-        guard !data.isEmpty else {
-            outputHandle?.readabilityHandler = nil
-            return
-        }
         outputBuffer.append(data)
 
         while let newline = outputBuffer.firstIndex(of: 0x0A) {
@@ -389,23 +405,40 @@ final class CodexAppServerProvider {
 
     private func failTransport(_ message: String) {
         handler?(.failure(.transport(message)))
-        let process = process
         clearProcessState()
-        if process?.isRunning == true { process?.terminate() }
         if active { scheduleRestart() }
     }
 
     private func clearProcessState() {
-        outputHandle?.readabilityHandler = nil
-        errorHandle?.readabilityHandler = nil
+        outputSource?.cancel()
+        errorSource?.cancel()
+        outputSource = nil
+        errorSource = nil
         outputHandle = nil
         errorHandle = nil
         inputHandle = nil
+        if let process {
+            OwnedProcessCleanup.stop(process, groupID: processGroupID)
+            BoundedProcessLifetime.shared.remove(process)
+        }
         process = nil
+        processGroupID = nil
         outputBuffer.removeAll(keepingCapacity: false)
         pendingTimeout?.cancel()
         pendingTimeout = nil
         pendingRateLimitID = nil
+    }
+
+    deinit {
+        outputSource?.cancel()
+        errorSource?.cancel()
+        if let process {
+            let groupID = processGroupID
+            DispatchQueue.global(qos: .utility).async {
+                OwnedProcessCleanup.stop(process, groupID: groupID)
+                BoundedProcessLifetime.shared.remove(process)
+            }
+        }
     }
 
     private func scheduleRestart() {

@@ -136,18 +136,36 @@ Terminal-specific behavior is documented in the [Terminal guide](modules/termina
 ## Run without installing
 
 ```bash
-swift test
-swift run DockDeck
+swift test --build-system native
+swift run --build-system native DockDeck
 ```
 
 Enable Dock geometry diagnostics when investigating placement:
 
 ```bash
-DOCKDECK_DEBUG=1 swift run DockDeck
+DOCKDECK_DEBUG=1 swift run --build-system native DockDeck
 ```
 
 Music Automation requires the packaged usage description and entitlement, so
 test that module with `./scripts/install.sh`, not `swift run DockDeck`.
+
+## Development verification
+
+Scheduled and manual CI runs check both macOS 26 and the `xcode-27` preview
+runner. Preview images change over time; consult each run's OS and Xcode versions
+and also verify the installed app's interactions on macOS 27.
+
+Use the native SwiftPM build system consistently for builds, tests, and packaging.
+Xcode 27's new default build system changes resource processing and output paths;
+it currently fails to compile SwiftTerm's Metal resource in the preview runner.
+The native build system retains the existing build behavior and bundle layout.
+If SDK 27 reports a missing `SwiftUIMacros` plugin with Command Line Tools,
+select a matching full Xcode installation; its SwiftUI compiler plugins are
+needed by the new `@State` implementation.
+
+```bash
+swift test --build-system native -c release -Xswiftc -warnings-as-errors
+```
 
 ## Update or uninstall
 

@@ -243,6 +243,17 @@ final class ProjectPulseTests: XCTestCase {
         XCTAssertEqual(activity.issueContributions, 3)
         XCTAssertEqual(activity.repositoriesWithCommits, 4)
         XCTAssertEqual(activity.restrictedContributions, 248)
+
+        for login in ["user-123", "éuser"] {
+            let input = Data(String(decoding: data, as: UTF8.self)
+                .replacingOccurrences(of: "bangwol", with: login).utf8)
+            XCTAssertEqual(try GitHubActivityParser.parse(input).login, login)
+        }
+        for login in ["", "bad/name", "bad@name", String(repeating: "a", count: 101)] {
+            let input = Data(String(decoding: data, as: UTF8.self)
+                .replacingOccurrences(of: "bangwol", with: login).utf8)
+            XCTAssertThrowsError(try GitHubActivityParser.parse(input), login)
+        }
     }
 
     func testGitHubRepositoryListParserFiltersInvalidAndDuplicateNames() throws {

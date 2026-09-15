@@ -45,7 +45,7 @@ jobs:
           echo "checksum=$artifact.sha256" >> "$GITHUB_OUTPUT"
 
       - name: Test release build with warnings as errors
-        run: swift test -c release -Xswiftc -warnings-as-errors
+        run: swift test --build-system native -c release -Xswiftc -warnings-as-errors
 
       - name: Build unsigned preview
         run: ./scripts/package.sh

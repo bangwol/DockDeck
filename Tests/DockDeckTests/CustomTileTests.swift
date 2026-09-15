@@ -102,6 +102,18 @@ final class CustomTileTests: XCTestCase {
                 Data(#"{"value":}"#.utf8), fallbackTitle: "Malformed"))
     }
 
+    func testOutputParserValidatesSymbolCharacters() throws {
+        for (symbol, accepted) in [
+            ("arrow.left.and.right", true), ("1.circle", true), ("a-b", true),
+            ("é.circle", true), ("bad/name", false), ("bad:name", false),
+            ("bad%2Fname", false),
+        ] {
+            let data = try JSONEncoder().encode(["value": "Ready", "symbol": symbol])
+            let content = try CustomTileOutputParser.parse(data, fallbackTitle: "Status")
+            XCTAssertEqual(content.symbolName, accepted ? symbol : nil, symbol)
+        }
+    }
+
     func testClientRunsExecutableWithoutShell() throws {
         let configuration = CustomTileConfiguration(
             title: "Build",

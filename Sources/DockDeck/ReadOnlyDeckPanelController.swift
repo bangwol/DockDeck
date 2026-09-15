@@ -111,6 +111,7 @@ final class ReadOnlyDeckPanelController:
     }
 
     var activeModule: PanelModuleID? { PanelSettings.activeModule(on: side) }
+    var hasVisibleContent: Bool { panel.isVisible || detailPanel?.isVisible == true }
 
     func gestureRecognizer(
         _ gestureRecognizer: NSGestureRecognizer,

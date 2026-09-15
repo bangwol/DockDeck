@@ -24,6 +24,10 @@ Use its previous, play/pause, and next buttons. Double-click the panel for a
 resizable detail view, or right-click it for the same transport controls and a
 link to Music.
 
+Only one transport command runs at a time. Additional clicks while that command
+is pending are ignored, and disabling the module discards queued commands and
+polls. An Apple Event already sent retains its existing three-second timeout.
+
 DockDeck samples every 5 seconds while the module is visible and every 30
 seconds in the background. Low Power Mode or serious thermal pressure extends
 those intervals to 15 and 90 seconds. Sampling stops while the module is

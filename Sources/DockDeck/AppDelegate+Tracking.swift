@@ -43,6 +43,11 @@ extension AppDelegate {
     }
 
     func startTrackingTimer() {
+        guard usageDisplayAwake, usageSessionActive else {
+            trackingTimer?.invalidate()
+            trackingTimer = nil
+            return
+        }
         let interval: TimeInterval
         if !accessibilityTrusted {
             interval = Self.untrustedTrackingInterval
@@ -225,7 +230,10 @@ extension AppDelegate {
             return
         }
         controller.synchronizeActiveModule()
-        if !controller.panel.isVisible { controller.panel.orderBack(nil) }
+        if !controller.panel.isVisible {
+            controller.panel.orderBack(nil)
+            synchronizeModuleRuntimes()
+        }
         applyReadOnlyDeckFrame(frame, on: side)
     }
 
@@ -236,6 +244,7 @@ extension AppDelegate {
         guard panel.isVisible else { return }
         debugLog("visibility", "hiding \(side.rawValue) deck; \(reason)")
         panel.orderOut(nil)
+        synchronizeModuleRuntimes()
     }
 
     func hideReadOnlyDecks(reason: String = "insufficient space beside Dock") {

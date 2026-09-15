@@ -201,7 +201,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 self?.deckSelectionDidChange(on: side)
             },
             onAutoSlideStateChange: { [weak self] in
-                self?.synchronizeDeckAutoSlideTimer()
+                self?.synchronizeModuleRuntimes()
             })
         rightReadOnlyDeckPanelController = ReadOnlyDeckPanelController(
             initialFrame: initialRightFrame,
@@ -213,7 +213,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 self?.deckSelectionDidChange(on: side)
             },
             onAutoSlideStateChange: { [weak self] in
-                self?.synchronizeDeckAutoSlideTimer()
+                self?.synchronizeModuleRuntimes()
             })
         panel.delegate = self
         configureNotifications()
@@ -377,9 +377,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func synchronizeModuleRuntimes() {
-        let visibleModules = PanelSide.allCases.compactMap {
-            PanelSettings.activeModule(on: $0)
+        var visibleModules = readOnlyDeckPanelControllers.compactMap { controller in
+            controller.hasVisibleContent && controller.activeModule != .terminal
+                ? controller.activeModule : nil
         }
+        if terminalPanelController?.panel.isVisible == true { visibleModules.append(.terminal) }
         let processInfo = ProcessInfo.processInfo
         let systemActive = usageDisplayAwake && usageSessionActive
         var enabledModules = PanelSettings.deckConfiguration.enabled
@@ -392,6 +394,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 lowPowerMode: processInfo.isLowPowerModeEnabled,
                 thermalState: processInfo.thermalState),
             systemActive: systemActive)
+        startTrackingTimer()
         synchronizeDeckAutoSlideTimer()
     }
 

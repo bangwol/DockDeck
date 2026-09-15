@@ -36,7 +36,6 @@ enum BoundedProcessRunner {
             throw BoundedProcessError.cancelled
         }
         let wake = DispatchSemaphore(value: 0)
-        let terminated = DispatchSemaphore(value: 0)
         cancellation?.cancellationHandler = { wake.signal() }
         defer { cancellation?.cancellationHandler = nil }
         let process = Process()
@@ -64,7 +63,6 @@ enum BoundedProcessRunner {
             onLimitExceeded: { wake.signal() })
 
         process.terminationHandler = { _ in
-            terminated.signal()
             wake.signal()
         }
         do {
@@ -75,6 +73,8 @@ enum BoundedProcessRunner {
             collector.finish()
             throw BoundedProcessError.launchFailed
         }
+        let groupID = OwnedProcessCleanup.groupID(for: process)
+        lifetime.didLaunch(process, groupID: groupID)
         outputPipe.fileHandleForWriting.closeFile()
         errorPipe.fileHandleForWriting.closeFile()
 
@@ -89,7 +89,7 @@ enum BoundedProcessRunner {
         } else {
             failure = nil
         }
-        if failure != nil { stop(process, terminated: terminated) }
+        if failure != nil { OwnedProcessCleanup.stop(process, groupID: groupID) }
         collector.finish()
         if let failure { throw failure }
         if capture.exceededLimit {
@@ -102,14 +102,40 @@ enum BoundedProcessRunner {
         }
         return capture.output
     }
+}
 
-    private static func stop(_ process: Process, terminated: DispatchSemaphore) {
-        guard process.isRunning else { return }
-        process.terminate()
-        if terminated.wait(timeout: .now() + 1) == .timedOut {
-            if process.isRunning { kill(process.processIdentifier, SIGKILL) }
-            _ = terminated.wait(timeout: .now() + 1)
+enum OwnedProcessCleanup {
+    // Foundation normally gives each child its own process group. Verify ownership
+    // while the leader is alive; never signal DockDeck's group or a detached daemon.
+    static func groupID(for process: Process) -> pid_t? {
+        let pid = process.processIdentifier
+        return pid > 1 && getpgid(pid) == pid && pid != getpgrp() ? pid : nil
+    }
+
+    static func signal(_ signal: Int32, process: Process, groupID: pid_t?) {
+        if let groupID {
+            kill(-groupID, signal)
+        } else if process.isRunning {
+            kill(process.processIdentifier, signal)
         }
+    }
+
+    static func stop(_ process: Process, groupID: pid_t?) {
+        let started = ProcessInfo.processInfo.systemUptime
+        signal(SIGTERM, process: process, groupID: groupID)
+        while isRunning(process, groupID: groupID),
+            ProcessInfo.processInfo.systemUptime - started < 1 {
+            Thread.sleep(forTimeInterval: 0.01)
+        }
+        signal(SIGKILL, process: process, groupID: groupID)
+        while isRunning(process, groupID: groupID),
+            ProcessInfo.processInfo.systemUptime - started < 2 {
+            Thread.sleep(forTimeInterval: 0.01)
+        }
+    }
+
+    private static func isRunning(_ process: Process, groupID: pid_t?) -> Bool {
+        process.isRunning || groupID.map { kill(-$0, 0) == 0 } == true
     }
 }
 
@@ -118,15 +144,19 @@ final class BoundedProcessLifetime {
     static let shared = BoundedProcessLifetime()
     private let lock = NSLock()
     private var stopping = false
-    private var processes: [ObjectIdentifier: Process] = [:]
+    private var processes: [ObjectIdentifier: (process: Process, groupID: pid_t?)] = [:]
     var isShuttingDown: Bool { lock.withLock { stopping } }
 
     func register(_ process: Process) -> Bool {
         lock.withLock {
             guard !stopping else { return false }
-            processes[ObjectIdentifier(process)] = process
+            processes[ObjectIdentifier(process)] = (process, nil)
             return true
         }
+    }
+
+    func didLaunch(_ process: Process, groupID: pid_t?) {
+        lock.withLock { processes[ObjectIdentifier(process)]?.groupID = groupID }
     }
 
     func remove(_ process: Process) { _ = lock.withLock { processes.removeValue(forKey: ObjectIdentifier(process)) } }
@@ -138,11 +168,12 @@ final class BoundedProcessLifetime {
         while ProcessInfo.processInfo.systemUptime - started < 2 {
             let active = lock.withLock { Array(processes.values) }
             if active.isEmpty { return }
-            for process in active where process.isRunning {
+            for entry in active {
                 if ProcessInfo.processInfo.systemUptime - started >= 1 {
-                    kill(process.processIdentifier, SIGKILL)
-                } else if signalled.insert(ObjectIdentifier(process)).inserted {
-                    process.terminate()
+                    OwnedProcessCleanup.signal(SIGKILL, process: entry.process, groupID: entry.groupID)
+                } else if entry.process.isRunning,
+                    signalled.insert(ObjectIdentifier(entry.process)).inserted {
+                    OwnedProcessCleanup.signal(SIGTERM, process: entry.process, groupID: entry.groupID)
                 }
             }
             Thread.sleep(forTimeInterval: 0.01)

@@ -14,6 +14,9 @@ final class QuickActionsTests: XCTestCase {
             (.shortcut, "--help"), (.shortcut, "bad\nname")] {
             XCTAssertThrowsError(try QuickAction(name: "Open", kind: kind, target: target).validated())
         }
+        for name in ["Open\nOther", "Open\u{7f}"] {
+            XCTAssertThrowsError(try QuickAction(name: name, kind: .shortcut, target: "Work").validated())
+        }
         let action = QuickAction(name: "Open", kind: .webpage, target: "https://example.com")
         XCTAssertThrowsError(try QuickAction.validated([action, action]))
         XCTAssertThrowsError(try QuickAction.validated((0..<5).map { QuickAction(name: String($0), kind: .shortcut, target: "Work") }))

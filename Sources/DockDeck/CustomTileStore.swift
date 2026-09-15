@@ -189,7 +189,7 @@ enum CustomTileOutputParser {
     private static func symbol(_ value: String?) -> String? {
         guard let value = field(value, limit: maximumSymbolLength) else { return nil }
         let allowed = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: ".-"))
-        return value.unicodeScalars.allSatisfy(allowed.contains) ? value : nil
+        return value.unicodeScalars.allSatisfy { allowed.contains($0) } ? value : nil
     }
 }
 

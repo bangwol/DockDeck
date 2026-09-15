@@ -31,6 +31,21 @@ final class LocalPortsTests: XCTestCase {
         XCTAssertEqual(reader.readCount, 1)
     }
 
+    func testReleasingStoreCancelsAnActiveProbe() {
+        let started = expectation(description: "Probe started")
+        let reader = BlockingPortReader(started: started)
+        var store: LocalPortsStore? = LocalPortsStore(reader: reader)
+        weak var releasedStore = store
+        store?.start()
+        wait(for: [started], timeout: 1)
+        store = nil
+        XCTAssertNil(releasedStore)
+        releasedStore = nil
+        reader.gate.signal()
+        RunLoop.current.run(until: Date().addingTimeInterval(0.1))
+        XCTAssertEqual(reader.readCount, 1)
+    }
+
     func testLoopbackProbeFindsListenerAndThenClosedPort() throws {
         let listener = socket(AF_INET, SOCK_STREAM, 0)
         XCTAssertGreaterThanOrEqual(listener, 0)

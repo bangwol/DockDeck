@@ -40,10 +40,10 @@ fi
 # not registered", even though the first build's binary is still fine on
 # disk). Isolated scratch dirs sidestep that entirely.
 echo "Building release binary (arm64)..."
-(cd "$REPO_DIR" && swift build -c release --arch arm64 --scratch-path "$ARM64_SCRATCH")
+(cd "$REPO_DIR" && swift build --build-system native -c release --arch arm64 --scratch-path "$ARM64_SCRATCH")
 
 echo "Building release binary (x86_64)..."
-(cd "$REPO_DIR" && swift build -c release --arch x86_64 --scratch-path "$X86_64_SCRATCH")
+(cd "$REPO_DIR" && swift build --build-system native -c release --arch x86_64 --scratch-path "$X86_64_SCRATCH")
 
 echo "Packaging $APP_PATH..."
 rm -rf "$APP_PATH"

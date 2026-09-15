@@ -1,4 +1,5 @@
 import Cocoa
+import Darwin
 import SwiftTerm
 
 struct WindowResizeEdges: OptionSet {
@@ -149,6 +150,81 @@ struct ShellRestartPolicy {
     }
 }
 
+struct TerminalShellSession {
+    private struct Identity: Hashable {
+        let pid: pid_t
+        let seconds: UInt64
+        let microseconds: UInt64
+
+        init(_ info: proc_bsdinfo) {
+            pid = pid_t(info.pbi_pid)
+            seconds = info.pbi_start_tvsec
+            microseconds = info.pbi_start_tvusec
+        }
+    }
+
+    private let shell: Identity
+
+    init?(pid: pid_t) {
+        guard pid > 1, pid != getpid(), let info = Self.info(pid),
+            info.pbi_ppid == getpid() else { return nil }
+        shell = Identity(info)
+    }
+
+    private static func info(_ pid: pid_t) -> proc_bsdinfo? {
+        var info = proc_bsdinfo()
+        let size = Int32(MemoryLayout<proc_bsdinfo>.size)
+        return proc_pidinfo(pid, PROC_PIDTBSDINFO, 0, &info, size) == size ? info : nil
+    }
+
+    private var members: [Identity] {
+        // A terminal's job-control groups share its session. Detached daemons do not.
+        if let current = Self.info(shell.pid), Identity(current) != shell { return [] }
+        let capacity = max(Int(proc_listallpids(nil, 0)) + 32, 32)
+        var pids = [pid_t](repeating: 0, count: capacity)
+        let count = pids.withUnsafeMutableBytes { buffer in
+            proc_listallpids(buffer.baseAddress, Int32(buffer.count))
+        }
+        return pids.prefix(max(0, min(Int(count), capacity))).compactMap { pid in
+            guard pid > 1, pid != getpid(), pid == shell.pid || getsid(pid) == shell.pid,
+                let info = Self.info(pid), info.pbi_status != SZOMB else { return nil }
+            return Identity(info)
+        }
+    }
+
+    func stop(closeTerminal: () -> Void) {
+        // Never call SwiftTerm.terminate with a stale PID: it sends SIGTERM itself.
+        if let current = Self.info(shell.pid), Identity(current) == shell { closeTerminal() }
+        let started = ProcessInfo.processInfo.systemUptime
+        var signalled: Set<Identity> = []
+        // ponytail: bounded synchronous cleanup also serves applicationWillTerminate.
+        // Move module-disable cleanup to a joined worker if its rare 2 s wait affects UX.
+        while ProcessInfo.processInfo.systemUptime - started < 2 {
+            let active = members
+            if active.isEmpty, reapShell() { return }
+            let signal = ProcessInfo.processInfo.systemUptime - started >= 1 ? SIGKILL : SIGTERM
+            for target in active {
+                guard let current = Self.info(target.pid), Identity(current) == target,
+                    target.pid == shell.pid || getsid(target.pid) == shell.pid else { continue }
+                if signal == SIGKILL || signalled.insert(target).inserted {
+                    kill(target.pid, signal)
+                }
+            }
+            Thread.sleep(forTimeInterval: 0.01)
+        }
+        _ = reapShell()
+    }
+
+    private func reapShell() -> Bool {
+        // Zombie process info may already be unavailable. waitpid still owns reaping;
+        // keep the leader's PID reserved until the session's living jobs are gone.
+        if let current = Self.info(shell.pid), Identity(current) != shell { return true }
+        var status: Int32 = 0
+        let result = waitpid(shell.pid, &status, WNOHANG)
+        return result == shell.pid || (result == -1 && errno == ECHILD)
+    }
+}
+
 final class TerminalPanelController: NSObject, LocalProcessTerminalViewDelegate {
     let panel: KeyablePanel
     let terminalView: LocalProcessTerminalView
@@ -161,6 +237,7 @@ final class TerminalPanelController: NSObject, LocalProcessTerminalViewDelegate 
     private(set) var lastRestartReason = "Initial login shell"
     private var scheduledRestart: DispatchWorkItem?
     private var automaticallyRestartsShell = true
+    private var shellSession: TerminalShellSession?
 
     init(
         initialFrame: NSRect, theme: Theme, menuTarget: AnyObject, menuAction: Selector,
@@ -238,13 +315,17 @@ final class TerminalPanelController: NSObject, LocalProcessTerminalViewDelegate 
     func stopShell() {
         automaticallyRestartsShell = false
         scheduledRestart?.cancel()
-        if terminalView.process.running {
-            terminalView.terminate()
-        }
+        stopShellSession()
+    }
+
+    private func stopShellSession() {
+        shellSession?.stop { terminalView.terminate() }
+        shellSession = nil
     }
 
     private func startShellSession() {
         guard automaticallyRestartsShell, !terminalView.process.running else { return }
+        stopShellSession()
         scheduledRestart = nil
         terminalView.terminal.resetToInitialState()
         restartPolicy.recordStart(at: ProcessInfo.processInfo.systemUptime)
@@ -254,6 +335,7 @@ final class TerminalPanelController: NSObject, LocalProcessTerminalViewDelegate 
             environment: ShellEnvironment.variables(),
             currentDirectory: NSHomeDirectory()
         )
+        shellSession = TerminalShellSession(pid: terminalView.process.shellPid)
     }
 
     func processTerminated(source: TerminalView, exitCode: Int32?) {

@@ -46,7 +46,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Build third-party Swift dependency
-        run: swift build --target SwiftTerm
+        run: swift build --build-system native --target SwiftTerm
       - name: Initialize CodeQL
         uses: github/codeql-action/init@cdf488f595d80d6e07e03d4674febd5ab45fa938 # v4.37.9
         with:
@@ -54,7 +54,7 @@ jobs:
           build-mode: manual
       - name: Build first-party Swift sources for analysis
         # Build both executables in one SwiftPM invocation to avoid repeated plugin work.
-        run: swift build
+        run: swift build --build-system native
       - name: Analyze Swift
         uses: github/codeql-action/analyze@cdf488f595d80d6e07e03d4674febd5ab45fa938 # v4.37.9
         with:

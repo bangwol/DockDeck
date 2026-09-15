@@ -10,7 +10,7 @@ enum DockDeckIntentCommand: Equatable {
         guard input.utf8.count <= 64 * 1_024 else { throw DockDeckIntentError.invalidProfile }
         let name = input.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !name.isEmpty, name.count <= 48,
-            !name.unicodeScalars.contains(where: CharacterSet.controlCharacters.contains) else { throw DockDeckIntentError.invalidProfile }
+            !name.unicodeScalars.contains(where: { CharacterSet.controlCharacters.contains($0) }) else { throw DockDeckIntentError.invalidProfile }
         return .switchProfile(name)
     }
 }

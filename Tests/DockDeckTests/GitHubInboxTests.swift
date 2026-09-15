@@ -76,6 +76,17 @@ final class GitHubInboxTests: XCTestCase {
     }
 
     func testNotificationURLResolverRejectsLookalikesAndCredentials() {
+        for (path, resolvedPath) in [
+            ("issues/12", "/issues/12"), ("actions/runs/42", "/actions/runs/42"),
+            ("commits/a-b_c.d", "/commit/a-b_c.d"), ("releases/1", "/releases"),
+            ("issues/bad%2Fname", ""), ("issues/bad%3Fname", ""),
+        ] {
+            XCTAssertEqual(
+                GitHubNotificationURLResolver.resolve(
+                    apiURL: "https://api.github.com/repos/bangwol/DockDeck/\(path)",
+                    repository: "bangwol/DockDeck")?.absoluteString,
+                "https://github.com/bangwol/DockDeck\(resolvedPath)", path)
+        }
         XCTAssertEqual(
             GitHubNotificationURLResolver.resolve(
                 apiURL: "https://api.github.com/repos/bangwol/DockDeck/commits/abc123",

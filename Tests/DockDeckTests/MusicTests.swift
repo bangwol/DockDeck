@@ -148,6 +148,28 @@ final class MusicTests: XCTestCase {
         XCTAssertEqual(provider.commands, [.next])
     }
 
+    func testSlowMusicCommandsAreBoundedAndCancelledOnStop() {
+        let provider = FakeMusicAutomationProvider(snapshot: fixtureSnapshot())
+        let queue = DispatchQueue(label: "DockDeckTests.MusicCancellation")
+        queue.suspend()
+        let store = MusicStore(provider: provider, queue: queue,
+            initialSnapshot: fixtureSnapshot(), initialStatus: .ready)
+        store.start()
+        XCTAssertTrue(store.send(.next, at: 100))
+        for index in 1...50 { XCTAssertFalse(store.send(.next, at: 100 + Double(index))) }
+        store.stop()
+        queue.resume()
+        queue.sync {}
+        XCTAssertTrue(provider.commands.isEmpty)
+        XCTAssertTrue(provider.authorizationPrompts.isEmpty, "Queued polling must also be cancelled")
+
+        store.start()
+        XCTAssertTrue(store.send(.playPause, at: 200))
+        queue.sync {}
+        XCTAssertEqual(provider.commands, [.playPause])
+        store.stop()
+    }
+
     func testCompactPanelRenders() throws {
         let size = NSSize(width: 214, height: 59)
         let store = MusicStore(

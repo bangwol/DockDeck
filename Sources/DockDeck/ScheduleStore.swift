@@ -135,6 +135,7 @@ final class EventKitScheduleProvider: ScheduleEventProviding {
     private let queue = DispatchQueue(label: "com.dockdeck.schedule.eventkit", qos: .utility)
     private var eventStore: EKEventStore?
     private var observer: NSObjectProtocol?
+    private var cancelReminderFetch: (() -> Void)?
 
     deinit {
         if let observer { NotificationCenter.default.removeObserver(observer) }
@@ -181,6 +182,8 @@ final class EventKitScheduleProvider: ScheduleEventProviding {
     func suspend() {
         queue.async { [weak self] in
             guard let self else { return }
+            cancelReminderFetch?()
+            cancelReminderFetch = nil
             if let observer {
                 NotificationCenter.default.removeObserver(observer)
                 self.observer = nil
@@ -274,17 +277,23 @@ final class EventKitScheduleProvider: ScheduleEventProviding {
                 withDueDateStarting: reminderStartDate,
                 ending: endDate,
                 calendars: selectedReminderCalendars)
-            store.fetchReminders(matching: predicate) { [weak self] reminders in
-                guard let self else { return }
-                self.queue.async {
-                    let items = (reminders ?? [])
-                        .compactMap(Self.item)
-                        .sorted { $0.dueDate < $1.dueDate }
-                    self.finish(
-                        calendars: calendars, events: events,
-                        reminderLists: reminderLists, reminders: items,
-                        completion: completion)
-                }
+            var finished = false // Accessed only on the EventKit queue.
+            let finish: ([EKReminder]?) -> Void = { [weak self] reminders in
+                guard let self, !finished else { return }
+                finished = true
+                self.cancelReminderFetch = nil
+                let items = (reminders ?? [])
+                    .compactMap(Self.item)
+                    .sorted { $0.dueDate < $1.dueDate }
+                self.finish(calendars: calendars, events: events,
+                    reminderLists: reminderLists, reminders: items, completion: completion)
+            }
+            let token = store.fetchReminders(matching: predicate) { [weak self] reminders in
+                self?.queue.async { finish(reminders) }
+            }
+            self.cancelReminderFetch = {
+                store.cancelFetchRequest(token)
+                finish(nil)
             }
         }
     }
@@ -402,6 +411,8 @@ final class ScheduleStore: ObservableObject {
 
     private var timer: Timer?
     private var generation = 0
+    private var isRefreshing = false
+    private var pendingRefreshAt: Date?
     private var storeChangeRefresh: DispatchWorkItem?
     private var isRunning = false
     private let provider: ScheduleEventProviding
@@ -446,6 +457,7 @@ final class ScheduleStore: ObservableObject {
         guard isRunning || timer != nil else { return }
         isRunning = false
         generation += 1
+        pendingRefreshAt = nil
         timer?.invalidate()
         timer = nil
         storeChangeRefresh?.cancel()
@@ -491,6 +503,8 @@ final class ScheduleStore: ObservableObject {
             scheduleTimer()
         } else {
             generation += 1
+            pendingRefreshAt = nil
+            if status == .loading || status == .ready { provider.suspend() }
             timer?.invalidate()
             timer = nil
             calendars = []
@@ -506,12 +520,18 @@ final class ScheduleStore: ObservableObject {
         includeAllDay: Bool, includeReminders: Bool,
         refreshInterval: TimeInterval
     ) {
-        self.selectedCalendarIDs = Set(selectedCalendarIDs.filter { !$0.isEmpty })
-        self.selectedReminderListIDs = Set(
-            selectedReminderListIDs.filter { !$0.isEmpty })
+        let calendars = Set(selectedCalendarIDs.filter { !$0.isEmpty })
+        let reminders = Set(selectedReminderListIDs.filter { !$0.isEmpty })
+        let interval = Self.resolvedRefreshInterval(refreshInterval)
+        guard self.selectedCalendarIDs != calendars || self.selectedReminderListIDs != reminders
+            || self.includeAllDay != includeAllDay || self.includeReminders != includeReminders
+            || self.refreshInterval != interval else { return }
+        self.selectedCalendarIDs = calendars
+        self.selectedReminderListIDs = reminders
         self.includeAllDay = includeAllDay
         self.includeReminders = includeReminders
-        self.refreshInterval = Self.resolvedRefreshInterval(refreshInterval)
+        self.refreshInterval = interval
+        generation += 1
         guard isRunning else { return }
         refreshAuthorization()
     }
@@ -527,6 +547,7 @@ final class ScheduleStore: ObservableObject {
 
     /// EventKit posts bursts of change notifications while syncing; fetch once they settle.
     private func scheduleStoreChangeRefresh() {
+        guard isRunning else { return }
         storeChangeRefresh?.cancel()
         let work = DispatchWorkItem { [weak self] in self?.refresh() }
         storeChangeRefresh = work
@@ -545,6 +566,11 @@ final class ScheduleStore: ObservableObject {
             refreshAuthorization()
             return
         }
+        guard !isRefreshing else {
+            pendingRefreshAt = now
+            return
+        }
+        isRefreshing = true
         generation += 1
         let generation = generation
         if status != .loading { status = .loading }
@@ -557,7 +583,14 @@ final class ScheduleStore: ObservableObject {
             includeAllDay: includeAllDay,
             includeReminders: includeReminders
         ) { [weak self] result in
-            guard let self, self.isRunning, generation == self.generation else { return }
+            guard let self else { return }
+            self.isRefreshing = false
+            let pendingRefreshAt = self.pendingRefreshAt
+            self.pendingRefreshAt = nil
+            defer {
+                if let pendingRefreshAt { self.refresh(now: pendingRefreshAt) }
+            }
+            guard self.isRunning, generation == self.generation else { return }
             if self.calendars != result.calendars { self.calendars = result.calendars }
             if self.events != result.events { self.events = result.events }
             if self.reminderLists != result.reminderLists {

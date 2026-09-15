@@ -223,6 +223,65 @@ final class UsageProviderTests: XCTestCase {
             [Date(timeIntervalSince1970: 2_000), Date(timeIntervalSince1970: 3_000)])
     }
 
+    func testCodexStopsStubbornProcessesBeforeRestartWithoutBlockingMain() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let executable = root.appendingPathComponent("codex")
+        try Data(#"""
+            #!/bin/sh
+            trap '' TERM
+            printf '%s' $$ > "$0.pid"
+            IFS= read -r initialize
+            IFS= read -r initialized
+            IFS= read -r request
+            printf '%s\n' '{"id":2,"result":{"rateLimits":{"primary":{"usedPercent":10,"windowDurationMins":300}}}}'
+            exec /bin/sleep 20
+            """#.utf8).write(to: executable)
+        try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: executable.path)
+        let provider = CodexAppServerProvider(executableURL: executable)
+        var pids: [Int32] = []
+        defer {
+            provider.stop()
+            for pid in pids where kill(pid, 0) == 0 { kill(pid, SIGKILL) }
+        }
+        for _ in 0..<3 {
+            let started = expectation(description: "Replacement is ready")
+            provider.start { result in
+                if case .success = result { started.fulfill() }
+                else { XCTFail("Unexpected startup failure") }
+            }
+            wait(for: [started], timeout: 4)
+            for pid in pids { XCTAssertEqual(kill(pid, 0), -1, "Previous server still running") }
+            let pid = try XCTUnwrap(Int32(String(contentsOfFile: executable.path + ".pid", encoding: .utf8)))
+            pids.append(pid)
+            let before = ProcessInfo.processInfo.systemUptime
+            provider.stop()
+            XCTAssertLessThan(ProcessInfo.processInfo.systemUptime - before, 0.1)
+        }
+        let stopped = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            pids.allSatisfy { kill($0, 0) == -1 }
+        }, object: nil)
+        wait(for: [stopped], timeout: 4)
+    }
+
+    func testCodexRejectsContinuousOversizedOutput() throws {
+        let executable = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: executable) }
+        try Data("#!/bin/sh\nexec /bin/dd if=/dev/zero bs=65536 count=32\n".utf8).write(to: executable)
+        try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: executable.path)
+        let provider = CodexAppServerProvider(executableURL: executable)
+        defer { provider.stop() }
+        let rejected = expectation(description: "Output bounded at 1 MiB")
+        provider.start { result in
+            if case .failure(let error) = result {
+                XCTAssertTrue(error.localizedDescription.contains("exceeded 1 MiB"))
+                rejected.fulfill()
+            }
+        }
+        wait(for: [rejected], timeout: 4)
+    }
+
     func testCodexProviderReportsClosedInputPipeWithoutSIGPIPE() throws {
         let previousSignalHandler = signal(SIGPIPE, SIG_DFL)
         defer { _ = signal(SIGPIPE, previousSignalHandler) }
