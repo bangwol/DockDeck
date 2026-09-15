@@ -10,7 +10,7 @@ if ! xcrun --find appintentsmetadataprocessor >/dev/null 2>&1; then
 fi
 METADATA_DIR="$(mktemp -d "$REPO_DIR/.build/appintents.XXXXXX")"
 trap 'rm -rf "$METADATA_DIR"' EXIT
-SDK_PATH="$(xcrun --show-sdk-path)"
+SDK_PATH="$(xcrun --sdk macosx --show-sdk-path)"
 SWIFT_PATH="$(xcrun --find swiftc)"
 TOOLCHAIN_DIR="$(dirname "$(dirname "$(dirname "$SWIFT_PATH")")")"
 TARGET_TRIPLE="$(uname -m)-apple-macosx13.0"

@@ -149,6 +149,19 @@ DOCKDECK_DEBUG=1 swift run DockDeck
 Music Automation requires the packaged usage description and entitlement, so
 test that module with `./scripts/install.sh`, not `swift run DockDeck`.
 
+## Development verification
+
+The GitHub Actions `xcode-27` runner is currently a macOS 26 image with the
+Xcode 27 public preview. It checks the Xcode 27 SDK and compiler, but does not
+guarantee that DockDeck runs on macOS 27 itself; verify that interaction on a
+macOS 27 machine as well.
+
+Keep the CI-equivalent check unchanged:
+
+```bash
+swift test -c release -Xswiftc -warnings-as-errors
+```
+
 ## Update or uninstall
 
 Pull the desired source revision and run `./scripts/install.sh` again to rebuild

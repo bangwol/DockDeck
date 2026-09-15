@@ -1,5 +1,14 @@
 import Cocoa
 
+private func preferVisibleQuickActionImage(_ item: NSMenuItem) {
+    guard #available(macOS 27, *),
+        item.responds(to: Selector(("setPreferredImageVisibility:"))) else { return }
+    // NSMenuItemImageVisibilityVisible is 1 in the Xcode 27 AppKit header.
+    // ponytail: When the minimum build SDK is macOS 27, replace this KVC bridge with
+    // item.preferredImageVisibility = .visible.
+    item.setValue(NSNumber(value: 1), forKey: "preferredImageVisibility")
+}
+
 extension AppDelegate {
     func setUpMainMenu() {
         let mainMenu = NSMenu()
@@ -145,6 +154,7 @@ extension AppDelegate: NSMenuDelegate {
                 item.target = self
                 item.representedObject = action.id.uuidString
                 item.image = NSImage(systemSymbolName: action.kind.symbol, accessibilityDescription: action.kind.title)
+                preferVisibleQuickActionImage(item)
                 item.isEnabled = !quickActions.running.contains(action.id)
                 menu.addItem(item)
             }

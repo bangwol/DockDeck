@@ -24,10 +24,21 @@ jobs:
 
   latest-macos:
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
-    runs-on: macos-26
+    strategy:
+      matrix:
+        include:
+          - runner: macos-26
+            developer_dir: /Applications/Xcode_26.6.app/Contents/Developer
+            label: macOS 26 · Xcode 26.6
+          - runner: xcode-27
+            developer_dir: /Applications/Xcode_27.0.app/Contents/Developer
+            label: macOS 26 · Xcode 27 preview
+    runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - name: Test release build with warnings as errors
+      - name: Test release build with warnings as errors (${{ matrix.label }})
+        env:
+          DEVELOPER_DIR: ${{ matrix.developer_dir }}
         run: swift test -c release -Xswiftc -warnings-as-errors
