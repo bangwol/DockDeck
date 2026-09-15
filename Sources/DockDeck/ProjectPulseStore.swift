@@ -139,7 +139,7 @@ struct ProjectPulseConfiguration: Codable, Equatable {
         let allowed = CharacterSet.alphanumerics.union(
             CharacterSet(charactersIn: "-_."))
         guard parts.allSatisfy({ part in
-            part.unicodeScalars.allSatisfy(allowed.contains)
+            part.unicodeScalars.allSatisfy { allowed.contains($0) }
         }) else { return nil }
         return parts.joined(separator: "/")
     }

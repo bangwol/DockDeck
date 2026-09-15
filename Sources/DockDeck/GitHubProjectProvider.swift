@@ -357,7 +357,7 @@ enum GitHubActivityParser {
         let login = viewer.login.trimmingCharacters(in: .whitespacesAndNewlines)
         let allowed = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "-"))
         guard !login.isEmpty, login.count <= 100,
-            login.unicodeScalars.allSatisfy(allowed.contains)
+            login.unicodeScalars.allSatisfy({ allowed.contains($0) })
         else { throw ProjectPulseError.invalidOutput }
         let contributions = viewer.contributionsCollection
         return ProjectGitHubActivitySnapshot(

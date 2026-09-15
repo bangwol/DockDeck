@@ -46,7 +46,7 @@ enum GitHubNotificationURLResolver {
         guard !value.isEmpty, value.count <= 128 else { return false }
         let allowed = CharacterSet.alphanumerics.union(
             CharacterSet(charactersIn: "-_."))
-        return value.unicodeScalars.allSatisfy(allowed.contains)
+        return value.unicodeScalars.allSatisfy { allowed.contains($0) }
     }
 }
 

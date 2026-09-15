@@ -16,9 +16,9 @@ struct QuickAction: Codable, Equatable, Identifiable {
 
     func validated() throws -> Self {
         guard !name.isEmpty, name.count <= 48, name == name.trimmingCharacters(in: .whitespacesAndNewlines),
-            !name.unicodeScalars.contains(where: CharacterSet.controlCharacters.contains),
+            !name.unicodeScalars.contains(where: { CharacterSet.controlCharacters.contains($0) }),
             !target.isEmpty, target.utf8.count <= 4_096,
-            !target.unicodeScalars.contains(where: CharacterSet.controlCharacters.contains) else { throw QuickActionError.invalid }
+            !target.unicodeScalars.contains(where: { CharacterSet.controlCharacters.contains($0) }) else { throw QuickActionError.invalid }
         switch kind {
         case .app, .folder:
             guard target.hasPrefix("/"), target.utf8.count < Int(PATH_MAX) else { throw QuickActionError.invalid }
