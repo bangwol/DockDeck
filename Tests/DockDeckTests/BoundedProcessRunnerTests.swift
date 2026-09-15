@@ -1,9 +1,92 @@
 import Darwin
+import SwiftTerm
 import XCTest
 
 @testable import DockDeck
 
 final class BoundedProcessRunnerTests: XCTestCase {
+    func testTerminalStopRemovesStubbornJobGroupsAndPreservesOtherProcesses() throws {
+        let marker = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: marker) }
+        let unrelated = Process()
+        unrelated.executableURL = URL(fileURLWithPath: "/bin/sleep")
+        unrelated.arguments = ["20"]
+        try unrelated.run()
+        defer { if unrelated.isRunning { unrelated.terminate() }; unrelated.waitUntilExit() }
+        let probe = TerminalCleanupProbe()
+        let process = LocalProcess(delegate: probe)
+        process.startProcess(executable: "/bin/zsh", args: ["-f", "-m", "-c",
+            #"trap '' TERM HUP; /bin/sh -c 'trap "" TERM HUP; printf "%s" $$ > "$1"; exec /bin/sleep 20' sh "$1" & wait"#,
+            "zsh", marker.path])
+        let pid = process.shellPid
+        let session = try XCTUnwrap(TerminalShellSession(pid: pid))
+        defer { session.stop { process.terminate() } }
+        let readyDeadline = Date().addingTimeInterval(2)
+        var childPID: Int32?
+        while childPID == nil, Date() < readyDeadline {
+            childPID = (try? String(contentsOf: marker, encoding: .utf8)).flatMap(Int32.init)
+            RunLoop.current.run(until: Date().addingTimeInterval(0.01))
+        }
+        let child = try XCTUnwrap(childPID)
+        XCTAssertEqual(getsid(child), pid)
+        XCTAssertNotEqual(getpgid(child), getpgid(pid), "Exercise a separate job-control group")
+        let started = Date()
+        session.stop { process.terminate() }
+        XCTAssertLessThan(Date().timeIntervalSince(started), 2.5)
+        XCTAssertFalse(process.running)
+        XCTAssertEqual(kill(pid, 0), -1)
+        let reapingDeadline = Date().addingTimeInterval(1)
+        while kill(child, 0) == 0, Date() < reapingDeadline { Thread.sleep(forTimeInterval: 0.01) }
+        XCTAssertEqual(kill(child, 0), -1)
+        XCTAssertTrue(unrelated.isRunning)
+        session.stop { XCTFail("Already stopped shells must not receive another terminate") }
+    }
+
+    func testTerminalStopChecksPIDAfterSwiftTermReportsStopped() throws {
+        let probe = TerminalCleanupProbe()
+        let process = LocalProcess(delegate: probe)
+        process.startProcess(executable: "/bin/sh", args: ["-c",
+            "trap '' TERM HUP; printf READY; exec /bin/sleep 20"])
+        let pid = process.shellPid
+        let session = try XCTUnwrap(TerminalShellSession(pid: pid))
+        defer { session.stop { process.terminate() } }
+        let deadline = Date().addingTimeInterval(2)
+        while !probe.ready, Date() < deadline { RunLoop.current.run(until: Date().addingTimeInterval(0.01)) }
+        XCTAssertTrue(probe.ready)
+        process.terminate()
+        XCTAssertFalse(process.running, "SwiftTerm's stopped flag is not proof that the shell exited")
+        XCTAssertEqual(kill(pid, 0), 0)
+        session.stop {}
+        XCTAssertEqual(kill(pid, 0), -1)
+    }
+
+    func testTerminalStopCleansJobsAfterShellAlreadyExited() throws {
+        let marker = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: marker) }
+        let probe = TerminalCleanupProbe()
+        let process = LocalProcess(delegate: probe)
+        process.startProcess(executable: "/bin/sh", args: ["-c",
+            #"/bin/sh -c 'trap "" TERM HUP; printf "%s" $$ > "$1"; exec /bin/sleep 20' sh "$1" & while [ ! -s "$1" ]; do sleep 0.01; done; exit 0"#,
+            "sh", marker.path])
+        let session = try XCTUnwrap(TerminalShellSession(pid: process.shellPid))
+        defer { session.stop { process.terminate() } }
+        let deadline = Date().addingTimeInterval(2)
+        while !probe.exited, Date() < deadline { RunLoop.current.run(until: Date().addingTimeInterval(0.01)) }
+        XCTAssertTrue(probe.exited)
+        let child = try XCTUnwrap(Int32(String(contentsOf: marker, encoding: .utf8)))
+        XCTAssertEqual(kill(child, 0), 0)
+        session.stop { XCTFail("An exited shell must not receive terminate") }
+        let reapingDeadline = Date().addingTimeInterval(1)
+        while kill(child, 0) == 0, Date() < reapingDeadline { Thread.sleep(forTimeInterval: 0.01) }
+        XCTAssertEqual(kill(child, 0), -1)
+    }
+
+    func testTerminalSessionRejectsUnownedProcesses() {
+        for pid: pid_t in [-1, 0, 1, getpid(), getppid()] {
+            XCTAssertNil(TerminalShellSession(pid: pid))
+        }
+    }
+
     func testTimeoutCancellationAndShutdownRemoveStubbornDescendants() throws {
         for mode in ["timeout", "cancel", "shutdown"] {
             let marker = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
@@ -212,5 +295,17 @@ final class BoundedProcessRunnerTests: XCTestCase {
         ) { error in
             XCTAssertEqual(error as? BoundedProcessError, .timedOut)
         }
+    }
+}
+
+private final class TerminalCleanupProbe: LocalProcessDelegate {
+    var ready = false
+    var exited = false
+    func processTerminated(_ source: LocalProcess, exitCode: Int32?) { exited = true }
+    func dataReceived(slice: ArraySlice<UInt8>) {
+        ready = ready || String(decoding: slice, as: UTF8.self).contains("READY")
+    }
+    func getWindowSize() -> winsize {
+        winsize(ws_row: 24, ws_col: 80, ws_xpixel: 0, ws_ypixel: 0)
     }
 }

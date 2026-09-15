@@ -26,6 +26,13 @@ active.
 Running `exit` starts a fresh DockDeck login shell. Use `⌘Q` to quit the
 application.
 
+Disabling Terminal or quitting DockDeck stops the shell and jobs in its terminal
+session, including background jobs in separate process groups. Save work before
+closing the session. Cleanup allows one second for normal termination, then
+force-stops remaining processes, with a two-second total limit. A closed terminal
+connection alone is not treated as proof that its process exited. Independent
+processes and daemons detached into another session are not stopped.
+
 ## Keyboard shortcuts
 
 | Shortcut | Action |
