@@ -20,6 +20,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Test release build with warnings as errors
+        # ponytail: keep native until Swift Build passes SwiftTerm resource and bundle-path checks.
         run: swift test --build-system native -c release -Xswiftc -warnings-as-errors
 
   latest-macos:

@@ -152,7 +152,7 @@ final class LocalPortsStore: ObservableObject, PanelModuleRuntime {
         let reader = reader
         let progress = Progress(totalUnitCount: 1)
         request = progress
-        queue.async {
+        queue.async { [weak self] in
             var items: [LocalPortItem] = []
             for port in ports {
                 guard !progress.isCancelled else { return }

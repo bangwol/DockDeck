@@ -159,6 +159,9 @@ Use the native SwiftPM build system consistently for builds, tests, and packagin
 Xcode 27's new default build system changes resource processing and output paths;
 it currently fails to compile SwiftTerm's Metal resource in the preview runner.
 The native build system retains the existing build behavior and bundle layout.
+If SDK 27 reports a missing `SwiftUIMacros` plugin with Command Line Tools,
+select a matching full Xcode installation; its SwiftUI compiler plugins are
+needed by the new `@State` implementation.
 
 ```bash
 swift test --build-system native -c release -Xswiftc -warnings-as-errors
