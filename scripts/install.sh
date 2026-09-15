@@ -114,7 +114,7 @@ else
 fi
 
 echo "Building release binary..."
-(cd "$REPO_DIR" && swift build -c release)
+(cd "$REPO_DIR" && swift build --build-system native -c release)
 lipo "$BIN_PATH" -verify_arch "$(uname -m)"
 lipo "$BRIDGE_BIN_PATH" -verify_arch "$(uname -m)"
 

@@ -66,7 +66,7 @@ positions.
 For a one-time development run instead:
 
 ```bash
-swift run DockDeck
+swift run --build-system native DockDeck
 ```
 
 See [Getting started](docs/getting-started.md) for permissions, optional CLI

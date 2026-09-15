@@ -151,7 +151,7 @@ after Developer ID signing and notarization are available.
 3. Run the release test and package checks:
 
    ```bash
-   swift test -c release -Xswiftc -warnings-as-errors
+   swift test --build-system native -c release -Xswiftc -warnings-as-errors
    ./scripts/package.sh
    ```
 
