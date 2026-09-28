@@ -82,6 +82,50 @@ final class UsageProviderTests: XCTestCase {
             0)
     }
 
+    func testProviderResetTimesOutsideSupportedDatesAreUnknown() throws {
+        for epoch in ["1e30", "-1e30", "9223372036854775808"] {
+            let codex = Data("""
+                {"result":{"rateLimits":{"primary":{
+                "usedPercent":85,"windowDurationMins":300,"resetsAt":\(epoch)}}}}
+                """.utf8)
+            let result = try XCTUnwrap(try CodexRateLimitParser.decodeEnvelope(codex).result)
+            let claude = Data("""
+                {"observed_at":1000,"rate_limits":{"five_hour":{
+                "used_percentage":85,"resets_at":\(epoch)}}}
+                """.utf8)
+            let snapshots = [
+                try CodexRateLimitParser.snapshot(from: result),
+                try ClaudeRateLimitParser.snapshot(from: claude, modificationDate: nil,
+                    now: Date(timeIntervalSince1970: 1_000)),
+            ]
+            for (id, snapshot) in zip([UsageProviderID.codex, .claude], snapshots) {
+                let window = try XCTUnwrap(snapshot.windows.first)
+                guard window.resetsAt == nil else {
+                    XCTFail("Invalid reset was not rejected: \(epoch)")
+                    return
+                }
+                XCTAssertEqual(window.usedPercent, 85)
+                XCTAssertNil(UsagePace.calculate(for: window))
+                var detector = DockNotificationEventDetector()
+                let provider = ProviderUsage(id: id, name: id.title, windows: snapshot.windows,
+                    freshness: .live, detail: nil)
+                XCTAssertEqual(detector.usageEvents(providers: [provider],
+                    remainingThreshold: 20, enabled: true).count, 1)
+            }
+        }
+    }
+
+    func testUsageWindowRejectsNonfiniteResetTimesAndPreservesSupportedDates() {
+        for epoch in [Double.nan, .infinity, -.infinity] {
+            XCTAssertNil(UsageWindow(durationMinutes: 300, usedPercent: 85,
+                resetsAt: Date(timeIntervalSince1970: epoch)).resetsAt)
+        }
+        for date in [Date.distantPast, Date(timeIntervalSince1970: 2_000_000_000), .distantFuture] {
+            XCTAssertEqual(UsageWindow(durationMinutes: 300, usedPercent: 85,
+                resetsAt: date).resetsAt, date)
+        }
+    }
+
     func testUsageDisplayModeChoosesRemainingOrUsedValue() {
         let window = UsageWindow(
             durationMinutes: 300, usedPercent: 22, resetsAt: nil)
@@ -280,6 +324,31 @@ final class UsageProviderTests: XCTestCase {
             }
         }
         wait(for: [rejected], timeout: 4)
+    }
+
+    func testCodexProviderRecoversWhenStdoutClosesBeforeProcessExit() throws {
+        let executable = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: executable) }
+        try Data(#"""
+            #!/bin/sh
+            IFS= read -r initialize
+            IFS= read -r initialized
+            IFS= read -r request
+            exec 1>&-
+            exec /bin/sleep 20
+            """#.utf8).write(to: executable)
+        try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: executable.path)
+        let provider = CodexAppServerProvider(executableURL: executable)
+        defer { provider.stop() }
+        let failed = expectation(description: "Closed stdout reports transport failure promptly")
+        provider.start { result in
+            if case .failure(let error) = result {
+                guard case .transport = error else { return XCTFail("Expected transport failure") }
+                XCTAssertTrue(error.localizedDescription.contains("stdout"))
+                failed.fulfill()
+            }
+        }
+        wait(for: [failed], timeout: 3)
     }
 
     func testCodexProviderReportsClosedInputPipeWithoutSIGPIPE() throws {

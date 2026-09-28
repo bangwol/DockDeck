@@ -15,8 +15,9 @@ in the first column and its reset time in the second. Providers with two or
 three windows place each reset below its matching bar.
 
 Resets later today use `HH:mm`; a different day uses `M/D HH:mm`. `--` means
-that the provider did not supply a timestamp. Hover a meter for its full
-localized reset date and time.
+that the provider did not supply a timestamp or supplied one outside the supported
+calendar range. Invalid reset times do not affect the quota percentage. Hover a
+meter for its full localized reset date and time.
 
 ### Even-use pace marker
 
@@ -49,6 +50,8 @@ Transport input is consumed in bounded chunks on a serial queue, with a 1 MiB
 message limit; a fast writer cannot accumulate an unbounded queue of output.
 Stopping the provider cleans up its process group before launching a replacement.
 Cleanup runs off the main thread and participates in the app's bounded shutdown.
+If the app-server closes its output while still running, DockDeck stops it and
+retries with the existing restart backoff instead of repeatedly timing out.
 
 ## Claude
 
