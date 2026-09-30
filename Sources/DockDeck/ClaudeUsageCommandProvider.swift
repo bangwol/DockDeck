@@ -347,8 +347,7 @@ final class ClaudeUsageCommandProvider: ClaudeUsageCommandReading {
     private let probeDirectory: URL
     private let lock = NSLock()
     private var operationID: UUID?
-    private var activeProcess: Process?
-    private var activeTerminal: HeadlessTerminal?
+    private var activeWake: DispatchSemaphore?
 
     init(
         fileManager: FileManager = .default,
@@ -419,17 +418,14 @@ final class ClaudeUsageCommandProvider: ClaudeUsageCommandReading {
     }
 
     func cancel() {
-        let process: Process?
-        let terminal: HeadlessTerminal?
-        lock.lock()
-        operationID = nil
-        process = activeProcess
-        terminal = activeTerminal
-        activeProcess = nil
-        activeTerminal = nil
-        lock.unlock()
-        if process?.isRunning == true { process?.terminate() }
-        terminal?.process.terminate()
+        let wake = lock.withLock {
+            operationID = nil
+            let wake = activeWake
+            activeWake = nil
+            return wake
+        }
+        // The reader owns cleanup; never mutate SwiftTerm from the cancelling thread.
+        wake?.signal()
     }
 
     private func runDirect(
@@ -461,22 +457,22 @@ final class ClaudeUsageCommandProvider: ClaudeUsageCommandReading {
         }
         try? outputPipe.fileHandleForWriting.close()
         try? errorPipe.fileHandleForWriting.close()
-        register(process, operation: operation)
+        let groupID = OwnedProcessCleanup.groupID(for: process)
+        lock.withLock {
+            if operationID == operation { activeWake = terminated }
+        }
         defer {
+            OwnedProcessCleanup.stop(process, groupID: groupID)
             collector.finish()
-            clear(process, operation: operation)
-        }
-        guard isCurrent(operation) else {
-            process.terminate()
-            throw ProbeFailure.cancelled
-        }
-
-        if terminated.wait(timeout: .now() + Self.directTimeout) == .timedOut {
-            process.terminate()
-            if terminated.wait(timeout: .now() + 1) == .timedOut {
-                kill(process.processIdentifier, SIGKILL)
-                _ = terminated.wait(timeout: .now() + 1)
+            lock.withLock {
+                if operationID == operation { activeWake = nil }
             }
+        }
+        guard isCurrent(operation) else { throw ProbeFailure.cancelled }
+
+        let waitResult = terminated.wait(timeout: .now() + Self.directTimeout)
+        guard isCurrent(operation) else { throw ProbeFailure.cancelled }
+        if waitResult == .timedOut {
             throw ProbeFailure.retryable("Claude /usage timed out")
         }
         collector.finish()
@@ -497,16 +493,13 @@ final class ClaudeUsageCommandProvider: ClaudeUsageCommandReading {
             cols: 160, rows: 140, scrollback: 0,
             enableSixelReported: false, kittyImageCacheLimitBytes: 1_048_576)
         let terminal = HeadlessTerminal(queue: queue, options: options) { _ in ended.signal() }
-        register(terminal, operation: operation)
         terminal.process.startProcess(
             executable: executable.path,
             args: launchArguments(sessionID: sessionID, command: nil),
             environment: launchEnvironment(executable: executable).map { "\($0.key)=\($0.value)" },
             currentDirectory: probeDirectory.path)
-        defer {
-            terminal.process.terminate()
-            clear(terminal, operation: operation)
-        }
+        let session = TerminalShellSession(pid: terminal.process.shellPid)
+        defer { session?.stop { terminal.process.terminate() } }
 
         let startedAt = uptime()
         var commandSent = false
@@ -682,37 +675,12 @@ final class ClaudeUsageCommandProvider: ClaudeUsageCommandReading {
         lock.withLock {
             guard operationID == operation else { return }
             operationID = nil
-            activeProcess = nil
-            activeTerminal = nil
+            activeWake = nil
         }
     }
 
     private func isCurrent(_ operation: UUID) -> Bool {
         lock.withLock { operationID == operation }
-    }
-
-    private func register(_ process: Process, operation: UUID) {
-        lock.withLock {
-            if operationID == operation { activeProcess = process }
-        }
-    }
-
-    private func clear(_ process: Process, operation: UUID) {
-        lock.withLock {
-            if operationID == operation, activeProcess === process { activeProcess = nil }
-        }
-    }
-
-    private func register(_ terminal: HeadlessTerminal, operation: UUID) {
-        lock.withLock {
-            if operationID == operation { activeTerminal = terminal }
-        }
-    }
-
-    private func clear(_ terminal: HeadlessTerminal, operation: UUID) {
-        lock.withLock {
-            if operationID == operation, activeTerminal === terminal { activeTerminal = nil }
-        }
     }
 }
 

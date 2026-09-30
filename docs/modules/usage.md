@@ -86,11 +86,13 @@ fan out provider work. The manual request overrides the exhausted-limit delay
 after the cooldown. DockDeck does not install a global keyboard or pointer idle
 monitor.
 
-Each command path has a fixed runtime limit, and the Usage store adds a 30-second
+Each command path has a fixed runtime limit, and the Usage store adds a 40-second
 watchdog. Pipe capture is closed explicitly after the Claude process exits, so a
 descendant process cannot leave refresh permanently waiting for end-of-file. If
 a transient probe fails, the last valid values remain visible as stale data and
 the hover detail reports the latest refresh error.
+Completed, cancelled, and timed-out probes clean up their owned process group or
+terminal session, with a bounded force-termination fallback for unresponsive children.
 
 The command can return 5-hour, weekly, and plan-specific Fable windows. DockDeck
 shows `FBL` only when Claude returns that value and never estimates it.

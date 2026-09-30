@@ -6,6 +6,22 @@ import XCTest
 @testable import DockDeck
 
 final class UsageProviderTests: XCTestCase {
+    func testLiveClaudeUsageWhenRequested() throws {
+        guard ProcessInfo.processInfo.environment["DOCKDECK_LIVE_CLAUDE_USAGE"] == "1" else {
+            throw XCTSkip("Set DOCKDECK_LIVE_CLAUDE_USAGE=1 to check the installed Claude CLI")
+        }
+        let provider = ClaudeUsageCommandProvider()
+        defer { provider.cancel() }
+        switch provider.read() {
+        case .success(let snapshot):
+            XCTAssertEqual(snapshot.freshness, .live)
+            XCTAssertFalse(snapshot.windows.isEmpty)
+            print("Claude usage windows: \(snapshot.windows.map(\.label).joined(separator: ", "))")
+        case .failure(let error):
+            XCTFail(error.localizedDescription)
+        }
+    }
+
     func testQuotaWarningColorsUseRemainingCapacityBoundaries() {
         for (remaining, expected) in [(0.0, Color.red), (19.99, .red), (20, .orange),
                                       (30, .orange), (50, .orange), (50.01, .purple)] {
@@ -702,6 +718,77 @@ final class UsageProviderTests: XCTestCase {
         wait(for: [finished], timeout: 2)
 
         XCTAssertLessThan(Date().timeIntervalSince(startedAt), 2)
+    }
+
+    func testClaudeCancellationAndPTYCompletionCleanOwnedProcesses() throws {
+        for usesPTY in [false, true] {
+            let files = FileManager.default
+            let root = files.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+            try files.createDirectory(at: root, withIntermediateDirectories: true)
+            let executable = root.appendingPathComponent("claude")
+            let marker = root.appendingPathComponent("pids")
+            var pids: [pid_t] = []
+            let finished = DispatchSemaphore(value: 0)
+            var completed = false
+            defer {
+                for pid in pids where pid > 1 && kill(pid, 0) == 0 { kill(pid, SIGKILL) }
+                if !completed { _ = finished.wait(timeout: .now() + 3) }
+                try? files.removeItem(at: root)
+            }
+            try Data(#"""
+                #!/bin/sh
+                if [ "$TEST_PTY" = 1 ]; then
+                  case " $* " in *" /usage "*) exit 0 ;; esac
+                fi
+                trap '' TERM HUP
+                (trap '' TERM HUP; exec /bin/sleep 60) &
+                printf '%s %s\n' "$$" "$!" > "$TEST_MARKER"
+                if [ "$TEST_PTY" != 1 ]; then exec /bin/sleep 60; fi
+                printf '❯ '
+                while IFS= read -r line; do
+                  case "$line" in
+                    *"/usage"*) printf '\nCurrent session\n10%% used\nResets in 2h\n' ;;
+                    *"/exit"*) exit 0 ;;
+                  esac
+                done
+                """#.utf8).write(to: executable)
+            try files.setAttributes([.posixPermissions: 0o700], ofItemAtPath: executable.path)
+            let provider = ClaudeUsageCommandProvider(
+                environment: ["DOCKDECK_CLAUDE_PATH": executable.path, "PATH": "/usr/bin:/bin",
+                    "TEST_PTY": usesPTY ? "1" : "0", "TEST_MARKER": marker.path],
+                homeDirectory: root, probeDirectory: root.appendingPathComponent("probe"))
+            defer { provider.cancel() }
+            var result: Result<UsageProviderSnapshot, UsageProviderError>?
+            DispatchQueue.global(qos: .utility).async {
+                result = provider.read()
+                finished.signal()
+            }
+            let deadline = ProcessInfo.processInfo.systemUptime + 4
+            while pids.count != 2, ProcessInfo.processInfo.systemUptime < deadline {
+                pids = (try? String(contentsOf: marker, encoding: .utf8))?
+                    .split(whereSeparator: \.isWhitespace).compactMap { pid_t($0) } ?? []
+                Thread.sleep(forTimeInterval: 0.01)
+            }
+            guard pids.count == 2 else { return XCTFail("Claude fixture did not start") }
+            XCTAssertEqual(usesPTY ? getsid(pids[1]) : getpgid(pids[1]), pids[0])
+            if !usesPTY { provider.cancel() }
+            completed = finished.wait(timeout: .now() + 4) == .success
+            guard completed else { return XCTFail("Claude probe did not finish promptly") }
+            if usesPTY {
+                guard case .success = result else { return XCTFail("Expected PTY usage") }
+            } else {
+                guard case .failure(let error) = result else { return XCTFail("Expected cancellation") }
+                XCTAssertTrue(error.localizedDescription.contains("cancelled"))
+            }
+            let reapingDeadline = ProcessInfo.processInfo.systemUptime + 1
+            while pids.contains(where: { kill($0, 0) == 0 }),
+                ProcessInfo.processInfo.systemUptime < reapingDeadline
+            { Thread.sleep(forTimeInterval: 0.01) }
+            for pid in pids {
+                XCTAssertEqual(kill(pid, 0), -1, "Surviving Claude probe (PTY: \(usesPTY))")
+                XCTAssertEqual(errno, ESRCH)
+            }
+        }
     }
 
     func testClaudeCleanupRequiresOwnershipAndDoesNotFollowProjectSymlinks() throws {
