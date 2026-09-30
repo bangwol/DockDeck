@@ -145,6 +145,7 @@ final class BoundedProcessLifetime {
     private let lock = NSLock()
     private var stopping = false
     private var processes: [ObjectIdentifier: (process: Process, groupID: pid_t?)] = [:]
+    private var operations: Set<UUID> = []
     var isShuttingDown: Bool { lock.withLock { stopping } }
 
     func register(_ process: Process) -> Bool {
@@ -161,13 +162,24 @@ final class BoundedProcessLifetime {
 
     func remove(_ process: Process) { _ = lock.withLock { processes.removeValue(forKey: ObjectIdentifier(process)) } }
 
+    // Readers such as Claude own their process cleanup on a worker thread.
+    func register(operation: UUID) -> Bool {
+        lock.withLock {
+            guard !stopping else { return false }
+            operations.insert(operation)
+            return true
+        }
+    }
+
+    func remove(operation: UUID) { _ = lock.withLock { operations.remove(operation) } }
+
     func shutdown() {
         lock.withLock { stopping = true }
         var signalled: Set<ObjectIdentifier> = []
         let started = ProcessInfo.processInfo.systemUptime
         while ProcessInfo.processInfo.systemUptime - started < 2 {
-            let active = lock.withLock { Array(processes.values) }
-            if active.isEmpty { return }
+            let (active, hasOperations) = lock.withLock { (Array(processes.values), !operations.isEmpty) }
+            if active.isEmpty, !hasOperations { return }
             for entry in active {
                 if ProcessInfo.processInfo.systemUptime - started >= 1 {
                     OwnedProcessCleanup.signal(SIGKILL, process: entry.process, groupID: entry.groupID)

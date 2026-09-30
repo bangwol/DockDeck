@@ -15,8 +15,9 @@ in the first column and its reset time in the second. Providers with two or
 three windows place each reset below its matching bar.
 
 Resets later today use `HH:mm`; a different day uses `M/D HH:mm`. `--` means
-that the provider did not supply a timestamp. Hover a meter for its full
-localized reset date and time.
+that the provider did not supply a timestamp or supplied one outside the supported
+calendar range. Invalid reset times do not affect the quota percentage. Hover a
+meter for its full localized reset date and time.
 
 ### Even-use pace marker
 
@@ -49,6 +50,8 @@ Transport input is consumed in bounded chunks on a serial queue, with a 1 MiB
 message limit; a fast writer cannot accumulate an unbounded queue of output.
 Stopping the provider cleans up its process group before launching a replacement.
 Cleanup runs off the main thread and participates in the app's bounded shutdown.
+If the app-server closes its output while still running, DockDeck stops it and
+retries with the existing restart backoff instead of repeatedly timing out.
 
 ## Claude
 
@@ -83,11 +86,15 @@ fan out provider work. The manual request overrides the exhausted-limit delay
 after the cooldown. DockDeck does not install a global keyboard or pointer idle
 monitor.
 
-Each command path has a fixed runtime limit, and the Usage store adds a 30-second
+Each command path has a fixed runtime limit, and the Usage store adds a 40-second
 watchdog. Pipe capture is closed explicitly after the Claude process exits, so a
 descendant process cannot leave refresh permanently waiting for end-of-file. If
 a transient probe fails, the last valid values remain visible as stale data and
 the hover detail reports the latest refresh error.
+Completed, cancelled, and timed-out probes clean up their owned process group or
+terminal session, with a bounded force-termination fallback for unresponsive children.
+App shutdown includes in-flight probes in its existing two-second cleanup wait
+and rejects new probes once shutdown begins.
 
 The command can return 5-hour, weekly, and plan-specific Fable windows. DockDeck
 shows `FBL` only when Claude returns that value and never estimates it.

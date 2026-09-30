@@ -219,10 +219,14 @@ DockDeck.
 
 ## 6. Troubleshoot Claude data
 
-1. Run `claude --version` and update to the current release.
+1. Check the Claude executable path and version under **Settings → Diagnostics**.
+   DockDeck can use a different installation from Claude Desktop or your terminal.
+   Update and sign in to that CLI; a working desktop session does not confirm its
+   authentication state.
 2. Run `claude`, then `/usage`, to confirm the signed-in account itself returns
    plan limits.
-3. In Automatic mode, press `⌘R`, wait up to 20 seconds, and hover the Claude
+3. In Automatic mode, press `⌘R`, allow for the one-minute probe cooldown and up
+   to 40 seconds of capture, and hover the Claude
    mark. `SIGN IN` means the local CLI needs authentication. `OFFLINE` indicates
    a command, timeout, or parsing failure.
 4. If only Automatic mode fails, select **Status line only** and configure the
@@ -241,3 +245,14 @@ DockDeck.
 A muted mark means cached data is old. A muted mark with a diagonal slash means
 setup, sign-in, or connectivity needs attention. See [Usage](../modules/usage.md)
 for meter layout and provider-state details.
+
+For a source checkout, verify the installed CLI through DockDeck's actual capture
+and parser without changing the status-line configuration:
+
+```bash
+DOCKDECK_LIVE_CLAUDE_USAGE=1 swift test --build-system native -c release \
+  -Xswiftc -warnings-as-errors --filter UsageProviderTests.testLiveClaudeUsageWhenRequested
+```
+
+This opt-in check contacts Claude through its existing CLI sign-in and reports
+window labels or a bounded error, without printing credentials or raw output.
