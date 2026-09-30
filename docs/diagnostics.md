@@ -60,11 +60,14 @@ see the executable path; hover the update status for the metadata check time.
 Updates are advisory and do not change the sign-in readiness badge.
 
 - npm installations compare with their package's `latest` version on the public
-  npm registry. The copied command targets the detected global prefix and Node
-  runtime, including NVM installations.
+  npm registry. Codex copies `codex update` when the installed CLI advertises that
+  command in `codex help update`; older versions copy `npm install -g @openai/codex@latest`.
+  npm-installed Claude Code copies `npm install -g @anthropic-ai/claude-code@latest`.
 - Homebrew installations compare with the detected cask or formula on the public
   Homebrew API. Claude Code's `claude-code` and `claude-code@latest` casks are
-  checked separately. The command uses that Homebrew installation.
+  checked separately. Commands stay short: `brew upgrade gh`, `brew upgrade claude-code`,
+  or `brew upgrade claude-code@latest`. Codex uses `codex update` when supported,
+  otherwise `brew upgrade codex`.
 - Native Claude Code compares with the latest published npm version. Its
   `claude update` command follows the user's configured release channel; a newer
   published version may not yet be offered on the stable channel.
@@ -74,7 +77,9 @@ Updates are advisory and do not change the sign-in readiness badge.
 
 **Copy Update Command** only copies text. Run it yourself in a terminal, then
 press **Refresh**. Commands are offered only when the matching package manager
-is present. DockDeck never installs CLI updates or changes their settings.
+is present or the CLI supports its own updater. Copied commands use your terminal's
+active `PATH` and npm prefix; select the intended installation first if you keep
+multiple Homebrew or Node versions. DockDeck never installs CLI updates or changes their settings.
 Pinned versions and organization policies still apply; consult the linked
 installation guide before changing an intentionally pinned installation.
 

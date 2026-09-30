@@ -107,23 +107,22 @@ enum CLIInstallation: Equatable {
     }
 
     func updateCommand(
-        executable: String,
+        supportsSelfUpdate: Bool = false,
         isExecutable: (String) -> Bool = FileManager.default.isExecutableFile(atPath:)
     ) -> String? {
-        func quote(_ value: String) -> String {
-            "'" + value.replacingOccurrences(of: "'", with: "'\\''") + "'"
-        }
         switch self {
         case .npm(let prefix, let package):
+            guard ["@openai/codex", "@anthropic-ai/claude-code"].contains(package) else { return nil }
+            if package == "@openai/codex", supportsSelfUpdate { return "codex update" }
             let bin = "\(prefix)/bin"
             guard isExecutable("\(bin)/npm"), isExecutable("\(bin)/node") else { return nil }
-            // Target the detected global prefix even when a terminal has a different NVM version.
-            return "PATH=\(quote(bin)):\"$PATH\" \(quote(bin + "/npm")) install -g --prefix \(quote(prefix)) \(package)@latest"
-        case .homebrew(let prefix, let package, let cask):
-            let brew = "\(prefix)/bin/brew"
-            guard isExecutable(brew) else { return nil }
-            return "\(quote(brew)) upgrade \(cask ? "--cask" : "--formula") \(package)"
-        case .claudeNative: return "\(quote(executable)) update"
+            return "npm install -g \(package)@latest"
+        case .homebrew(let prefix, let package, _):
+            guard ["codex", "claude-code", "claude-code@latest", "gh"].contains(package) else { return nil }
+            if package == "codex", supportsSelfUpdate { return "codex update" }
+            guard isExecutable("\(prefix)/bin/brew") else { return nil }
+            return "brew upgrade \(package)"
+        case .claudeNative: return "claude update"
         case .bundled, .unknown: return nil
         }
     }
@@ -164,10 +163,19 @@ struct CLIUpdateInfo: Equatable {
             executableURL: executable, arguments: ["--version"],
             environment: CodexBinaryLocator.launchEnvironment(for: executable, environment: environment),
             timeout: 3, maximumOutputBytes: 4 * 1_024, diagnosticSource: .diagnostics)
+        var supportsSelfUpdate = false
+        if id == .codex, installation != .bundled, installation != .unknown,
+            let help = try? BoundedProcessRunner.run(
+                executableURL: executable, arguments: ["help", "update"],
+                environment: CodexBinaryLocator.launchEnvironment(for: executable, environment: environment),
+                timeout: 3, maximumOutputBytes: 16 * 1_024, diagnosticSource: .diagnostics)
+        {
+            supportsSelfUpdate = String(decoding: help, as: UTF8.self).contains("Usage: codex update")
+        }
         return Self(
             installedVersion: output.flatMap { CLIVersion.parseOutput($0, id: id) },
             installation: installation, executablePath: executable.path,
-            command: installation.updateCommand(executable: executable.path))
+            command: installation.updateCommand(supportsSelfUpdate: supportsSelfUpdate))
     }
 }
 
