@@ -721,7 +721,10 @@ final class UsageProviderTests: XCTestCase {
     }
 
     func testClaudeCancellationAndPTYCompletionCleanOwnedProcesses() throws {
-        for usesPTY in [false, true] {
+        for mode in ["cancel", "pty-complete", "shutdown"] {
+            let usesPTY = mode != "cancel"
+            let completesNormally = mode == "pty-complete"
+            let lifetime = BoundedProcessLifetime()
             let files = FileManager.default
             let root = files.temporaryDirectory.appendingPathComponent(UUID().uuidString)
             try files.createDirectory(at: root, withIntermediateDirectories: true)
@@ -729,6 +732,7 @@ final class UsageProviderTests: XCTestCase {
             let marker = root.appendingPathComponent("pids")
             var pids: [pid_t] = []
             let finished = DispatchSemaphore(value: 0)
+            let returned = expectation(description: "Claude probe returns: \(mode)")
             var completed = false
             defer {
                 for pid in pids where pid > 1 && kill(pid, 0) == 0 { kill(pid, SIGKILL) }
@@ -756,12 +760,13 @@ final class UsageProviderTests: XCTestCase {
             let provider = ClaudeUsageCommandProvider(
                 environment: ["DOCKDECK_CLAUDE_PATH": executable.path, "PATH": "/usr/bin:/bin",
                     "TEST_PTY": usesPTY ? "1" : "0", "TEST_MARKER": marker.path],
-                homeDirectory: root, probeDirectory: root.appendingPathComponent("probe"))
+                homeDirectory: root, probeDirectory: root.appendingPathComponent("probe"), lifetime: lifetime)
             defer { provider.cancel() }
             var result: Result<UsageProviderSnapshot, UsageProviderError>?
             DispatchQueue.global(qos: .utility).async {
                 result = provider.read()
                 finished.signal()
+                returned.fulfill()
             }
             let deadline = ProcessInfo.processInfo.systemUptime + 4
             while pids.count != 2, ProcessInfo.processInfo.systemUptime < deadline {
@@ -771,10 +776,16 @@ final class UsageProviderTests: XCTestCase {
             }
             guard pids.count == 2 else { return XCTFail("Claude fixture did not start") }
             XCTAssertEqual(usesPTY ? getsid(pids[1]) : getpgid(pids[1]), pids[0])
-            if !usesPTY { provider.cancel() }
-            completed = finished.wait(timeout: .now() + 4) == .success
-            guard completed else { return XCTFail("Claude probe did not finish promptly") }
-            if usesPTY {
+            if !completesNormally { provider.cancel() }
+            if mode == "shutdown" {
+                lifetime.shutdown()
+                for pid in pids {
+                    XCTAssertEqual(kill(pid, 0), -1, "App shutdown returned before probe cleanup")
+                }
+            }
+            completed = XCTWaiter.wait(for: [returned], timeout: 4) == .completed
+            guard completed else { return XCTFail("Claude probe did not finish promptly: \(mode)") }
+            if completesNormally {
                 guard case .success = result else { return XCTFail("Expected PTY usage") }
             } else {
                 guard case .failure(let error) = result else { return XCTFail("Expected cancellation") }
@@ -787,6 +798,12 @@ final class UsageProviderTests: XCTestCase {
             for pid in pids {
                 XCTAssertEqual(kill(pid, 0), -1, "Surviving Claude probe (PTY: \(usesPTY))")
                 XCTAssertEqual(errno, ESRCH)
+            }
+            if mode == "shutdown" {
+                guard case .failure(let error) = provider.read() else {
+                    return XCTFail("Claude probe started after shutdown")
+                }
+                XCTAssertTrue(error.localizedDescription.contains("cancelled"))
             }
         }
     }

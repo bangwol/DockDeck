@@ -93,6 +93,8 @@ a transient probe fails, the last valid values remain visible as stale data and
 the hover detail reports the latest refresh error.
 Completed, cancelled, and timed-out probes clean up their owned process group or
 terminal session, with a bounded force-termination fallback for unresponsive children.
+App shutdown includes in-flight probes in its existing two-second cleanup wait
+and rejects new probes once shutdown begins.
 
 The command can return 5-hour, weekly, and plan-specific Fable windows. DockDeck
 shows `FBL` only when Claude returns that value and never estimates it.

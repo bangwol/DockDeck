@@ -343,6 +343,7 @@ final class ClaudeUsageCommandProvider: ClaudeUsageCommandReading {
     private let fileManager: FileManager
     private let environment: [String: String]
     private let homeDirectory: URL
+    private let lifetime: BoundedProcessLifetime
     private let uptime: () -> TimeInterval
     private let probeDirectory: URL
     private let lock = NSLock()
@@ -354,12 +355,14 @@ final class ClaudeUsageCommandProvider: ClaudeUsageCommandReading {
         environment: [String: String] = ProcessInfo.processInfo.environment,
         homeDirectory: URL = FileManager.default.homeDirectoryForCurrentUser,
         probeDirectory: URL? = nil,
+        lifetime: BoundedProcessLifetime = .shared,
         uptime: @escaping () -> TimeInterval = { ProcessInfo.processInfo.systemUptime }
     ) {
         self.fileManager = fileManager
         self.uptime = uptime
         self.environment = environment
         self.homeDirectory = homeDirectory
+        self.lifetime = lifetime
         self.probeDirectory = probeDirectory
             ?? fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
                 .appendingPathComponent("DockDeck", isDirectory: true)
@@ -367,6 +370,15 @@ final class ClaudeUsageCommandProvider: ClaudeUsageCommandReading {
     }
 
     func read(now: Date = Date()) -> Result<UsageProviderSnapshot, UsageProviderError> {
+        let operation = UUID()
+        guard lifetime.register(operation: operation) else {
+            return .failure(.transport("Claude /usage refresh cancelled"))
+        }
+        begin(operation)
+        defer {
+            finish(operation)
+            lifetime.remove(operation: operation)
+        }
         guard let executable = ClaudeBinaryLocator.locate(
             environment: environment, homeDirectory: homeDirectory)
         else {
@@ -378,10 +390,6 @@ final class ClaudeUsageCommandProvider: ClaudeUsageCommandReading {
             return .failure(.transport("Could not prepare Claude probe directory"))
         }
         removeStaleProbeArtifacts()
-
-        let operation = UUID()
-        begin(operation)
-        defer { finish(operation) }
 
         do {
             let directSession = UUID()
@@ -448,6 +456,7 @@ final class ClaudeUsageCommandProvider: ClaudeUsageCommandReading {
         let terminated = DispatchSemaphore(value: 0)
         process.terminationHandler = { _ in terminated.signal() }
         do {
+            guard isCurrent(operation) else { throw ProbeFailure.cancelled }
             try process.run()
         } catch {
             try? outputPipe.fileHandleForWriting.close()
@@ -493,6 +502,7 @@ final class ClaudeUsageCommandProvider: ClaudeUsageCommandReading {
             cols: 160, rows: 140, scrollback: 0,
             enableSixelReported: false, kittyImageCacheLimitBytes: 1_048_576)
         let terminal = HeadlessTerminal(queue: queue, options: options) { _ in ended.signal() }
+        guard isCurrent(operation) else { throw ProbeFailure.cancelled }
         terminal.process.startProcess(
             executable: executable.path,
             args: launchArguments(sessionID: sessionID, command: nil),
@@ -680,7 +690,7 @@ final class ClaudeUsageCommandProvider: ClaudeUsageCommandReading {
     }
 
     private func isCurrent(_ operation: UUID) -> Bool {
-        lock.withLock { operationID == operation }
+        lock.withLock { operationID == operation } && !lifetime.isShuttingDown
     }
 }
 
