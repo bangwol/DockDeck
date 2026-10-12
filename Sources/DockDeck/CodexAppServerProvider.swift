@@ -287,7 +287,11 @@ final class CodexAppServerProvider {
             if count > 0 {
                 if capturesOutput { self.consume(Data(bytes.prefix(count)), from: handle) }
             } else if count == 0 || (errno != EAGAIN && errno != EWOULDBLOCK && errno != EINTR) {
-                (capturesOutput ? self.outputSource : self.errorSource)?.cancel()
+                if capturesOutput {
+                    self.failTransport("Codex app-server stdout closed or could not be read")
+                } else {
+                    self.errorSource?.cancel()
+                }
             }
         }
         source.setCancelHandler { try? handle.close() }
