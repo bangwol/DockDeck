@@ -53,7 +53,12 @@ struct UsageWindow: Identifiable, Equatable {
     ) {
         self.durationMinutes = durationMinutes
         self.usedPercent = usedPercent
-        self.resetsAt = resetsAt
+        // Provider timestamps also reach calendar formatting and integer notification IDs.
+        self.resetsAt = resetsAt.flatMap { date in
+            guard date.timeIntervalSinceReferenceDate.isFinite,
+                (Date.distantPast...Date.distantFuture).contains(date) else { return nil }
+            return date
+        }
         self.customLabel = customLabel
     }
 

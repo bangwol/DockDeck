@@ -42,34 +42,69 @@ final class CLIUpdateTests: XCTestCase {
         }
         let stable = CLIInstallation.homebrew(prefix: "/opt/homebrew", package: "claude-code", cask: true)
         XCTAssertEqual(stable.metadataURL?.absoluteString, "https://formulae.brew.sh/api/cask/claude-code.json")
-        XCTAssertEqual(stable.updateCommand(executable: "/ignored", isExecutable: { _ in true }),
-            "'/opt/homebrew/bin/brew' upgrade --cask claude-code")
-        XCTAssertNil(stable.updateCommand(executable: "/ignored", isExecutable: { _ in false }))
-        XCTAssertNil(CLIInstallation.bundled.updateCommand(executable: "/ignored"))
+        XCTAssertEqual(stable.updateCommand(isExecutable: { _ in true }),
+            "brew upgrade claude-code")
+        XCTAssertNil(stable.updateCommand(isExecutable: { _ in false }))
+        XCTAssertNil(CLIInstallation.bundled.updateCommand())
         XCTAssertNil(CLIInstallation.unknown.metadataURL)
     }
 
-    func testNPMCommandPreservesPrefixAndQuotesShellMetacharacters() throws {
+    func testUpdateCommandsStayShortAndPreservePackageChannels() {
         let prefix = "/tmp/Node's $(touch bad)"
-        let installation = CLIInstallation.npm(prefix: prefix, package: "@openai/codex")
-        let command = try XCTUnwrap(installation.updateCommand(executable: "/ignored", isExecutable: { _ in true }))
-        XCTAssertEqual(command,
-            "PATH='/tmp/Node'\\''s $(touch bad)/bin':\"$PATH\" '/tmp/Node'\\''s $(touch bad)/bin/npm' install -g --prefix '/tmp/Node'\\''s $(touch bad)' @openai/codex@latest")
-        // Parse the generated command with a fake npm; no installation command is executed.
-        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
-        let bin = directory.appendingPathComponent("Node's $(touch bad)/bin")
-        try FileManager.default.createDirectory(at: bin, withIntermediateDirectories: true)
-        defer { try? FileManager.default.removeItem(at: directory) }
-        let npm = bin.appendingPathComponent("npm")
-        try Data("#!/bin/sh\n/usr/bin/printf '%s\\n' \"$@\"\n".utf8).write(to: npm)
-        try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: npm.path)
-        let generated = try XCTUnwrap(CLIInstallation.npm(prefix: bin.deletingLastPathComponent().path,
-            package: "@openai/codex").updateCommand(executable: "/ignored", isExecutable: { _ in true }))
-        let output = try BoundedProcessRunner.run(executableURL: URL(fileURLWithPath: "/bin/sh"),
-            arguments: ["-c", generated], currentDirectoryURL: directory)
-        XCTAssertEqual(String(decoding: output, as: UTF8.self),
-            "install\n-g\n--prefix\n\(bin.deletingLastPathComponent().path)\n@openai/codex@latest\n")
-        XCTAssertFalse(FileManager.default.fileExists(atPath: directory.appendingPathComponent("bad").path))
+        let cases: [(CLIInstallation, String)] = [
+            (.npm(prefix: prefix, package: "@openai/codex"), "codex update"),
+            (.homebrew(prefix: "/opt/homebrew", package: "codex", cask: true), "codex update"),
+            (.homebrew(prefix: "/opt/homebrew", package: "gh", cask: false), "brew upgrade gh"),
+            (.homebrew(prefix: "/usr/local", package: "claude-code@latest", cask: true), "brew upgrade claude-code@latest"),
+            (.npm(prefix: prefix, package: "@anthropic-ai/claude-code"), "npm install -g @anthropic-ai/claude-code@latest"),
+            (.claudeNative, "claude update"),
+        ]
+        for (installation, expected) in cases {
+            XCTAssertEqual(installation.updateCommand(supportsSelfUpdate: true, isExecutable: { _ in true }), expected)
+        }
+        XCTAssertEqual(CLIInstallation.npm(prefix: prefix, package: "@openai/codex")
+            .updateCommand(isExecutable: { _ in true }), "npm install -g @openai/codex@latest")
+        XCTAssertNil(CLIInstallation.npm(prefix: prefix, package: "@openai/codex; touch bad")
+            .updateCommand(isExecutable: { _ in true }))
+        XCTAssertNil(CLIInstallation.homebrew(prefix: prefix, package: "gh; touch bad", cask: false)
+            .updateCommand(isExecutable: { _ in true }))
+        XCTAssertNil(CLIInstallation.bundled.updateCommand(supportsSelfUpdate: true))
+        XCTAssertNil(CLIInstallation.unknown.updateCommand(supportsSelfUpdate: true))
+    }
+
+    func testCodexUpdateCapabilityCheckOnlyRunsHelp() throws {
+        let files = FileManager.default
+        let root = files.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? files.removeItem(at: root) }
+        let executable = root.appendingPathComponent("lib/node_modules/@openai/codex/bin/codex")
+        try files.createDirectory(at: executable.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try files.createDirectory(at: root.appendingPathComponent("bin"), withIntermediateDirectories: true)
+        try Data(#"""
+            #!/bin/sh
+            printf '%s\n' "$*" >> "$TEST_CALLS"
+            case "$*" in
+              --version) printf 'codex-cli 0.159.2\n' ;;
+              'help update')
+                if [ "$TEST_SUPPORTS_UPDATE" != 1 ]; then exit 1; fi
+                printf 'Usage: codex update [OPTIONS]\n'
+                ;;
+              *) exit 99 ;;
+            esac
+            """#.utf8).write(to: executable)
+        for name in ["npm", "node"] {
+            let tool = root.appendingPathComponent("bin/" + name)
+            try Data("#!/bin/sh\nexit 99\n".utf8).write(to: tool)
+            try files.setAttributes([.posixPermissions: 0o700], ofItemAtPath: tool.path)
+        }
+        try files.setAttributes([.posixPermissions: 0o700], ofItemAtPath: executable.path)
+        let calls = root.appendingPathComponent("calls")
+        for supports in [false, true] {
+            let info = CLIUpdateInfo.inspect(id: .codex, executable: executable,
+                environment: ["TEST_CALLS": calls.path, "TEST_SUPPORTS_UPDATE": supports ? "1" : "0"])
+            XCTAssertEqual(info.command, supports ? "codex update" : "npm install -g @openai/codex@latest")
+        }
+        XCTAssertEqual(try String(contentsOf: calls, encoding: .utf8),
+            "--version\nhelp update\n--version\nhelp update\n")
     }
 
     func testReleaseMetadataRejectsMalformedPreviewAndOversizedResponses() {
@@ -175,6 +210,7 @@ final class CLIUpdateTests: XCTestCase {
             let installed = CLIUpdateInfo.inspect(id: id, executable: executable,
                 environment: ProcessInfo.processInfo.environment)
             XCTAssertNotNil(installed.installedVersion, id.title)
+            if let command = installed.command { print("CLI update command: \(id.title): \(command)") }
             guard installed.installation.metadataURL != nil else { continue }
             let result = await checker.check(installed)
             XCTAssertNotNil(result.latestVersion, id.title)
