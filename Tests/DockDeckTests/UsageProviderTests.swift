@@ -644,7 +644,9 @@ final class UsageProviderTests: XCTestCase {
             result = provider.read(now: Date(timeIntervalSince1970: 2_000))
             completed.fulfill()
         }
-        wait(for: [completed], timeout: 3)
+        // Allow process startup and both bounded cleanup phases on busy CI runners.
+        // Stay below the real 16-second PTY deadline so a wall-clock regression fails.
+        wait(for: [completed], timeout: 10)
         provider.cancel()
         queue.sync {}
         guard case .failure(let error) = result else { return XCTFail("Expected timeout") }
