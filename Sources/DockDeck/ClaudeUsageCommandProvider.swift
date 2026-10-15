@@ -500,7 +500,8 @@ final class ClaudeUsageCommandProvider: ClaudeUsageCommandReading {
         let ended = DispatchSemaphore(value: 0)
         let options = TerminalOptions(
             cols: 160, rows: 140, scrollback: 0,
-            enableSixelReported: false, kittyImageCacheLimitBytes: 1_048_576)
+            enableSixelReported: false,
+            kittyGraphics: .init(storageLimitBytesPerScreen: 524_288))
         let terminal = HeadlessTerminal(queue: queue, options: options) { _ in ended.signal() }
         guard isCurrent(operation) else { throw ProbeFailure.cancelled }
         terminal.process.startProcess(

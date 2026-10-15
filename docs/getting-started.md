@@ -8,7 +8,7 @@ ID-signed and notarized stable binary is not available yet.
 
 | Requirement | Used for |
 | --- | --- |
-| Xcode Command Line Tools with Swift 6.0 or later | Building DockDeck and SwiftTerm |
+| Xcode Command Line Tools with Swift 6.2 or later (Xcode 26 or later) | Building DockDeck and SwiftTerm |
 | Accessibility permission | Precise Dock geometry and display tracking |
 | [Codex CLI](https://github.com/openai/codex), signed in | Codex Usage values |
 | [Claude Code](https://code.claude.com/docs/en/installation), signed in | Claude Usage values |
@@ -151,14 +151,15 @@ test that module with `./scripts/install.sh`, not `swift run DockDeck`.
 
 ## Development verification
 
+Regular CI uses macOS 15 with Xcode 26.3; its default Xcode 16.4 is too old for
+SwiftTerm 1.99.0. The app's minimum runtime remains macOS 13.
 Scheduled and manual CI runs check both macOS 26 and the `xcode-27` preview
 runner. Preview images change over time; consult each run's OS and Xcode versions
 and also verify the installed app's interactions on macOS 27.
 
 Use the native SwiftPM build system consistently for builds, tests, and packaging.
-Xcode 27's new default build system changes resource processing and output paths;
-it currently fails to compile SwiftTerm's Metal resource in the preview runner.
-The native build system retains the existing build behavior and bundle layout.
+The native build system retains the build behavior and bundle layout expected
+by the installation and packaging scripts.
 If SDK 27 reports a missing `SwiftUIMacros` plugin with Command Line Tools,
 select a matching full Xcode installation; its SwiftUI compiler plugins are
 needed by the new `@State` implementation.
