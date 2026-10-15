@@ -225,7 +225,7 @@ struct TerminalShellSession {
     }
 }
 
-final class TerminalPanelController: NSObject, LocalProcessTerminalViewDelegate {
+final class TerminalPanelController: NSObject {
     let panel: KeyablePanel
     let terminalView: LocalProcessTerminalView
     let surfaceView: PanelSurfaceView
@@ -327,7 +327,7 @@ final class TerminalPanelController: NSObject, LocalProcessTerminalViewDelegate 
         guard automaticallyRestartsShell, !terminalView.process.running else { return }
         stopShellSession()
         scheduledRestart = nil
-        terminalView.terminal.resetToInitialState()
+        terminalView.feed(text: "\u{1b}c") // RIS resets the terminal through its serialized public API.
         restartPolicy.recordStart(at: ProcessInfo.processInfo.systemUptime)
         terminalView.startProcess(
             executable: ShellEnvironment.executable,
@@ -338,6 +338,10 @@ final class TerminalPanelController: NSObject, LocalProcessTerminalViewDelegate 
         shellSession = TerminalShellSession(pid: terminalView.process.shellPid)
     }
 
+}
+
+@MainActor
+extension TerminalPanelController: LocalProcessTerminalViewDelegate {
     func processTerminated(source: TerminalView, exitCode: Int32?) {
         DispatchQueue.main.async { [weak self] in
             self?.handleShellTermination(exitCode: exitCode)

@@ -11,10 +11,10 @@ final class PanelAppearanceTests: XCTestCase {
         let terminal = LocalProcessTerminalView(frame: NSRect(origin: .zero, size: size))
         for fontSize in [TerminalTheme.minimumFontSize, TerminalTheme.maximumFontSize, TerminalTheme.fontSize] {
             terminal.font = TerminalTheme.font(named: "Menlo", size: fontSize)
-            let columnsAfterFontChange = terminal.getTerminal().cols
+            let columnsAfterFontChange = terminal.terminalDimensions.cols
             terminal.setFrameSize(NSSize(width: size.width + 1, height: size.height))
             terminal.setFrameSize(size)
-            XCTAssertEqual(terminal.getTerminal().cols, columnsAfterFontChange, "Font size: \(fontSize)")
+            XCTAssertEqual(terminal.terminalDimensions.cols, columnsAfterFontChange, "Font size: \(fontSize)")
         }
     }
 

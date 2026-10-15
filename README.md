@@ -49,7 +49,7 @@ or build from source below. The downloaded app is ad-hoc signed and unnotarized;
 see the [preview installation notes](docs/releases.md#preview-artifacts).
 Apple silicon is the primary target; Intel compatibility remains in the
 universal preview. See the [architecture policy](docs/releases.md#architecture-support).
-For the recommended source installation, install Xcode Command Line Tools, then run:
+For source installation, install Xcode Command Line Tools with Swift 6.2 or later, then run:
 
 ```bash
 git clone https://github.com/bangwol/DockDeck.git

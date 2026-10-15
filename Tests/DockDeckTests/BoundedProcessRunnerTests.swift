@@ -42,7 +42,7 @@ final class BoundedProcessRunnerTests: XCTestCase {
         session.stop { XCTFail("Already stopped shells must not receive another terminate") }
     }
 
-    func testTerminalStopChecksPIDAfterSwiftTermReportsStopped() throws {
+    func testTerminalStopReapsAProcessStillRunningAfterTerminate() throws {
         let probe = TerminalCleanupProbe()
         let process = LocalProcess(delegate: probe)
         process.startProcess(executable: "/bin/sh", args: ["-c",
@@ -54,7 +54,10 @@ final class BoundedProcessRunnerTests: XCTestCase {
         while !probe.ready, Date() < deadline { RunLoop.current.run(until: Date().addingTimeInterval(0.01)) }
         XCTAssertTrue(probe.ready)
         process.terminate()
-        XCTAssertFalse(process.running, "SwiftTerm's stopped flag is not proof that the shell exited")
+        XCTAssertTrue(process.running, "Termination remains pending while the child ignores SIGTERM")
+        if case .failure(.alreadyRunning) = process.startProcessChecked(executable: "/bin/true") {} else {
+            XCTFail("A terminating process must not be replaced before cleanup")
+        }
         XCTAssertEqual(kill(pid, 0), 0)
         session.stop {}
         XCTAssertEqual(kill(pid, 0), -1)

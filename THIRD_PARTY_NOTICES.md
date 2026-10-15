@@ -2,13 +2,16 @@
 
 DockDeck links the following open-source dependency:
 
-## SwiftTerm 1.18.0
+## SwiftTerm 1.99.0
 
-- Source: [SwiftTerm v1.18.0](https://github.com/migueldeicaza/SwiftTerm/tree/v1.18.0)
+- Source: [SwiftTerm v1.99.0](https://github.com/migueldeicaza/SwiftTerm/tree/v1.99.0)
 - License: MIT
 - Full license: [ThirdPartyLicenses/SwiftTerm.txt](ThirdPartyLicenses/SwiftTerm.txt)
 
 SwiftTerm's package graph also resolves `swift-argument-parser` for its separate `Termcast` executable. DockDeck does not depend on or link that executable or the `ArgumentParser` product.
+
+The graph resolves `swift-png` and `h` for SwiftTerm's portable graphics support.
+Those products are excluded from SwiftTerm's macOS target and are not linked into DockDeck.
 
 ## Provider marks
 
