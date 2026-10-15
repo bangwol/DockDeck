@@ -4,6 +4,43 @@ DockDeck is a pre-1.0 project. Public binaries are technical previews until a
 Developer ID-signed and notarized build is available. The root `VERSION` file is
 the single source of truth for the app's three-part version.
 
+## 0.1.5 preview integration
+
+This release candidate collects the changes merged since `v0.1.4-preview.2`:
+[#36](https://github.com/bangwol/DockDeck/pull/36),
+[#41](https://github.com/bangwol/DockDeck/pull/41),
+[#43](https://github.com/bangwol/DockDeck/pull/43), and
+[#45](https://github.com/bangwol/DockDeck/pull/45).
+
+- Background refresh and Dock tracking follow deck/detail visibility and pause
+  while the display or login session is inactive. Schedule reads coalesce during
+  bursts; stopped Music and Local Ports work is cancelled.
+- Terminal sessions, usage probes, and other owned commands receive bounded
+  cleanup during cancellation, replacement, and app shutdown, including their
+  child process groups.
+- Usage meters retain quota percentages when reset timestamps are invalid.
+  Codex reconnects when its output closes early, and Claude probes clean up after
+  successful reads, cancellation, and failed refreshes.
+- Diagnostics copy supported, shorter CLI update commands, including
+  `codex update` and `brew upgrade gh`, with package-manager fallbacks for other
+  installations.
+- SwiftTerm moves to the upstream `1.99.0` preview before 2.0. Terminal API and
+  process-lifecycle integration are updated, alongside macOS 27 menu and
+  Quick Actions icon compatibility fixes.
+
+The app still targets macOS 13 or later and retains universal Apple silicon and
+Intel binaries. Source builds now require Swift 6.2 or later (Xcode 26 or later).
+Regular tests, Swift CodeQL, and preview packaging select Xcode 26.3. CodeQL
+steps use the same `4.38.3` version and are grouped for future Dependabot updates;
+artifact uploads use `actions/upload-artifact` `7.0.2`.
+Universal packaging checks each required architecture separately for compatibility
+with Xcode 27's `lipo`.
+
+The candidate package is `DockDeck-0.1.5-macos-universal-unsigned.zip` with a
+matching `.sha256` file. It remains ad-hoc signed and unnotarized. This integration
+does not create a tag or publish a GitHub Release; the latest published download
+remains the [0.1.4 preview](https://github.com/bangwol/DockDeck/releases/tag/v0.1.4-preview.2).
+
 ## 0.1.4 preview integration
 
 This patch includes the 0.1.3 integration below and the subsequent controls,

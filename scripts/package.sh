@@ -134,8 +134,11 @@ else
 fi
 
 codesign --verify --deep --strict "$APP_PATH"
-lipo "$APP_BIN_PATH" -verify_arch arm64 x86_64
-lipo "$APP_BRIDGE_PATH" -verify_arch arm64 x86_64
+# Xcode 27's lipo rejects multiple names in one -verify_arch invocation.
+for architecture in arm64 x86_64; do
+    lipo "$APP_BIN_PATH" -verify_arch "$architecture"
+    lipo "$APP_BRIDGE_PATH" -verify_arch "$architecture"
+done
 
 echo "Zipping..."
 rm -f \
