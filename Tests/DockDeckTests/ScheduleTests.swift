@@ -5,6 +5,28 @@ import XCTest
 @testable import DockDeck
 
 final class ScheduleTests: XCTestCase {
+    func testAllDayReminderTextUsesCalendarDaysAcrossDST() throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = try XCTUnwrap(TimeZone(identifier: "America/New_York"))
+        let due = try XCTUnwrap(calendar.date(from: DateComponents(year: 2024, month: 3, day: 10)))
+        let reminder = ScheduleReminderItem(
+            id: "all-day", title: "Task", dueDate: due, isAllDay: true, listTitle: "Tasks")
+        for (day, hour, expected) in [(8, 12, "Later"), (9, 23, "Tomorrow"),
+            (10, 0, "Today"), (10, 12, "Today"), (10, 23, "Today"), (11, 0, "Overdue")]
+        {
+            let now = try XCTUnwrap(calendar.date(from:
+                DateComponents(year: 2024, month: 3, day: day, hour: hour)))
+            XCTAssertEqual(SchedulePanelView.reminderRelativeText(reminder, now: now, calendar: calendar), expected)
+        }
+    }
+
+    func testTimedReminderTextKeepsMinutePrecision() {
+        let due = Date(timeIntervalSince1970: 1_000)
+        let reminder = reminder(id: "timed", due: due)
+        XCTAssertEqual(SchedulePanelView.reminderRelativeText(reminder, now: due.addingTimeInterval(-90)), "in 2m")
+        XCTAssertEqual(SchedulePanelView.reminderRelativeText(reminder, now: due.addingTimeInterval(90)), "2m late")
+    }
+
     func testAgendaGroupsRespectCalendarDaysAcrossDSTAndHideEndedEvents() throws {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = try XCTUnwrap(TimeZone(identifier: "America/New_York"))

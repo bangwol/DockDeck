@@ -51,7 +51,7 @@ struct SchedulePanelView: View {
                     .foregroundStyle(baseColor)
                     .lineLimit(1)
                 Spacer(minLength: 2)
-                Text(reminderRelativeText(item, now: now))
+                Text(Self.reminderRelativeText(item, now: now))
                     .font(.system(size: CompactReadability.size(8, enabled: readable), weight: .semibold, design: .monospaced))
                     .foregroundStyle(baseColor.opacity(0.76))
                     .lineLimit(1)
@@ -150,10 +150,10 @@ struct SchedulePanelView: View {
             : presentation.event.startDate.timeIntervalSince(now)
         let prefix = presentation.mode == .current ? "" : "in "
         let suffix = presentation.mode == .current ? " left" : ""
-        return prefix + durationText(max(seconds, 0)) + suffix
+        return prefix + Self.durationText(max(seconds, 0)) + suffix
     }
 
-    private func durationText(_ seconds: TimeInterval) -> String {
+    private static func durationText(_ seconds: TimeInterval) -> String {
         if seconds < 60 { return "<1m" }
         let minutes = Int(ceil(seconds / 60))
         if minutes < 60 { return "\(minutes)m" }
@@ -168,7 +168,12 @@ struct SchedulePanelView: View {
             + Self.timeFormatter.string(from: event.endDate)
     }
 
-    private func reminderRelativeText(_ reminder: ScheduleReminderItem, now: Date) -> String {
+    static func reminderRelativeText(
+        _ reminder: ScheduleReminderItem, now: Date, calendar: Calendar = .current
+    ) -> String {
+        if reminder.isAllDay {
+            return ScheduleAgendaSection.reminder(reminder, now: now, calendar: calendar).rawValue
+        }
         let seconds = reminder.dueDate.timeIntervalSince(now)
         return seconds <= 0
             ? durationText(abs(seconds)) + " late"
@@ -194,7 +199,7 @@ struct SchedulePanelView: View {
     ) -> String {
         let state = presentation.mode == .overdue ? "Overdue reminder" : "Upcoming reminder"
         return "\(state), \(reminderTimeText(presentation.reminder)), "
-            + "\(reminderRelativeText(presentation.reminder, now: now)), "
+            + "\(Self.reminderRelativeText(presentation.reminder, now: now)), "
             + presentation.reminder.listTitle
     }
 
