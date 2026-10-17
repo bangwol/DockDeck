@@ -18,6 +18,10 @@ date or time, and list name. DockDeck reads incomplete Reminders due within the
 last seven days or next 48 hours; items without a due date are not shown. The
 same 48-hour horizon applies to upcoming Calendar events.
 
+All-day Reminders show Today, Tomorrow, Later, or Overdue using local calendar
+days. A Reminder due today stays due today until the next day; it does not show
+hours late just because midnight has passed.
+
 Calendar events can show a compact video button. DockDeck selects only HTTPS
 conference links from the event URL, location, or a bounded portion of its
 notes. Supported hosts include Around, Amazon Chime, BlueJeans, FaceTime,
