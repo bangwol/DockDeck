@@ -70,8 +70,10 @@ rendering. No Terminal window appears, no Claude process is kept alive, and
 tools are disabled for the probe. The process exits after capture.
 
 Automatic probes stop while the display sleeps or the macOS login session is
-locked. An in-flight probe is cancelled and one fresh probe normally runs after
-the system becomes active. If a returned 5-hour or weekly limit is exhausted,
+locked. Running and queued probes are cancelled, and one fresh probe normally
+runs after the system becomes active. Disabling Claude or Usage, switching to
+**Status line only**, or reaching the watchdog timeout also cancels queued probes
+before they can launch the CLI. If a returned 5-hour or weekly limit is exhausted,
 background probes instead wait until the latest blocking reset plus a short
 grace period. A missing reset time backs off to one probe per hour. An exhausted
 Fable allowance does not pause checks for the other models.

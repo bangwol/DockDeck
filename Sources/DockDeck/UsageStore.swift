@@ -143,6 +143,7 @@ final class UsageStore: ObservableObject {
     private var refreshTimer: Timer?
     private var claudeProbeTimer: Timer?
     private var claudeProbeWatchdogTimer: Timer?
+    private var claudeProbeCancellation: Progress?
     private var claudeProbeInFlight = false
     private var claudeProbeGeneration = 0
     private var lastClaudeProbeUptime: TimeInterval?
@@ -358,10 +359,12 @@ final class UsageStore: ObservableObject {
         claudeProbeInFlight = true
         lastClaudeProbeUptime = currentUptime
         let generation = claudeProbeGeneration
+        let cancellation = Progress(totalUnitCount: 1)
+        claudeProbeCancellation = cancellation
         scheduleClaudeProbeWatchdog(generation: generation)
         claudeProbeQueue.async { [weak self] in
-            guard let self else { return }
-            let result = self.claudeCommandProvider.read(now: Date())
+            guard let self, !cancellation.isCancelled else { return }
+            let result = self.claudeCommandProvider.read(now: Date(), cancellation: cancellation)
             DispatchQueue.main.async {
                 guard self.started, self.systemRefreshActive,
                     self.enabledProviderIDs.contains(.claude),
@@ -369,6 +372,7 @@ final class UsageStore: ObservableObject {
                 else { return }
                 self.claudeProbeWatchdogTimer?.invalidate()
                 self.claudeProbeWatchdogTimer = nil
+                self.claudeProbeCancellation = nil
                 self.claudeProbeInFlight = false
                 switch result {
                 case .success(let snapshot):
@@ -432,6 +436,8 @@ final class UsageStore: ObservableObject {
     }
 
     private func cancelClaudeProbe() {
+        claudeProbeCancellation?.cancel()
+        claudeProbeCancellation = nil
         claudeProbeTimer?.invalidate()
         claudeProbeTimer = nil
         claudeProbeWatchdogTimer?.invalidate()
@@ -447,10 +453,7 @@ final class UsageStore: ObservableObject {
             guard let self, self.claudeProbeInFlight,
                 self.claudeProbeGeneration == generation
             else { return }
-            self.claudeProbeGeneration += 1
-            self.claudeProbeInFlight = false
-            self.claudeProbeWatchdogTimer = nil
-            self.claudeCommandProvider.cancel()
+            self.cancelClaudeProbe()
             let error = UsageProviderError.transport("Claude /usage refresh timed out")
             self.claudeProbeError = error
             self.publishClaudeSources(fallbackError: error)

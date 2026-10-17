@@ -3,7 +3,7 @@ import Foundation
 import SwiftTerm
 
 protocol ClaudeUsageCommandReading: AnyObject {
-    func read(now: Date) -> Result<UsageProviderSnapshot, UsageProviderError>
+    func read(now: Date, cancellation: Progress?) -> Result<UsageProviderSnapshot, UsageProviderError>
     func cancel()
 }
 
@@ -348,6 +348,8 @@ final class ClaudeUsageCommandProvider: ClaudeUsageCommandReading {
     private let probeDirectory: URL
     private let lock = NSLock()
     private var operationID: UUID?
+    // A request can enter read() after cancel() ran while it was still queued.
+    private var operationCancellation: Progress?
     private var activeWake: DispatchSemaphore?
 
     init(
@@ -369,12 +371,14 @@ final class ClaudeUsageCommandProvider: ClaudeUsageCommandReading {
                 .appendingPathComponent("ClaudeProbe", isDirectory: true)
     }
 
-    func read(now: Date = Date()) -> Result<UsageProviderSnapshot, UsageProviderError> {
+    func read(now: Date = Date(), cancellation: Progress? = nil)
+        -> Result<UsageProviderSnapshot, UsageProviderError>
+    {
         let operation = UUID()
-        guard lifetime.register(operation: operation) else {
+        guard cancellation?.isCancelled != true, lifetime.register(operation: operation) else {
             return .failure(.transport("Claude /usage refresh cancelled"))
         }
-        begin(operation)
+        begin(operation, cancellation: cancellation)
         defer {
             finish(operation)
             lifetime.remove(operation: operation)
@@ -428,6 +432,7 @@ final class ClaudeUsageCommandProvider: ClaudeUsageCommandReading {
     func cancel() {
         let wake = lock.withLock {
             operationID = nil
+            operationCancellation = nil
             let wake = activeWake
             activeWake = nil
             return wake
@@ -677,21 +682,27 @@ final class ClaudeUsageCommandProvider: ClaudeUsageCommandReading {
         // Retain the marker for the next sweep: a late writer or crash can outlive this retry.
     }
 
-    private func begin(_ operation: UUID) {
+    private func begin(_ operation: UUID, cancellation: Progress?) {
         cancel()
-        lock.withLock { operationID = operation }
+        lock.withLock {
+            operationID = operation
+            operationCancellation = cancellation
+        }
     }
 
     private func finish(_ operation: UUID) {
         lock.withLock {
             guard operationID == operation else { return }
             operationID = nil
+            operationCancellation = nil
             activeWake = nil
         }
     }
 
     private func isCurrent(_ operation: UUID) -> Bool {
-        lock.withLock { operationID == operation } && !lifetime.isShuttingDown
+        lock.withLock {
+            operationID == operation && operationCancellation?.isCancelled != true
+        } && !lifetime.isShuttingDown
     }
 }
 
