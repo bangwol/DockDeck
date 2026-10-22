@@ -572,6 +572,22 @@ final class UsageProviderTests: XCTestCase {
             }
     }
 
+    func testClaudeProviderRejectsCancelledRequestBeforeSetup() {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let provider = ClaudeUsageCommandProvider(
+            environment: ["DOCKDECK_CLAUDE_PATH": "/usr/bin/true"],
+            homeDirectory: directory, probeDirectory: directory)
+        let cancellation = Progress(totalUnitCount: 1)
+        cancellation.cancel()
+
+        let result = provider.read(cancellation: cancellation)
+
+        guard case .failure(let error) = result else { return XCTFail("Expected cancellation") }
+        XCTAssertTrue(error.localizedDescription.contains("cancelled"))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: directory.path))
+    }
+
     func testClaudeProviderFallsBackToHiddenPTY() throws {
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("DockDeckClaudePTY-\(UUID().uuidString)", isDirectory: true)
@@ -1159,6 +1175,66 @@ final class UsageProviderTests: XCTestCase {
         store.stop()
     }
 
+    func testUsageStoreCancelsQueuedClaudeProbes() {
+        for transition in ["stop", "sleep", "status-line", "disable"] {
+            let command = FakeClaudeUsageCommandProvider(
+                result: .failure(.transport("Test probe")))
+            let queue = DispatchQueue(label: "DockDeckTests.ClaudeQueuedCancellation")
+            var uptime: TimeInterval = 100
+            let store = UsageStore(
+                codexProvider: CodexAppServerProvider(executableURL: missingCacheURL()),
+                claudeProvider: ClaudeStatuslineCacheProvider(cacheURL: missingCacheURL()),
+                claudeCommandProvider: command,
+                claudeProbeQueue: queue,
+                uptime: { uptime })
+            defer { store.stop() }
+            store.setEnabledProviders([.claude])
+            queue.suspend()
+            store.start()
+            switch transition {
+            case "stop": store.stop()
+            case "sleep": store.setSystemRefreshActive(false)
+            case "status-line": store.setClaudeRefreshMode(.statusLineOnly)
+            default: store.setEnabledProviders([.codex])
+            }
+            queue.resume()
+            queue.sync {}
+            XCTAssertEqual(command.readCount, 0, transition)
+
+            store.stop()
+            uptime += 61
+            store.setClaudeRefreshMode(.automatic)
+            store.setSystemRefreshActive(true)
+            store.setEnabledProviders([.claude])
+            store.start()
+            queue.sync {}
+            XCTAssertEqual(command.readCount, 1, "A fresh probe must run after \(transition)")
+        }
+    }
+
+    func testUsageStoreWatchdogCancelsQueuedClaudeProbe() {
+        let command = FakeClaudeUsageCommandProvider(
+            result: .failure(.transport("Should not run")))
+        let queue = DispatchQueue(label: "DockDeckTests.ClaudeQueuedWatchdog")
+        let store = UsageStore(
+            claudeProvider: ClaudeStatuslineCacheProvider(cacheURL: missingCacheURL()),
+            claudeCommandProvider: command,
+            claudeProbeTimeout: 0.05,
+            claudeProbeQueue: queue)
+        defer { store.stop() }
+        store.setEnabledProviders([.claude])
+        queue.suspend()
+        store.start()
+        let timedOut = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            command.cancelCount > 0
+        }, object: nil)
+        wait(for: [timedOut], timeout: 2)
+        queue.resume()
+        queue.sync {}
+        XCTAssertEqual(command.readCount, 0)
+        XCTAssertTrue(store.providers.first?.detail?.contains("refresh timed out") == true)
+    }
+
     func testUsageStoreWatchdogCancelsStuckClaudeProbe() {
         let command = BlockingClaudeUsageCommandProvider()
         let store = UsageStore(
@@ -1190,6 +1266,7 @@ final class UsageProviderTests: XCTestCase {
 
         XCTAssertEqual(command.readCount, 1)
         XCTAssertGreaterThanOrEqual(command.cancelCount, 1)
+        XCTAssertTrue(command.requestWasCancelled)
     }
 
     func testUsageStoreShowsProbeFailureAlongsideCachedClaudeUsage() throws {
@@ -1311,7 +1388,7 @@ private final class FakeClaudeUsageCommandProvider: ClaudeUsageCommandReading {
     var readCount: Int { lock.withLock { storedReadCount } }
     var cancelCount: Int { lock.withLock { storedCancelCount } }
 
-    func read(now: Date) -> Result<UsageProviderSnapshot, UsageProviderError> {
+    func read(now: Date, cancellation: Progress?) -> Result<UsageProviderSnapshot, UsageProviderError> {
         lock.withLock { storedReadCount += 1 }
         return result
     }
@@ -1324,12 +1401,17 @@ private final class BlockingClaudeUsageCommandProvider: ClaudeUsageCommandReadin
     private let cancelled = DispatchSemaphore(value: 0)
     private var storedReadCount = 0
     private var storedCancelCount = 0
+    private var storedCancellation: Progress?
 
     var readCount: Int { lock.withLock { storedReadCount } }
     var cancelCount: Int { lock.withLock { storedCancelCount } }
+    var requestWasCancelled: Bool { lock.withLock { storedCancellation?.isCancelled == true } }
 
-    func read(now: Date) -> Result<UsageProviderSnapshot, UsageProviderError> {
-        lock.withLock { storedReadCount += 1 }
+    func read(now: Date, cancellation: Progress?) -> Result<UsageProviderSnapshot, UsageProviderError> {
+        lock.withLock {
+            storedReadCount += 1
+            storedCancellation = cancellation
+        }
         _ = cancelled.wait(timeout: .now() + 5)
         return .failure(.transport("Cancelled by watchdog"))
     }
