@@ -201,7 +201,11 @@ final class WeatherTests: XCTestCase {
 
     func testAutoSlideKeepsWeatherDeadlineAnchoredAcrossCadenceChanges() throws {
         let session = makeSession()
-        WeatherURLProtocol.handler = { _ in (200, self.forecastData()) }
+        let requestStarted = expectation(description: "Forecast request reached its mock")
+        WeatherURLProtocol.handler = { _ in
+            requestStarted.fulfill()
+            return (200, self.forecastData())
+        }
         let store = WeatherStore(location: fixtureLocation(), refreshInterval: 900, session: session)
         defer {
             store.stop()
@@ -209,6 +213,8 @@ final class WeatherTests: XCTestCase {
             WeatherURLProtocol.handler = nil
         }
         store.start()
+        // Cancellation is asynchronous; capture this mock before the next test replaces it.
+        wait(for: [requestStarted], timeout: 1)
         let firstDeadline = try XCTUnwrap(store.nextRefreshAt)
         for _ in 0..<20 {
             store.setRuntimeActivity(.background, lowPowerMode: false)
