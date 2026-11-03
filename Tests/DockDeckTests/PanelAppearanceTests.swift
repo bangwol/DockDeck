@@ -6,6 +6,30 @@ import XCTest
 @testable import DockDeck
 
 final class PanelAppearanceTests: XCTestCase {
+    @MainActor
+    func testTerminalClipboardQueriesAreBlockedWhileCopyAndInputStillWork() {
+        for protected in [false, true] {
+            let terminal = TerminalView(frame: NSRect(x: 0, y: 0, width: 400, height: 200))
+            let copied = expectation(description: "OSC 52 copy: \(protected)")
+            let input = expectation(description: "Explicit input: \(protected)")
+            let delegate = ClipboardTestDelegate(copied: copied, input: input)
+            let guardDelegate = TerminalClipboardGuard(forwarding: delegate)
+            terminal.terminalDelegate = protected ? guardDelegate : delegate
+
+            withExtendedLifetime(guardDelegate) {
+                // Use fake clipboard data only; this test never touches NSPasteboard.general.
+                terminal.feed(text: "\u{1b}c\u{1b}]52;c;?\u{7}\u{1b}]52;;?\u{1b}\\")
+                terminal.feed(text: "\u{1b}]52;c;Y29waWVk\u{7}")
+                wait(for: [copied], timeout: 1)
+                XCTAssertEqual(delegate.readCount, protected ? 0 : 2)
+                XCTAssertEqual(delegate.copiedData, Data("copied".utf8))
+
+                terminal.send(txt: "explicit input")
+                wait(for: [input], timeout: 1)
+            }
+        }
+    }
+
     func testTerminalFontChangesKeepColumnsConsistentWithViewResize() {
         let size = NSSize(width: 400, height: 200)
         let terminal = LocalProcessTerminalView(frame: NSRect(origin: .zero, size: size))
@@ -1562,4 +1586,36 @@ private struct PanelFakeGitHubRepositoryListing: GitHubRepositoryListing {
     func listRepositories() throws -> [GitHubRepositoryOption] {
         repositories
     }
+}
+
+private final class ClipboardTestDelegate: TerminalViewDelegate {
+    let copied: XCTestExpectation
+    let input: XCTestExpectation
+    var readCount = 0
+    var copiedData: Data?
+
+    init(copied: XCTestExpectation, input: XCTestExpectation) {
+        self.copied = copied
+        self.input = input
+    }
+
+    func clipboardRead(source: TerminalView) -> Data? {
+        readCount += 1
+        return Data("fake clipboard secret".utf8)
+    }
+
+    func clipboardCopy(source: TerminalView, content: Data) {
+        copiedData = content
+        copied.fulfill()
+    }
+
+    func send(source: TerminalView, data: ArraySlice<UInt8>) {
+        if String(decoding: data, as: UTF8.self) == "explicit input" { input.fulfill() }
+    }
+
+    func sizeChanged(source: TerminalView, newCols: Int, newRows: Int) {}
+    func setTerminalTitle(source: TerminalView, title: String) {}
+    func hostCurrentDirectoryUpdate(source: TerminalView, directory: String?) {}
+    func scrolled(source: TerminalView, position: Double) {}
+    func rangeChanged(source: TerminalView, startY: Int, endY: Int) {}
 }

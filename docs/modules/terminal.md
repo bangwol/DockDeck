@@ -50,6 +50,10 @@ keys, Home/End, Delete, and F1–F12 continue through SwiftTerm's normal input
 handling. Option acts as Meta by default. Page Up and Page Down follow terminal
 scrolling behavior unless the running application requests cursor-key handling.
 
+Terminal output cannot read the Mac clipboard through OSC 52 queries. Use `⌘V`
+to explicitly paste clipboard contents into the session. OSC 52 copy requests
+and normal `⌘C`/`⌘V` behavior remain supported.
+
 ## Settings and local files
 
 Use **Settings → Terminal** to configure the focused size, font, and font size
