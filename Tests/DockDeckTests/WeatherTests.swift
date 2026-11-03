@@ -232,6 +232,89 @@ final class WeatherTests: XCTestCase {
         XCTAssertNil(store.nextRefreshAt)
     }
 
+    func testIntervalOnlyWeatherConfigurationKeepsSnapshotAndCadenceDeadline() throws {
+        let session = makeSession()
+        WeatherURLProtocol.handler = { _ in (200, self.forecastData()) }
+        let store = WeatherStore(
+            location: fixtureLocation(), refreshInterval: 900, session: session)
+        defer {
+            store.stop()
+            session.invalidateAndCancel()
+            WeatherURLProtocol.handler = nil
+        }
+        let loaded = expectation(description: "Initial forecast loaded")
+        let observation = store.$status.first(where: { $0 == .ready }).sink { _ in loaded.fulfill() }
+
+        store.start()
+        wait(for: [loaded], timeout: 1)
+        observation.cancel()
+        let snapshot = try XCTUnwrap(store.snapshot)
+        let firstDeadline = try XCTUnwrap(store.nextRefreshAt)
+
+        store.setRuntimeActivity(.background, lowPowerMode: true)
+        let constrainedDeadline = try XCTUnwrap(store.nextRefreshAt)
+        XCTAssertEqual(
+            constrainedDeadline.timeIntervalSince(firstDeadline), 2_700, accuracy: 0.001)
+
+        store.updateConfiguration(
+            location: fixtureLocation(), unit: .celsius, refreshInterval: 1_800)
+
+        XCTAssertEqual(store.status, .ready)
+        XCTAssertEqual(store.snapshot, snapshot)
+        XCTAssertEqual(
+            try XCTUnwrap(store.nextRefreshAt).timeIntervalSince(constrainedDeadline),
+            3_600, accuracy: 0.001)
+    }
+
+    func testIntervalOnlyWeatherConfigurationKeepsInFlightRequest() {
+        let session = makeSession()
+        let requestStarted = expectation(description: "Initial forecast request started")
+        let originalForecastLoaded = expectation(description: "Original forecast completed")
+        let requestGate = DispatchSemaphore(value: 0)
+        let requestLock = NSLock()
+        var requestCount = 0
+        let replacement = Data(
+            String(decoding: forecastData(), as: UTF8.self)
+                .replacingOccurrences(of: "21.2", with: "31.2").utf8)
+        WeatherURLProtocol.handler = { _ in
+            requestLock.lock()
+            requestCount += 1
+            let requestNumber = requestCount
+            requestLock.unlock()
+            if requestNumber == 1 {
+                requestStarted.fulfill()
+                _ = requestGate.wait(timeout: .now() + 2)
+                return (200, self.forecastData())
+            }
+            return (200, replacement)
+        }
+        let store = WeatherStore(
+            location: fixtureLocation(), refreshInterval: 900, session: session)
+        let observation = store.$snapshot.sink { snapshot in
+            if snapshot?.temperature == 21.2 { originalForecastLoaded.fulfill() }
+        }
+        defer {
+            requestGate.signal()
+            observation.cancel()
+            store.stop()
+            session.invalidateAndCancel()
+            WeatherURLProtocol.handler = nil
+        }
+
+        store.start()
+        wait(for: [requestStarted], timeout: 1)
+        store.updateConfiguration(
+            location: fixtureLocation(), unit: .celsius, refreshInterval: 1_800)
+        requestGate.signal()
+        wait(for: [originalForecastLoaded], timeout: 2)
+
+        XCTAssertEqual(store.snapshot?.temperature, 21.2)
+        requestLock.lock()
+        let finalRequestCount = requestCount
+        requestLock.unlock()
+        XCTAssertEqual(finalRequestCount, 1)
+    }
+
     func testRefreshFailureAndResumeKeepWeatherScheduled() throws {
         let session = makeSession()
         WeatherURLProtocol.handler = { _ in (200, self.forecastData()) }
