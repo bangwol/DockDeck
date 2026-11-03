@@ -225,6 +225,84 @@ struct TerminalShellSession {
     }
 }
 
+// SwiftTerm's local-process delegate reads the system clipboard for OSC 52 queries.
+// Keep its other callbacks intact; clipboard contents require an explicit user paste.
+final class TerminalClipboardGuard: TerminalViewDelegate {
+    private weak var forwarding: TerminalViewDelegate?
+
+    init(forwarding: TerminalViewDelegate) { self.forwarding = forwarding }
+
+    func clipboardRead(source: TerminalView) -> Data? { nil }
+
+    func clipboardCopy(source: TerminalView, content: Data) {
+        forwarding?.clipboardCopy(source: source, content: content)
+    }
+
+    func send(source: TerminalView, data: ArraySlice<UInt8>) {
+        forwarding?.send(source: source, data: data)
+    }
+
+    func sizeChanged(source: TerminalView, newCols: Int, newRows: Int) {
+        forwarding?.sizeChanged(source: source, newCols: newCols, newRows: newRows)
+    }
+
+    func setTerminalTitle(source: TerminalView, title: String) {
+        forwarding?.setTerminalTitle(source: source, title: title)
+    }
+
+    func hostCurrentDirectoryUpdate(source: TerminalView, directory: String?) {
+        forwarding?.hostCurrentDirectoryUpdate(source: source, directory: directory)
+    }
+
+    func scrolled(source: TerminalView, position: Double) {
+        forwarding?.scrolled(source: source, position: position)
+    }
+
+    func rangeChanged(source: TerminalView, startY: Int, endY: Int) {
+        forwarding?.rangeChanged(source: source, startY: startY, endY: endY)
+    }
+
+    func requestOpenLink(source: TerminalView, link: String, params: [String: String]) {
+        forwarding?.requestOpenLink(source: source, link: link, params: params)
+    }
+
+    func bell(source: TerminalView) { forwarding?.bell(source: source) }
+
+    func iTermContent(source: TerminalView, content: ArraySlice<UInt8>) {
+        forwarding?.iTermContent(source: source, content: content)
+    }
+
+    func programStatusChanged(source: TerminalView, records: [TerminalProgramStatus]) {
+        forwarding?.programStatusChanged(source: source, records: records)
+    }
+
+    func kittyClipboardCapabilities(source: TerminalView) -> KittyClipboardCapabilities {
+        forwarding?.kittyClipboardCapabilities(source: source) ?? []
+    }
+
+    func kittyClipboardAvailableMimeTypes(source: TerminalView, location: KittyClipboardLocation) -> [String]? {
+        forwarding?.kittyClipboardAvailableMimeTypes(source: source, location: location)
+    }
+
+    func kittyClipboardRead(
+        source: TerminalView, location: KittyClipboardLocation, mimeType: String
+    ) -> KittyClipboardReadResult? {
+        forwarding?.kittyClipboardRead(source: source, location: location, mimeType: mimeType)
+    }
+
+    func kittyClipboardWrite(
+        source: TerminalView, location: KittyClipboardLocation, content: KittyClipboardWriteContent
+    ) -> KittyClipboardWriteResult {
+        forwarding?.kittyClipboardWrite(source: source, location: location, content: content) ?? .unsupported
+    }
+
+    func kittyClipboardRequestPermission(
+        source: TerminalView, request: KittyClipboardPermissionRequest
+    ) -> KittyClipboardPermissionResult {
+        forwarding?.kittyClipboardRequestPermission(source: source, request: request) ?? .deny
+    }
+}
+
 final class TerminalPanelController: NSObject {
     let panel: KeyablePanel
     let terminalView: LocalProcessTerminalView
@@ -232,6 +310,7 @@ final class TerminalPanelController: NSObject {
     let menuButton: NSButton
 
     private let onShellEvent: (String) -> Void
+    private let clipboardGuard: TerminalClipboardGuard
     private let resizeHandleView: TerminalResizeHandleView
     private var restartPolicy = ShellRestartPolicy()
     private(set) var lastRestartReason = "Initial login shell"
@@ -251,6 +330,9 @@ final class TerminalPanelController: NSObject {
             menuAction: menuAction)
         panel = built.panel
         terminalView = built.terminal
+        clipboardGuard = MainActor.assumeIsolated {
+            TerminalClipboardGuard(forwarding: built.terminal)
+        }
         surfaceView = built.surfaceView
         menuButton = built.menuButton
         self.onShellEvent = onShellEvent
@@ -263,6 +345,7 @@ final class TerminalPanelController: NSObject {
         built.surfaceView.contentContainer.addSubview(resizeHandleView)
         self.resizeHandleView = resizeHandleView
         super.init()
+        terminalView.terminalDelegate = clipboardGuard
         terminalView.processDelegate = self
         applyAppearance(theme, presentation: .compact)
     }

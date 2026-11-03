@@ -8,7 +8,7 @@ ID-signed and notarized stable binary is not available yet.
 
 | Requirement | Used for |
 | --- | --- |
-| Xcode Command Line Tools with Swift 6.2 or later (Xcode 26 or later) | Building DockDeck and SwiftTerm |
+| Xcode 26.6 or later, or matching Command Line Tools with Swift 6.3 or later | Building DockDeck and SwiftTerm |
 | Accessibility permission | Precise Dock geometry and display tracking |
 | [Codex CLI](https://github.com/openai/codex), signed in | Codex Usage values |
 | [Claude Code](https://code.claude.com/docs/en/installation), signed in | Claude Usage values |
@@ -151,10 +151,11 @@ test that module with `./scripts/install.sh`, not `swift run DockDeck`.
 
 ## Development verification
 
-Regular CI uses macOS 15 with Xcode 26.3; its default Xcode 16.4 is too old for
-SwiftTerm 1.99.0. The app's minimum runtime remains macOS 13.
-Scheduled and manual CI runs check both macOS 26 and the `xcode-27` preview
-runner. Preview images change over time; consult each run's OS and Xcode versions
+Regular CI and preview packaging use macOS 26 with Xcode 26.6. SwiftTerm 1.99.2
+does not compile with the Swift 6.2 toolchain in Xcode 26.3. The app's minimum
+runtime remains macOS 13; newer build tools are needed only on the build machine.
+Scheduled and manual CI runs also check the `xcode-27` preview runner.
+Preview images change over time; consult each run's OS and Xcode versions
 and also verify the installed app's interactions on macOS 27.
 
 Use the native SwiftPM build system consistently for builds, tests, and packaging.

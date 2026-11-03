@@ -368,6 +368,10 @@ final class WeatherStore: ObservableObject {
             status = .idle
         }
         guard isRunning else { return }
+        guard contentChanged else {
+            scheduleTimer()
+            return
+        }
         generation += 1
         task?.cancel()
         task = nil

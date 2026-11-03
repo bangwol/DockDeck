@@ -67,6 +67,8 @@ doubles it again. Switching decks or auto-sliding changes the interval while
 keeping elapsed time since the last request, so repeated switches cannot keep
 postponing a refresh. Manual refreshes start a new interval. After display sleep
 or session inactivity, Weather requests fresh data when the module resumes.
+Changing only the configured refresh interval preserves the current forecast
+and any in-flight request, with the next check anchored to the last request.
 
 DockDeck stores the selected city and coordinates in local preferences. Search
 text and coordinates are sent over HTTPS only when searching or while the
