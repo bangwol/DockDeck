@@ -51,7 +51,8 @@ The [0.1.5 release candidate notes](docs/releases.md#015-preview-integration)
 describe the changes being prepared from current source.
 Apple silicon is the primary target; Intel compatibility remains in the
 universal preview. See the [architecture policy](docs/releases.md#architecture-support).
-For source installation, install Xcode Command Line Tools with Swift 6.2 or later, then run:
+For source installation, install Xcode 26.6 or later, or matching Command Line Tools
+with Swift 6.3 or later, then run:
 
 ```bash
 git clone https://github.com/bangwol/DockDeck.git
