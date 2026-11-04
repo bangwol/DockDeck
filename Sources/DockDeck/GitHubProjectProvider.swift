@@ -26,6 +26,7 @@ final class GitHubCLIRequestBroker {
         cacheDuration: TimeInterval = 0,
         timeout: TimeInterval = 8,
         maximumOutputBytes: Int = BoundedProcessRunner.defaultMaximumOutputBytes,
+        allowedExitStatuses: Set<Int32> = [0],
         cancellation: Progress? = nil
     ) throws -> Data {
         while gate.wait(timeout: .now() + 0.05) == .timedOut {
@@ -47,6 +48,7 @@ final class GitHubCLIRequestBroker {
                 environmentAdditions: environment,
                 timeout: timeout,
                 maximumOutputBytes: maximumOutputBytes,
+                allowedExitStatuses: allowedExitStatuses,
                 cancellation: cancellation)
         } catch BoundedProcessError.cancelled {
             throw BoundedProcessError.cancelled

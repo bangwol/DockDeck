@@ -94,16 +94,19 @@ struct GitHubInboxPanelView: View {
 
     private var baseColor: Color { Color(nsColor: theme.foregroundColor) }
 
-    private func helpText(_ snapshot: GitHubInboxSnapshot) -> String {
+    func helpText(_ snapshot: GitHubInboxSnapshot) -> String {
         var parts = [
             "\(snapshot.unreadCount) unread notifications",
             "\(snapshot.mentionCount) mentions",
             "\(snapshot.reviewRequestCount) review requests",
         ]
-        if let repository = snapshot.actionsRepository,
-            let failures = snapshot.failedRunsLastSevenDays
-        {
-            parts.append("\(failures) failed Actions runs in \(repository) over 7 days")
+        if let repository = snapshot.actionsRepository {
+            if let failures = snapshot.failedRunsLastSevenDays {
+                parts.append("\(failures) failed Actions runs in \(repository) over 7 days")
+            }
+            if let error = snapshot.actionsError {
+                parts.append("\(repository): \(error)")
+            }
         } else {
             parts.append("\(snapshot.ciNotificationCount) CI notifications")
         }
@@ -127,7 +130,7 @@ struct GitHubInboxDetailView: View {
     var body: some View {
         Group {
             if let snapshot = store.snapshot {
-                VStack(alignment: .leading, spacing: 9) {
+                VStack(alignment: .leading, spacing: snapshot.actionsError == nil ? 9 : 4) {
                     HStack(spacing: 7) {
                         summary("Unread", snapshot.unreadCount, color: .cyan)
                         summary("Mentions", snapshot.mentionCount, color: .mint)
@@ -138,6 +141,12 @@ struct GitHubInboxDetailView: View {
                                 ? snapshot.ciNotificationCount
                                 : snapshot.failedRunsLastSevenDays,
                             color: snapshot.actionsRepository == nil ? .purple : .red)
+                    }
+                    if let error = snapshot.actionsError {
+                        Label(error, systemImage: "exclamationmark.triangle")
+                            .font(.caption)
+                            .foregroundStyle(baseColor)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
                     HStack {
                         Picker("Repository", selection: $repository) {

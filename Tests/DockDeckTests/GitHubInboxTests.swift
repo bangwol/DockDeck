@@ -146,6 +146,125 @@ final class GitHubInboxTests: XCTestCase {
         XCTAssertEqual(count, 2)
     }
 
+    func testClientQueriesCompletedRunsAndReusesConditionalNotifications() throws {
+        let cli = try makeCLI(#"""
+            if [ "$1" = api ]; then
+                if [ -f fetched ]; then
+                    case "$*" in *'If-None-Match: "inbox"'*) ;; *) exit 2 ;; esac
+                    printf 'HTTP/2.0 304 Not Modified\r\nX-Poll-Interval: 90\r\n\r\n'
+                    exit 1
+                fi
+                touch fetched
+                printf 'HTTP/2.0 200 OK\r\nETag: "inbox"\r\nX-Poll-Interval: 90\r\n\r\n'
+                printf '[{"id":"1","reason":"mention","subject":{"title":"Keep this notification"},"repository":{"full_name":"owner/repo"}}]'
+            else
+                [ "$*" = 'run list --repo owner/repo --limit 100 --status completed --json conclusion,createdAt' ] || exit 2
+                printf '[{"conclusion":"failure","createdAt":"2026-09-02T00:00:00Z"},{"conclusion":"timed_out","createdAt":"2026-09-02T00:00:00Z"},{"conclusion":"startup_failure","createdAt":"2026-09-02T00:00:00Z"},{"conclusion":"action_required","createdAt":"2026-09-02T00:00:00Z"},{"conclusion":"success","createdAt":"2026-09-02T00:00:00Z"},{"conclusion":"failure","createdAt":"2026-08-01T00:00:00Z"}]'
+            fi
+            """#)
+        defer { try? FileManager.default.removeItem(at: cli.deletingLastPathComponent()) }
+        let client = GitHubInboxClient(broker: GitHubCLIRequestBroker(), executableLocator: { cli })
+        let now = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-09-03T00:00:00Z"))
+        for _ in 0..<2 {
+            let snapshot = try client.read(
+                configuration: GitHubInboxConfiguration(actionsRepository: "owner/repo"), now: now)
+            XCTAssertEqual(snapshot.unreadCount, 1)
+            XCTAssertEqual(snapshot.entries.first?.title, "Keep this notification")
+            XCTAssertEqual(snapshot.failedRunsLastSevenDays, 4)
+            XCTAssertNil(snapshot.actionsError)
+            XCTAssertEqual(client.minimumPollInterval, 90)
+        }
+    }
+
+    func testActionsFailuresKeepNotificationsAndExplainPartialFailure() throws {
+        for (command, message) in [
+            ("exit 1", "Actions check failed; check repository access and GitHub CLI sign-in"),
+            ("printf invalid", "Actions returned an invalid response"),
+            ("/bin/dd if=/dev/zero bs=1048576 count=2 2>/dev/null", "Actions response exceeded its size limit"),
+            ("/bin/sleep 9", "Actions check timed out"),
+        ] {
+            let cli = try makeCLI(#"""
+                if [ "$1" = api ]; then
+                    printf 'HTTP/2.0 200 OK\r\n\r\n[{"id":"1","reason":"mention","subject":{"title":"Notification survives"},"repository":{"full_name":"owner/repo"}}]'
+                else
+                """# + "\n" + command + "\nfi\n")
+            defer { try? FileManager.default.removeItem(at: cli.deletingLastPathComponent()) }
+            let client = GitHubInboxClient(broker: GitHubCLIRequestBroker(), executableLocator: { cli })
+            let snapshot = try client.read(
+                configuration: GitHubInboxConfiguration(actionsRepository: "owner/repo"), now: Date())
+            XCTAssertEqual(snapshot.unreadCount, 1)
+            XCTAssertEqual(snapshot.entries.first?.title, "Notification survives")
+            XCTAssertNil(snapshot.failedRunsLastSevenDays)
+            XCTAssertEqual(snapshot.actionsError, message)
+            let store = GitHubInboxStore(initialSnapshot: snapshot)
+            let view = GitHubInboxPanelView(store: store, theme: Theme.theme(id: ""))
+            XCTAssertTrue(view.helpText(snapshot).contains(message))
+            XCTAssertFalse(view.helpText(snapshot).contains("CI notifications"))
+        }
+    }
+
+    func testConditionalRequestWaitsForSharedBrokerAndCancelsWithoutLaunching() throws {
+        let cli = try makeCLI(#"""
+            if [ "$1" = hold ]; then
+                touch held
+                while [ ! -f release ]; do sleep 0.01; done
+            else
+                touch inbox-started
+                printf 'HTTP/2.0 200 OK\r\n\r\n[]'
+            fi
+            """#)
+        let directory = cli.deletingLastPathComponent()
+        let broker = GitHubCLIRequestBroker()
+        let holderFinished = expectation(description: "Shared request released")
+        DispatchQueue.global().async {
+            defer { holderFinished.fulfill() }
+            do {
+                _ = try broker.run(
+                    executableURL: cli, arguments: ["hold"], currentDirectoryURL: directory,
+                    environment: [:], timeout: 4)
+            } catch { XCTFail("Shared request failed: \(error)") }
+        }
+        defer {
+            try? Data().write(to: directory.appendingPathComponent("release"))
+            wait(for: [holderFinished], timeout: 5)
+            try? FileManager.default.removeItem(at: directory)
+        }
+        let deadline = Date().addingTimeInterval(2)
+        while !FileManager.default.fileExists(atPath: directory.appendingPathComponent("held").path),
+            Date() < deadline { Thread.sleep(forTimeInterval: 0.01) }
+        XCTAssertTrue(FileManager.default.fileExists(atPath: directory.appendingPathComponent("held").path))
+        let requested = expectation(description: "Inbox request queued")
+        let cancelled = expectation(description: "Queued inbox cancelled")
+        let cancellation = Progress(totalUnitCount: 1)
+        let client = GitHubInboxClient(broker: broker, executableLocator: {
+            requested.fulfill()
+            return cli
+        })
+        DispatchQueue.global().async {
+            defer { cancelled.fulfill() }
+            do {
+                _ = try client.read(configuration: .init(), now: Date(), cancellation: cancellation)
+                XCTFail("Queued request should be cancelled")
+            } catch { XCTAssertEqual(error as? BoundedProcessError, .cancelled) }
+        }
+        wait(for: [requested], timeout: 2)
+        Thread.sleep(forTimeInterval: 0.15)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: directory.appendingPathComponent("inbox-started").path))
+        cancellation.cancel()
+        wait(for: [cancelled], timeout: 2)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: directory.appendingPathComponent("inbox-started").path))
+    }
+
+    private func makeCLI(_ script: String) throws -> URL {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("DockDeckInbox-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let cli = directory.appendingPathComponent("gh")
+        try Data(("#!/bin/sh\nset -eu\ncd -- \"$(dirname \"$0\")\"\n" + script + "\n").utf8).write(to: cli)
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: cli.path)
+        return cli
+    }
+
     func testStoreRefreshesAndCompactPanelRenders() throws {
         let snapshot = GitHubInboxSnapshot(
             unreadCount: 12, mentionCount: 2, reviewRequestCount: 3,
