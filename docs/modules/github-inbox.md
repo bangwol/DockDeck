@@ -25,7 +25,8 @@ DockDeck never starts a GitHub login flow.
 | `CI` | CI-activity notifications when no Actions repository is selected |
 | `FAIL` | Failed, timed-out, startup-failed, or action-required runs during the previous seven days for the selected repository |
 
-The optional Actions query examines at most 100 failed runs, so `FAIL` can be a
+The optional Actions query examines the 100 most recent completed runs and counts
+the failure conclusions listed above within the seven-day window. `FAIL` can be a
 lower bound for unusually active repositories. The compact panel also shows one
 bounded message preview, prioritizing review requests, mentions, assignments,
 and CI activity before other notifications. Double-click the panel to see up to
@@ -66,6 +67,11 @@ is three times slower than the selected interval; macOS Low Power Mode adds anot
 two-times multiplier. `⌘R` requests an immediate refresh when the module is
 enabled. A failed refresh retains the last successful snapshot and exposes the
 error in panel help.
+
+If only the Actions query fails, unread notifications still update. `FAIL` shows
+`--`, and panel help, VoiceOver, and the detail window explain the Actions error.
+Timeouts, oversized output, and invalid responses have distinct messages; other
+command failures suggest checking repository access and GitHub CLI sign-in.
 
 The detail window filters up to 100 cached messages by repository and reason;
 Mentions includes team mentions. It initially displays 20 matching messages and

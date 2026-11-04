@@ -76,11 +76,13 @@ struct GitHubInboxSnapshot: Equatable {
     let actionsRepository: String?
     let entries: [GitHubInboxEntry]
     let observedAt: Date
+    let actionsError: String?
 
     init(
         unreadCount: Int, mentionCount: Int, reviewRequestCount: Int,
         ciNotificationCount: Int, failedRunsLastSevenDays: Int?,
-        actionsRepository: String?, entries: [GitHubInboxEntry] = [], observedAt: Date
+        actionsRepository: String?, entries: [GitHubInboxEntry] = [], observedAt: Date,
+        actionsError: String? = nil
     ) {
         self.unreadCount = max(unreadCount, 0)
         self.mentionCount = max(mentionCount, 0)
@@ -90,6 +92,7 @@ struct GitHubInboxSnapshot: Equatable {
         self.actionsRepository = actionsRepository
         self.entries = Array(entries.prefix(100))
         self.observedAt = observedAt
+        self.actionsError = actionsError
     }
 }
 
@@ -158,7 +161,8 @@ enum GitHubInboxParser {
     }
 
     static func parseNotifications(
-        _ data: Data, failedRuns: Int?, repository: String?, observedAt: Date
+        _ data: Data, failedRuns: Int?, repository: String?, observedAt: Date,
+        actionsError: String? = nil
     ) throws -> GitHubInboxSnapshot {
         let notifications: [Notification]
         if let flat = try? JSONDecoder().decode([Notification].self, from: data) {
@@ -201,7 +205,8 @@ enum GitHubInboxParser {
             failedRunsLastSevenDays: failedRuns,
             actionsRepository: repository,
             entries: entries,
-            observedAt: observedAt)
+            observedAt: observedAt,
+            actionsError: actionsError)
     }
 
     private static func priority(_ reason: String) -> Int {
@@ -252,6 +257,16 @@ final class GitHubInboxClient: GitHubInboxReading {
     private var validatorHeader: String?
     private var cachedNotifications: Data?
     private var storedMinimumPollInterval: TimeInterval = 0
+    private let broker: GitHubCLIRequestBroker
+    private let executableLocator: () -> URL?
+
+    init(
+        broker: GitHubCLIRequestBroker = .shared,
+        executableLocator: @escaping () -> URL? = { ProjectPulseBinaryLocator.githubCLI() }
+    ) {
+        self.broker = broker
+        self.executableLocator = executableLocator
+    }
 
     var minimumPollInterval: TimeInterval {
         lock.withLock { storedMinimumPollInterval }
@@ -260,7 +275,7 @@ final class GitHubInboxClient: GitHubInboxReading {
     func read(
         configuration: GitHubInboxConfiguration, now: Date, cancellation: Progress? = nil
     ) throws -> GitHubInboxSnapshot {
-        guard let gh = ProjectPulseBinaryLocator.githubCLI() else {
+        guard let gh = executableLocator() else {
             throw GitHubInboxError.cliUnavailable
         }
         let probe: GitHubIncludedResponse
@@ -272,11 +287,11 @@ final class GitHubInboxClient: GitHubInboxReading {
             if let validatorHeader = lock.withLock({ validatorHeader }) {
                 arguments.append(contentsOf: ["-H", validatorHeader])
             }
-            let output = try BoundedProcessRunner.run(
+            let output = try broker.run(
                 executableURL: gh,
                 arguments: arguments,
                 currentDirectoryURL: FileManager.default.homeDirectoryForCurrentUser,
-                environmentAdditions: Self.environment,
+                environment: Self.environment,
                 allowedExitStatuses: [0, 1], cancellation: cancellation)
             probe = try GitHubIncludedResponseParser.parse(output)
         } catch BoundedProcessError.cancelled {
@@ -294,7 +309,7 @@ final class GitHubInboxClient: GitHubInboxReading {
             cachesNotifications = true
             if probe.headers["link"]?.contains("rel=\"next\"") == true {
                 do {
-                    notifications = try GitHubCLIRequestBroker.shared.run(
+                    notifications = try broker.run(
                         executableURL: gh,
                         arguments: [
                             "api", "--paginate", "--slurp", "-X", "GET", "notifications",
@@ -326,14 +341,26 @@ final class GitHubInboxClient: GitHubInboxReading {
         }
 
         let repository = configuration.normalized().actionsRepository
-        let failedRuns: Int?
+        var failedRuns: Int?
+        var actionsError: String?
         if let repository {
-            failedRuns = readFailedRuns(gh: gh, repository: repository, now: now, cancellation: cancellation)
-        } else {
-            failedRuns = nil
+            do {
+                failedRuns = try readFailedRuns(gh: gh, repository: repository, now: now, cancellation: cancellation)
+            } catch BoundedProcessError.cancelled {
+                throw BoundedProcessError.cancelled
+            } catch ProjectPulseError.commandTimedOut {
+                actionsError = "Actions check timed out"
+            } catch ProjectPulseError.outputTooLarge {
+                actionsError = "Actions response exceeded its size limit"
+            } catch GitHubInboxError.invalidOutput {
+                actionsError = "Actions returned an invalid response"
+            } catch {
+                actionsError = "Actions check failed; check repository access and GitHub CLI sign-in"
+            }
         }
         let snapshot = try GitHubInboxParser.parseNotifications(
-            notifications, failedRuns: failedRuns, repository: repository, observedAt: now)
+            notifications, failedRuns: failedRuns, repository: repository, observedAt: now,
+            actionsError: actionsError)
         if cancellation?.isCancelled == true { throw BoundedProcessError.cancelled }
         if cachesNotifications {
             lock.withLock {
@@ -371,22 +398,18 @@ final class GitHubInboxClient: GitHubInboxReading {
         return value
     }
 
-    private func readFailedRuns(gh: URL, repository: String, now: Date, cancellation: Progress?) -> Int? {
-        do {
-            let output = try GitHubCLIRequestBroker.shared.run(
-                executableURL: gh,
-                arguments: [
-                    "run", "list", "--repo", repository, "--limit", "100",
-                    "--status", "failure", "--json", "conclusion,createdAt",
-                ],
-                currentDirectoryURL: FileManager.default.homeDirectoryForCurrentUser,
-                environment: Self.environment,
-                cacheKey: "failed-runs:\(repository)", cacheDuration: 30, cancellation: cancellation)
-            return try GitHubInboxParser.parseFailedRuns(
-                output, since: now.addingTimeInterval(-7 * 24 * 60 * 60))
-        } catch {
-            return nil
-        }
+    private func readFailedRuns(gh: URL, repository: String, now: Date, cancellation: Progress?) throws -> Int {
+        let output = try broker.run(
+            executableURL: gh,
+            arguments: [
+                "run", "list", "--repo", repository, "--limit", "100",
+                "--status", "completed", "--json", "conclusion,createdAt",
+            ],
+            currentDirectoryURL: FileManager.default.homeDirectoryForCurrentUser,
+            environment: Self.environment,
+            cacheKey: "failed-runs:\(repository)", cacheDuration: 30, cancellation: cancellation)
+        return try GitHubInboxParser.parseFailedRuns(
+            output, since: now.addingTimeInterval(-7 * 24 * 60 * 60))
     }
 }
 
