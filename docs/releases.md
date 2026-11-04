@@ -4,9 +4,40 @@ DockDeck is a pre-1.0 project. Public binaries are technical previews until a
 Developer ID-signed and notarized build is available. The root `VERSION` file is
 the single source of truth for the app's three-part version.
 
+## 0.1.6 preview integration
+
+This preview collects the fixes merged since `v0.1.5-preview.1`, including
+[#47](https://github.com/bangwol/DockDeck/pull/47),
+[#52](https://github.com/bangwol/DockDeck/pull/52), and
+[#53](https://github.com/bangwol/DockDeck/pull/53).
+
+- Quick Actions and Startup open in the requested Settings pane and remain
+  selected when Settings reopens.
+- GitHub Inbox counts failure, timeout, startup-failure, and action-required
+  conclusions among the 100 most recent completed Actions runs within seven
+  days. Conditional notification requests use the shared serialized broker.
+  Actions errors remain visible while refreshed notifications are retained.
+- Terminal output cannot read the Mac clipboard through OSC 52. Explicit paste
+  and terminal copy remain supported.
+- Weather preserves its forecast and in-flight request when only the refresh
+  interval changes.
+- Queued Claude Usage probes are cancelled before launch when monitoring stops,
+  the system sleeps, Claude is disabled, or the watchdog expires. All-day
+  Reminders use local calendar days, including daylight saving transitions.
+
+SwiftTerm is updated to `1.99.2`. Source builds require Xcode 26.6 or later, or
+matching Command Line Tools with Swift 6.3 or later. Tests, Swift CodeQL, and
+preview packaging use Xcode 26.6. The app still supports macOS 13 or later and
+includes native Apple silicon and Intel binaries.
+
+The public preview tag is `v0.1.6-preview.1`. See the
+[GitHub Release](https://github.com/bangwol/DockDeck/releases/tag/v0.1.6-preview.1)
+for `DockDeck-0.1.6-macos-universal-unsigned.zip`, its checksum, and the changes
+since the previous public preview. The app remains ad-hoc signed and unnotarized.
+
 ## 0.1.5 preview integration
 
-This release candidate collects the changes merged since `v0.1.4-preview.2`:
+The 0.1.5 preview collected the changes merged since `v0.1.4-preview.2`:
 [#36](https://github.com/bangwol/DockDeck/pull/36),
 [#41](https://github.com/bangwol/DockDeck/pull/41),
 [#43](https://github.com/bangwol/DockDeck/pull/43), and
@@ -28,18 +59,17 @@ This release candidate collects the changes merged since `v0.1.4-preview.2`:
   process-lifecycle integration are updated, alongside macOS 27 menu and
   Quick Actions icon compatibility fixes.
 
-The app still targets macOS 13 or later and retains universal Apple silicon and
-Intel binaries. Source builds now require Swift 6.2 or later (Xcode 26 or later).
-Regular tests, Swift CodeQL, and preview packaging select Xcode 26.3. CodeQL
-steps use the same `4.38.3` version and are grouped for future Dependabot updates;
-artifact uploads use `actions/upload-artifact` `7.0.2`.
+The 0.1.5 app targets macOS 13 or later and retains universal Apple silicon and
+Intel binaries. Its source builds require Swift 6.2 or later (Xcode 26 or later).
+Tests, Swift CodeQL, and preview packaging used Xcode 26.3. CodeQL steps used
+version `4.38.3` and were grouped for Dependabot updates; artifact uploads used
+`actions/upload-artifact` `7.0.2`.
 Universal packaging checks each required architecture separately for compatibility
 with Xcode 27's `lipo`.
 
-The candidate package is `DockDeck-0.1.5-macos-universal-unsigned.zip` with a
-matching `.sha256` file. It remains ad-hoc signed and unnotarized. This integration
-does not create a tag or publish a GitHub Release; the latest published download
-remains the [0.1.4 preview](https://github.com/bangwol/DockDeck/releases/tag/v0.1.4-preview.2).
+The published package is `DockDeck-0.1.5-macos-universal-unsigned.zip` with a
+matching `.sha256` file. It remains ad-hoc signed and unnotarized. The public tag
+is [v0.1.5-preview.1](https://github.com/bangwol/DockDeck/releases/tag/v0.1.5-preview.1).
 
 ## 0.1.4 preview integration
 
