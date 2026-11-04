@@ -34,10 +34,10 @@ final class SettingsPanelModel: ObservableObject {
 
         let modulePanes = Self.moduleDefinitions(in: values.deckConfiguration)
             .compactMap(\.settingsPane)
-        self.selectedPane = modulePanes.contains(selectedPane)
-            || selectedPane == .decks || selectedPane == .notifications
-            || selectedPane == .diagnostics
-            || selectedPane == .appearance
+        let availablePanes = modulePanes + [
+            .decks, .quickActions, .startup, .notifications, .diagnostics, .appearance,
+        ]
+        self.selectedPane = availablePanes.contains(selectedPane)
             ? selectedPane : .decks
     }
 

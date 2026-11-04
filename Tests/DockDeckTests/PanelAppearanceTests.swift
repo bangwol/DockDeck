@@ -80,6 +80,18 @@ final class PanelAppearanceTests: XCTestCase {
         XCTAssertFalse(model.customTileConfiguration.isConfigured)
     }
 
+    func testInitialSettingsPanePreservesEveryAvailablePane() {
+        let values = makeSettingsValues(
+            configuration: .legacy(order: .terminalLeft, enabledPanels: .all))
+
+        for pane in SettingsPaneID.allCases {
+            let model = SettingsPanelModel(
+                selectedPane: pane, values: values, fontNames: ["Menlo"])
+
+            XCTAssertEqual(model.selectedPane, pane, "Initial pane: \(pane)")
+        }
+    }
+
     func testEnabledPanelsKeepsSingleSelectionsAndRecoversEmptyState() {
         XCTAssertEqual(EnabledPanels.resolved(.terminal), .terminal)
         XCTAssertEqual(EnabledPanels.resolved(.usage), .usage)
