@@ -5,6 +5,32 @@ import XCTest
 @testable import DockDeck
 
 final class ModuleGalleryTests: XCTestCase {
+    func testRenderFoldedDeckGallery() throws {
+        guard let outputPath = ProcessInfo.processInfo.environment["DOCKDECK_UI_GALLERY_DIR"],
+            !outputPath.isEmpty
+        else { throw XCTSkip("Set DOCKDECK_UI_GALLERY_DIR to render the gallery") }
+        let outputURL = URL(fileURLWithPath: outputPath, isDirectory: true)
+        try FileManager.default.createDirectory(at: outputURL, withIntermediateDirectories: true)
+        let services = makeServices()
+        for (themeName, theme) in [("dark", Theme.theme(id: "")), ("light", Theme.theme(id: "github-light"))] {
+            for module: PanelModuleID in [.terminal, .usage] {
+                for mode in [DockPanelMode.capsule, .tab] {
+                    let presentation = ReadOnlyDeckPresentation(activeModule: module, theme: theme)
+                    presentation.setSpaceMode(mode)
+                    presentation.setFoldedSummary(.make(module: module, services: services))
+                    let size = NSSize(width: mode.minimumWidth, height: mode == .capsule ? 36 : 48)
+                    try render(
+                        ReadOnlyDeckPanelView(
+                            services: services, presentation: presentation,
+                            side: module == .terminal ? .left : .right)
+                            .background(Color(nsColor: theme.panelTintColor)),
+                        size: size, dark: theme.isDark,
+                        to: outputURL.appendingPathComponent("\(themeName)-\(module.rawValue)-\(mode).png"))
+                }
+            }
+        }
+    }
+
     func testRenderModuleGallery() throws {
         guard let outputPath = ProcessInfo.processInfo.environment[
             "DOCKDECK_UI_GALLERY_DIR"],

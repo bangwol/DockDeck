@@ -7,9 +7,12 @@ final class DockCoordinator {
 
     private let logger: (String, String) -> Void
     private var cachedHostScreenID: CGDirectDisplayID?
+    private var layoutHostScreenID: CGDirectDisplayID?
+    private var previousFrames: DockPanelFrames?
 
     private(set) var orientation = "bottom"
     private(set) var autoHides = false
+    private(set) var magnifies = false
 
     init(logger: @escaping (String, String) -> Void) {
         self.logger = logger
@@ -20,6 +23,8 @@ final class DockCoordinator {
     func refresh() {
         orientation = dockOrientation()
         autoHides = dockAutoHides()
+        magnifies = (CFPreferencesCopyAppValue(
+            "magnification" as CFString, Self.dockPreferencesDomain) as? Bool) ?? false
         let host =
             autoHides
             ? dockWindowHostScreen()
@@ -58,8 +63,15 @@ final class DockCoordinator {
     func frames(for presence: DockPresence) -> DockPanelFrames {
         switch presence {
         case .revealed(let tray, let host):
-            return DockPanelLayout.frames(tray: tray, hostFrame: host.frame)
+            let hostID = displayID(of: host)
+            let frames = DockPanelLayout.frames(
+                tray: tray, hostFrame: host.frame,
+                previous: layoutHostScreenID == hostID ? previousFrames : nil)
+            layoutHostScreenID = hostID
+            previousFrames = frames
+            return frames
         case .concealed(let host), .untracked(let host):
+            previousFrames = nil
             return fallbackFrames(on: host)
         }
     }

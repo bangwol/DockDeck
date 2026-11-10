@@ -1417,6 +1417,113 @@ final class PanelAppearanceTests: XCTestCase {
         XCTAssertTrue(app.trackingTimer?.isValid == true)
     }
 
+    func testFoldedTerminalUsesProxyWithoutResizingOrStoppingSession() {
+        let previousConfiguration = PanelSettings.deckConfiguration
+        let previousLeft = PanelSettings.activeModule(on: .left)
+        let previousRight = PanelSettings.activeModule(on: .right)
+        PanelSettings.deckConfiguration = .legacy(order: .terminalLeft, enabledPanels: .all)
+        PanelSettings.setActiveModule(.terminal, on: .left)
+        PanelSettings.setActiveModule(.usage, on: .right)
+        let app = makeWindowPolicyDelegate()
+        let originalFrame = app.panel.frame
+        let originalColumns = app.terminalView.terminalDimensions.cols
+        app.collapsedFrame = originalFrame
+        var starts = 0
+        var stops = 0
+        app.moduleRuntimeCoordinator.register(
+            .terminal, start: { starts += 1 }, stop: { stops += 1 }, suspendsWhenInactive: false)
+        defer {
+            app.trackingTimer?.invalidate()
+            app.deckAutoSlideTimer?.invalidate()
+            for window in [app.panel] + app.readOnlyDeckPanels { window.orderOut(nil) }
+            PanelSettings.deckConfiguration = previousConfiguration
+            PanelSettings.setActiveModule(previousLeft, on: .left)
+            PanelSettings.setActiveModule(previousRight, on: .right)
+        }
+        app.synchronizeModuleRuntimes()
+        let folded = DockPanelFrames(
+            terminal: NSRect(x: -10_000, y: -10_000, width: 28, height: 48),
+            quota: NSRect(x: -9_500, y: -10_000, width: 84, height: 36),
+            leftMode: .tab, rightMode: .capsule)
+        app.showPanels(in: folded, terminalTarget: originalFrame)
+
+        XCTAssertFalse(app.panel.isVisible)
+        XCTAssertTrue(app.leftReadOnlyDeckPanelController.panel.isVisible)
+        XCTAssertEqual(app.leftReadOnlyDeckPanelController.activeModule, .terminal)
+        XCTAssertEqual(app.leftReadOnlyDeckPanelController.spaceMode, .tab)
+        XCTAssertEqual(app.panel.frame, originalFrame)
+        XCTAssertEqual(app.collapsedFrame, originalFrame)
+        XCTAssertEqual(app.terminalView.terminalDimensions.cols, originalColumns)
+        XCTAssertEqual(app.moduleRuntimeCoordinator.state(for: .terminal), .background)
+        XCTAssertEqual(starts, 1)
+        XCTAssertEqual(stops, 0)
+        XCTAssertFalse(app.blocksAutoSlideInteraction(on: .left))
+        let menu = NSMenu()
+        app.leftReadOnlyDeckPanelController.menuWillOpen(menu)
+        XCTAssertTrue(app.blocksAutoSlideInteraction(on: .left))
+        app.leftReadOnlyDeckPanelController.menuDidClose(menu)
+        XCTAssertFalse(app.blocksAutoSlideInteraction(on: .left))
+
+        app.terminalPanelMode = .focused
+        app.showPanels(in: folded, terminalTarget: originalFrame)
+        XCTAssertTrue(app.panel.isVisible)
+        XCTAssertFalse(app.leftReadOnlyDeckPanelController.panel.isVisible)
+
+        app.terminalPanelMode = .docked
+        app.showPanels(in: DockPanelFrames(terminal: originalFrame, quota: nil))
+        XCTAssertTrue(app.panel.isVisible)
+        XCTAssertFalse(app.leftReadOnlyDeckPanelController.panel.isVisible)
+        XCTAssertEqual(stops, 0)
+    }
+
+    func testFoldedTerminalDetailRoutesToTerminalInsteadOfEmptyDetailWindow() {
+        let previousConfiguration = PanelSettings.deckConfiguration
+        let previousLeft = PanelSettings.activeModule(on: .left)
+        PanelSettings.deckConfiguration = .legacy(order: .terminalLeft, enabledPanels: .all)
+        PanelSettings.setActiveModule(.terminal, on: .left)
+        defer {
+            PanelSettings.deckConfiguration = previousConfiguration
+            PanelSettings.setActiveModule(previousLeft, on: .left)
+        }
+        var openedSide: PanelSide?
+        let controller = ReadOnlyDeckPanelController(
+            initialFrame: NSRect(x: -10_000, y: -10_000, width: 28, height: 48),
+            theme: Theme.theme(id: ""), services: PanelModuleServices(),
+            menuTarget: NSObject(), side: .left,
+            onOpenFolded: { openedSide = $0 })
+        controller.setSpaceMode(.tab)
+        controller.synchronizeActiveModule()
+        controller.showDetail()
+        XCTAssertEqual(openedSide, .left)
+        XCTAssertNil(controller.detailWindowForTesting)
+    }
+
+    func testFocusedTerminalStaysVisibleWhenEvenEdgeTabCannotFit() throws {
+        let host = try XCTUnwrap(NSScreen.screens.first)
+        let previousConfiguration = PanelSettings.deckConfiguration
+        let previousLeft = PanelSettings.activeModule(on: .left)
+        PanelSettings.deckConfiguration = .legacy(order: .terminalLeft, enabledPanels: .all)
+        PanelSettings.setActiveModule(.terminal, on: .left)
+        let app = makeWindowPolicyDelegate()
+        app.collapsedFrame = app.panel.frame
+        app.terminalPanelMode = .focused
+        defer {
+            app.trackingTimer?.invalidate()
+            app.deckAutoSlideTimer?.invalidate()
+            for window in [app.panel] + app.readOnlyDeckPanels { window.orderOut(nil) }
+            PanelSettings.deckConfiguration = previousConfiguration
+            PanelSettings.setActiveModule(previousLeft, on: .left)
+        }
+        let presence = DockPresence.revealed(tray: host.frame, host: host)
+        let frames = app.collapsedFrames(for: presence)
+        XCTAssertNil(frames.terminal)
+        let target = try XCTUnwrap(app.terminalFrame(for: presence))
+        XCTAssertGreaterThanOrEqual(target.width, DockPanelLayout.minimumPanelWidth)
+        XCTAssertTrue(host.frame.contains(target))
+        app.showPanels(in: frames, terminalTarget: target.offsetBy(dx: -10_000, dy: -10_000))
+        XCTAssertTrue(app.panel.isVisible)
+    }
+
     private func makeWindowPolicyDelegate() -> AppDelegate {
         let app = AppDelegate()
         app.usageDisplayAwake = false

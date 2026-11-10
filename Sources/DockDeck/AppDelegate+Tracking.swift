@@ -1,6 +1,17 @@
 import ApplicationServices
 import Cocoa
 
+enum DockHoverTracking {
+    static let height: CGFloat = 180
+    static let settlingTime: TimeInterval = 0.6
+
+    static func isNearDock(pointer: NSPoint, screens: [NSRect]) -> Bool {
+        screens.contains {
+            $0.contains(pointer) && pointer.y < $0.minY + height
+        }
+    }
+}
+
 extension AppDelegate {
     static let dockTrackingInterval: TimeInterval = 3.0
     static let fastTrackingInterval: TimeInterval = 0.10
@@ -18,16 +29,27 @@ extension AppDelegate {
             return
         }
 
-        if !dockCoordinator.autoHides || tickCount % Self.coarseTickRatio == 0 {
+        if (!dockCoordinator.autoHides && !dockCoordinator.magnifies)
+            || tickCount % Self.coarseTickRatio == 0
+        {
             refreshCoarseCaches()
             startTrackingTimer()
             runEvaluation()
             return
         }
 
-        guard dockCoordinator.autoHides, !lastPresenceUntracked else { return }
-        guard !isHeld else { return }
-        guard isArmed() else { return }
+        guard !lastPresenceUntracked else { return }
+        if dockCoordinator.autoHides {
+            guard !isHeld, isArmed() else { return }
+        } else {
+            let now = ProcessInfo.processInfo.systemUptime
+            if DockHoverTracking.isNearDock(
+                pointer: NSEvent.mouseLocation, screens: NSScreen.screens.map(\.frame))
+            {
+                dockHoverTrackingUntil = now + DockHoverTracking.settlingTime
+            }
+            guard now < dockHoverTrackingUntil else { return }
+        }
 
         runEvaluation()
     }
@@ -53,7 +75,8 @@ extension AppDelegate {
             interval = Self.untrustedTrackingInterval
         } else {
             interval =
-                dockCoordinator.autoHides ? Self.fastTrackingInterval : Self.dockTrackingInterval
+                dockCoordinator.autoHides || dockCoordinator.magnifies
+                ? Self.fastTrackingInterval : Self.dockTrackingInterval
         }
         guard trackingTimer == nil || trackingTimer.timeInterval != interval else { return }
 
@@ -61,7 +84,7 @@ extension AppDelegate {
         let timer = Timer(timeInterval: interval, repeats: true) { [weak self] _ in
             self?.tick()
         }
-        // Coarse polling can drift; the 0.1 s auto-hide tracker stays exact for responsiveness.
+        // Fast ticks only sample Dock geometry near the Dock (or while auto-hiding).
         timer.tolerance = interval >= 1 ? interval * 0.1 : 0
         RunLoop.main.add(timer, forMode: .common)
         trackingTimer = timer
@@ -181,7 +204,8 @@ extension AppDelegate {
         let terminalActive = configuration.contains(.terminal)
             && PanelSettings.activeModule(on: terminalSide) == .terminal
         let terminalFrame = terminalTarget ?? frames.frame(on: terminalSide)
-        if terminalActive, let terminalFrame {
+        let foldsTerminal = terminalPanelMode == .docked && frames.mode(on: terminalSide) != .full
+        if terminalActive, let terminalFrame, !foldsTerminal {
             showTerminal(terminalFrame, animated: terminalAnimated)
         } else {
             if panel.isVisible {
@@ -190,12 +214,19 @@ extension AppDelegate {
                 debugLog("visibility", "hiding terminal; \(reason)")
                 panel.orderOut(nil)
             }
+            // Proxy geometry never resizes the terminal or its PTY. Retain a full-width anchor.
+            if terminalActive, foldsTerminal, let terminalTarget {
+                applyFrame(terminalTarget)
+            }
         }
 
         for side in PanelSide.allCases {
             let activeModule = PanelSettings.activeModule(on: side)
-            if let activeModule, activeModule != .terminal, let frame = frames.frame(on: side) {
-                showReadOnlyDeck(on: side, frame: frame)
+            let mode = frames.mode(on: side)
+            if let activeModule, let frame = frames.frame(on: side),
+                activeModule != .terminal || (foldsTerminal && side == terminalSide)
+            {
+                showReadOnlyDeck(on: side, frame: frame, mode: mode)
             } else {
                 let reason = activeModule == nil
                     ? "no enabled module in deck"
@@ -220,21 +251,22 @@ extension AppDelegate {
         applyFrame(frame, animated: animated)
     }
 
-    func showReadOnlyDeck(on side: PanelSide, frame: NSRect) {
+    func showReadOnlyDeck(on side: PanelSide, frame: NSRect, mode: DockPanelMode = .full) {
         guard !hidePanelsForPresentationIfNeeded() else { return }
         let controller = readOnlyDeckPanelController(on: side)
         guard let activeModule = PanelSettings.activeModule(on: side),
-            activeModule != .terminal
+            activeModule != .terminal || mode != .full
         else {
             hideReadOnlyDeck(on: side, reason: "no read-only module is active")
             return
         }
+        controller.setSpaceMode(mode)
         controller.synchronizeActiveModule()
+        applyReadOnlyDeckFrame(frame, on: side)
         if !controller.panel.isVisible {
             controller.panel.orderBack(nil)
             synchronizeModuleRuntimes()
         }
-        applyReadOnlyDeckFrame(frame, on: side)
     }
 
     func hideReadOnlyDeck(
@@ -316,8 +348,7 @@ extension AppDelegate {
         guard let presence else {
             return NSRect(x: 0, y: 0, width: Self.fallbackWidth, height: Self.fallbackHeight)
         }
-        let side = PanelSettings.deckConfiguration.side(containing: .terminal) ?? .left
-        return collapsedFrames(for: presence).frame(on: side)
+        return terminalFrame(for: presence)
     }
 
     func expansionScreen(fallingBackTo host: NSScreen?) -> NSScreen? {
