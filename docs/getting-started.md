@@ -116,6 +116,20 @@ Ordinary Dock auto-hide still follows the Dock. Settings uses a normal window
 level and stays in its own desktop Space. The theme picker opens above the deck
 and closes when full-screen or presentation mode starts.
 
+As Dock magnification leaves less room, each side independently folds from a full
+panel (at least 160 pt) to an 84 pt status capsule, then a 28 pt edge tab. If a tab
+cannot fit beside the Dock, it moves just above the Dock at the screen edge.
+Panels expand automatically when enough space returns, with 12 pt of extra room
+to avoid flickering at a boundary. Click a capsule or tab to open the module's
+detail window, or to focus Terminal. A folded terminal keeps its session and
+normal terminal dimensions. Hover a capsule to identify its displayed metric;
+Usage shows the first enabled provider's first limit and the configured
+used/remaining display mode. Unavailable usage data is shown as `--`.
+
+With magnification enabled, DockDeck follows geometry every 0.1 seconds while
+the pointer is near the bottom edge, and briefly after it leaves. Away from the
+Dock, geometry reads retain the ordinary 3-second cadence.
+
 | Action | Result |
 | --- | --- |
 | Scroll over a compact Deck | Select the previous or next enabled module |

@@ -214,8 +214,11 @@ extension AppDelegate {
         return true
     }
 
-    private func blocksAutoSlideInteraction(on side: PanelSide) -> Bool {
-        guard PanelSettings.activeModule(on: side) == .terminal else {
+    func blocksAutoSlideInteraction(on side: PanelSide) -> Bool {
+        let controller = readOnlyDeckPanelController(on: side)
+        guard PanelSettings.activeModule(on: side) == .terminal,
+            !(controller.panel.isVisible && controller.spaceMode != .full)
+        else {
             return readOnlyDeckPanelController(on: side).blocksAutoSlideInteraction
         }
         return TerminalAutoSlidePolicy.blocksAdvance(

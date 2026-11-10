@@ -135,6 +135,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     var lastPresenceUntracked = true
     var tickCount = 0
+    var dockHoverTrackingUntil: TimeInterval = 0
     var lastDebugLine: [String: String] = [:]
     var usageDisplayAwake = true
     var usageSessionActive = true
@@ -150,7 +151,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         refreshCoarseCaches()
         let initialPresence = resolveDockPresence()
-        let fallbackScreen = mainDisplayScreen() ?? NSScreen.screens.first
+        let fallbackScreen = initialPresence?.host ?? mainDisplayScreen() ?? NSScreen.screens.first
         let fallbackFrames = fallbackScreen.map {
             dockCoordinator.fallbackFrames(on: $0)
         }
@@ -163,7 +164,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 quota: nil)
         let terminalSide = PanelSettings.deckConfiguration.side(containing: .terminal) ?? .left
         let initialTerminalFrame =
-            initialFrames.frame(on: terminalSide)
+            (initialFrames.mode(on: terminalSide) == .full ? initialFrames.frame(on: terminalSide) : nil)
+            ?? fallbackFrames?.frame(on: terminalSide)
             ?? NSRect(x: 0, y: 0, width: Self.fallbackWidth, height: Self.fallbackHeight)
         let initialLeftFrame =
             initialFrames.frame(on: .left)
@@ -175,7 +177,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 y: initialTerminalFrame.minY,
                 width: DockPanelLayout.fallbackPanelWidth,
                 height: initialTerminalFrame.height)
-        collapsedFrame = initialFrames.frame(on: terminalSide)
+        collapsedFrame = initialTerminalFrame
         lastPresenceUntracked = initialPresence?.isUntracked ?? true
 
         terminalPanelController = TerminalPanelController(
@@ -202,6 +204,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             },
             onAutoSlideStateChange: { [weak self] in
                 self?.synchronizeModuleRuntimes()
+            },
+            onOpenFolded: { [weak self] side in
+                self?.openFoldedDeck(on: side)
             })
         rightReadOnlyDeckPanelController = ReadOnlyDeckPanelController(
             initialFrame: initialRightFrame,
@@ -214,6 +219,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             },
             onAutoSlideStateChange: { [weak self] in
                 self?.synchronizeModuleRuntimes()
+            },
+            onOpenFolded: { [weak self] side in
+                self?.openFoldedDeck(on: side)
             })
         panel.delegate = self
         configureNotifications()

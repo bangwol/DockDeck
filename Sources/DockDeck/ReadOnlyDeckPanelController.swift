@@ -35,11 +35,13 @@ final class ReadOnlyDeckPanelController:
     private weak var menuTarget: AnyObject?
     private let onSelectionChange: (PanelSide) -> Void
     private let onAutoSlideStateChange: () -> Void
+    private let onOpenFolded: (PanelSide) -> Void
     private var lastScrollSelectionTime: TimeInterval = 0
     private var lastUsageRefreshClickTime: TimeInterval?
     private var appliedModule: PanelModuleID?
     private var detailPanel: NSPanel?
     private var isMenuOpen = false
+    private var deckClickRecognizers: [NSClickGestureRecognizer] = []
 
     init(
         initialFrame: NSRect,
@@ -48,13 +50,15 @@ final class ReadOnlyDeckPanelController:
         menuTarget: AnyObject,
         side: PanelSide = .right,
         onSelectionChange: @escaping (PanelSide) -> Void = { _ in },
-        onAutoSlideStateChange: @escaping () -> Void = {}
+        onAutoSlideStateChange: @escaping () -> Void = {},
+        onOpenFolded: @escaping (PanelSide) -> Void = { _ in }
     ) {
         self.services = services
         self.menuTarget = menuTarget
         self.side = side
         self.onSelectionChange = onSelectionChange
         self.onAutoSlideStateChange = onAutoSlideStateChange
+        self.onOpenFolded = onOpenFolded
         let presentation = ReadOnlyDeckPresentation(
             activeModule: PanelSettings.activeModule(on: side), theme: theme)
         self.presentation = presentation
@@ -81,7 +85,9 @@ final class ReadOnlyDeckPanelController:
         let hostingView = NSHostingView(
             rootView: ReadOnlyDeckPanelView(
                 services: services,
-                presentation: presentation))
+                presentation: presentation,
+                side: side,
+                onOpenFolded: { onOpenFolded(side) }))
         hostingView.frame = surfaceView.bounds
         hostingView.autoresizingMask = [.width, .height]
         surfaceView.contentContainer.addSubview(hostingView)
@@ -106,12 +112,26 @@ final class ReadOnlyDeckPanelController:
         singleClick.delegate = self
         hostingView.addGestureRecognizer(doubleClick)
         hostingView.addGestureRecognizer(singleClick)
+        deckClickRecognizers = [doubleClick, singleClick]
         menu.delegate = self
         applySettings()
     }
 
     var activeModule: PanelModuleID? { PanelSettings.activeModule(on: side) }
+    var spaceMode: DockPanelMode { presentation.spaceMode }
     var hasVisibleContent: Bool { panel.isVisible || detailPanel?.isVisible == true }
+
+    func setSpaceMode(_ mode: DockPanelMode) {
+        guard mode != spaceMode else { return }
+        presentation.setSpaceMode(mode)
+        deckClickRecognizers.forEach { $0.isEnabled = mode == .full }
+        applyCornerRadius()
+    }
+
+    private func refreshFoldedSummary() {
+        guard spaceMode != .full, let activeModule else { return }
+        presentation.setFoldedSummary(.make(module: activeModule, services: services))
+    }
 
     func gestureRecognizer(
         _ gestureRecognizer: NSGestureRecognizer,
@@ -141,6 +161,7 @@ final class ReadOnlyDeckPanelController:
     /// only when the resolved active module changed since the last render.
     @discardableResult
     func synchronizeActiveModule() -> Bool {
+        refreshFoldedSummary()
         let activeModule = PanelSettings.activeModule(on: side)
         guard activeModule != appliedModule else { return false }
         render(activeModule: activeModule, direction: .next, showsIndicator: false)
@@ -163,6 +184,7 @@ final class ReadOnlyDeckPanelController:
             direction: direction,
             enabledModules: PanelSettings.enabledModules(on: side),
             showsIndicator: showsIndicator)
+        refreshFoldedSummary()
     }
 
     func select(
@@ -205,7 +227,7 @@ final class ReadOnlyDeckPanelController:
     }
 
     func applyCornerRadius() {
-        surfaceView.applyCornerRadius()
+        surfaceView.applyCornerRadius(spaceMode == .full ? nil : spaceMode == .capsule ? 18 : 12)
     }
 
     func menuWillOpen(_ menu: NSMenu) {
@@ -366,6 +388,10 @@ final class ReadOnlyDeckPanelController:
     }
 
     func showDetail() {
+        if activeModule == .terminal {
+            onOpenFolded(side)
+            return
+        }
         guard let activeModule,
             let definition = PanelModuleRegistry.definition(for: activeModule)
         else { return }

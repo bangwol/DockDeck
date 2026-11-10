@@ -138,8 +138,8 @@ final class PanelSurfaceView: NSView {
         }
     }
 
-    func applyCornerRadius() {
-        let radius = PanelSettings.cornerRadius
+    func applyCornerRadius(_ override: CGFloat? = nil) {
+        let radius = override ?? PanelSettings.cornerRadius
         contentContainer.layer?.cornerRadius = radius
         contentContainer.layer?.masksToBounds = true
 

@@ -27,6 +27,8 @@ final class ReadOnlyDeckPresentation: ObservableObject {
     @Published private(set) var theme: Theme
     @Published private(set) var direction = DeckTransitionDirection.next
     @Published private(set) var pageIndicator: String?
+    @Published private(set) var spaceMode = DockPanelMode.full
+    @Published private(set) var foldedSummary = FoldedDeckSummary(value: "", detail: "")
     private var indicatorDismissal: DispatchWorkItem?
 
     init(activeModule: PanelModuleID?, theme: Theme) {
@@ -36,6 +38,14 @@ final class ReadOnlyDeckPresentation: ObservableObject {
 
     func setTheme(_ theme: Theme) {
         self.theme = theme
+    }
+
+    func setSpaceMode(_ mode: DockPanelMode) {
+        if spaceMode != mode { spaceMode = mode }
+    }
+
+    func setFoldedSummary(_ summary: FoldedDeckSummary) {
+        if foldedSummary != summary { foldedSummary = summary }
     }
 
     func select(
@@ -170,8 +180,59 @@ struct ReadOnlyDeckPanelView: View {
     let services: PanelModuleServices
     @ObservedObject var presentation: ReadOnlyDeckPresentation
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    var side: PanelSide = .right
+    var onOpenFolded: () -> Void = {}
 
     var body: some View {
+        ZStack {
+            if presentation.spaceMode != .full {
+                foldedView.transition(.move(edge: side == .left ? .leading : .trailing).combined(with: .opacity))
+            } else {
+                fullView.transition(.opacity)
+            }
+        }
+        .clipped()
+        .animation(reduceMotion ? nil : .easeOut(duration: 0.16), value: presentation.spaceMode)
+    }
+
+    private var foldedView: some View {
+        let definition = presentation.activeModule.flatMap { PanelModuleRegistry.definition(for: $0) }
+        return Button(action: onOpenFolded) {
+            Group {
+                if presentation.spaceMode == .tab {
+                    VStack(spacing: 5) {
+                        Image(systemName: definition?.symbolName ?? "rectangle.stack")
+                            .font(.system(size: 13, weight: .medium))
+                        Image(systemName: side == .left ? "chevron.right" : "chevron.left")
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundStyle(Color(nsColor: presentation.theme.chromeTintColor))
+                    }
+                } else {
+                    HStack(spacing: 6) {
+                        Image(systemName: definition?.symbolName ?? "rectangle.stack")
+                            .font(.system(size: 14, weight: .medium))
+                            .fixedSize()
+                        Text(presentation.foldedSummary.value)
+                            .font(.system(size: 12, weight: .medium, design: .rounded))
+                            .monospacedDigit()
+                            .lineLimit(1)
+                    }
+                    .padding(.horizontal, 7)
+                }
+            }
+            .foregroundStyle(Color(nsColor: presentation.theme.foregroundColor))
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .help(presentation.foldedSummary.value + " · " + presentation.foldedSummary.detail
+            + "\n" + L10n.text("Open Detail"))
+        .accessibilityLabel((definition?.displayTitle ?? L10n.text("Modules")) + ", " + L10n.text("Folded"))
+        .accessibilityValue(presentation.foldedSummary.value + ", " + presentation.foldedSummary.detail)
+        .accessibilityHint(L10n.text("Open Detail"))
+    }
+
+    private var fullView: some View {
         ZStack(alignment: .topTrailing) {
             moduleView
                 .id(presentation.activeModule?.rawValue ?? "empty")

@@ -22,13 +22,44 @@ extension AppDelegate {
             return expandedFrame(on: screen)
         }
         let side = PanelSettings.deckConfiguration.side(containing: .terminal) ?? .left
-        let collapsed = collapsedFrames(for: presence).frame(on: side)
+        let frames = collapsedFrames(for: presence)
+        var collapsed = frames.frame(on: side)
+        if frames.mode(on: side) != .full || (collapsed == nil && isFocusExpanded) {
+            let bottom: CGFloat
+            if case .revealed(let tray, _) = presence {
+                bottom = tray.minY - DockPanelLayout.dockBottomCorrection
+            } else {
+                bottom = presence.host.frame.minY + DockPanelLayout.fallbackBottomInset
+            }
+            collapsed = DockPanelLayout.terminalAnchor(
+                on: side, hostFrame: presence.host.frame,
+                bottom: bottom,
+                previousSize: collapsedFrame?.size)
+        }
         guard isFocusExpanded, let collapsed else { return collapsed }
         return focusedTerminalFrame(collapsed: collapsed, hostFrame: presence.host.frame)
     }
 
     func collapsedFrames(for presence: DockPresence) -> DockPanelFrames {
         dockCoordinator.frames(for: presence)
+    }
+
+    func openFoldedDeck(on side: PanelSide) {
+        guard !hidePanelsForPresentationIfNeeded(),
+            let module = PanelSettings.activeModule(on: side)
+        else { return }
+        guard module == .terminal else {
+            readOnlyDeckPanelController(on: side).showDetail()
+            return
+        }
+        refreshCoarseCaches()
+        guard let presence = resolveDockPresence(), let anchor = terminalFrame(for: presence) else { return }
+        applyFrame(anchor)
+        terminalPanelController.ensureShellRunning()
+        expandTerminalForFocus()
+        hideReadOnlyDeck(on: side, reason: "terminal opened")
+        panel.makeKeyAndOrderFront(nil)
+        panel.makeFirstResponder(terminalView)
     }
 
     func expandedFrame(on screen: NSScreen) -> NSRect {
