@@ -7,7 +7,7 @@ import XCTest
 
 final class PanelAppearanceTests: XCTestCase {
     @MainActor
-    func testTerminalClipboardQueriesAreBlockedWhileCopyAndInputStillWork() {
+    func testTerminalClipboardGuardBlocksReadsAndForwardsOtherCallbacks() {
         for protected in [false, true] {
             let terminal = TerminalView(frame: NSRect(x: 0, y: 0, width: 400, height: 200))
             let copied = expectation(description: "OSC 52 copy: \(protected)")
@@ -26,6 +26,13 @@ final class PanelAppearanceTests: XCTestCase {
 
                 terminal.send(txt: "explicit input")
                 wait(for: [input], timeout: 1)
+
+                let request = TerminalLinkRequest(
+                    link: "https://example.com/guide", params: ["id": "guide"], isExplicit: true)
+                terminal.terminalDelegate?.requestOpenLink(source: terminal, request: request)
+                XCTAssertEqual(delegate.linkRequest?.link, request.link)
+                XCTAssertEqual(delegate.linkRequest?.params, request.params)
+                XCTAssertEqual(delegate.linkRequest?.isExplicit, request.isExplicit)
             }
         }
     }
@@ -1712,6 +1719,7 @@ private final class ClipboardTestDelegate: TerminalViewDelegate {
     let input: XCTestExpectation
     var readCount = 0
     var copiedData: Data?
+    var linkRequest: TerminalLinkRequest?
 
     init(copied: XCTestExpectation, input: XCTestExpectation) {
         self.copied = copied
@@ -1730,6 +1738,10 @@ private final class ClipboardTestDelegate: TerminalViewDelegate {
 
     func send(source: TerminalView, data: ArraySlice<UInt8>) {
         if String(decoding: data, as: UTF8.self) == "explicit input" { input.fulfill() }
+    }
+
+    func requestOpenLink(source: TerminalView, request: TerminalLinkRequest) {
+        linkRequest = request
     }
 
     func sizeChanged(source: TerminalView, newCols: Int, newRows: Int) {}

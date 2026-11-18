@@ -66,7 +66,8 @@ Queued calls are also cancelled, and late results are discarded. Hidden polling
 is three times slower than the selected interval; macOS Low Power Mode adds another
 two-times multiplier. `⌘R` requests an immediate refresh when the module is
 enabled. A failed refresh retains the last successful snapshot and exposes the
-error in panel help.
+error in panel help. Notification timeouts, oversized responses, and invalid
+responses each show a distinct error.
 
 If only the Actions query fails, unread notifications still update. `FAIL` shows
 `--`, and panel help, VoiceOver, and the detail window explain the Actions error.

@@ -262,8 +262,8 @@ final class TerminalClipboardGuard: TerminalViewDelegate {
         forwarding?.rangeChanged(source: source, startY: startY, endY: endY)
     }
 
-    func requestOpenLink(source: TerminalView, link: String, params: [String: String]) {
-        forwarding?.requestOpenLink(source: source, link: link, params: params)
+    func requestOpenLink(source: TerminalView, request: TerminalLinkRequest) {
+        forwarding?.requestOpenLink(source: source, request: request)
     }
 
     func bell(source: TerminalView) { forwarding?.bell(source: source) }

@@ -801,7 +801,10 @@ final class UsageProviderTests: XCTestCase {
                     XCTAssertEqual(kill(pid, 0), -1, "App shutdown returned before probe cleanup")
                 }
             }
-            completed = XCTWaiter.wait(for: [returned], timeout: 4) == .completed
+            // A successful PTY probe can spend over four seconds settling the screen,
+            // exiting gracefully, stopping child jobs, and checking for a late transcript.
+            let completionTimeout: TimeInterval = completesNormally ? 6 : 4
+            completed = XCTWaiter.wait(for: [returned], timeout: completionTimeout) == .completed
             guard completed else { return XCTFail("Claude probe did not finish promptly: \(mode)") }
             if completesNormally {
                 guard case .success = result else { return XCTFail("Expected PTY usage") }

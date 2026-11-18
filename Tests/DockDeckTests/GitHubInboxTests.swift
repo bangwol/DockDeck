@@ -176,6 +176,30 @@ final class GitHubInboxTests: XCTestCase {
         }
     }
 
+    func testNotificationFailuresExplainMalformedAndOversizedResponses() throws {
+        let oversized = "/bin/dd if=/dev/zero bs=1048576 count=2 2>/dev/null"
+        let paginated = #"""
+            if [ "$2" = "--paginate" ]; then
+                \#(oversized)
+            else
+                printf 'HTTP/2.0 200 OK\r\nLink: <https://api.github.com/notifications?page=2>; rel="next"\r\n\r\n[]'
+            fi
+            """#
+        for (script, message) in [
+            ("exit 1", "GitHub account check failed"),
+            ("printf invalid", "GitHub returned an invalid response"),
+            (oversized, "GitHub notification response exceeded its size limit"),
+            (paginated, "GitHub notification response exceeded its size limit"),
+        ] {
+            let cli = try makeCLI(script)
+            defer { try? FileManager.default.removeItem(at: cli.deletingLastPathComponent()) }
+            let client = GitHubInboxClient(broker: GitHubCLIRequestBroker(), executableLocator: { cli })
+            XCTAssertThrowsError(try client.read(configuration: .init(), now: Date())) { error in
+                XCTAssertEqual((error as? LocalizedError)?.errorDescription, message)
+            }
+        }
+    }
+
     func testActionsFailuresKeepNotificationsAndExplainPartialFailure() throws {
         for (command, message) in [
             ("exit 1", "Actions check failed; check repository access and GitHub CLI sign-in"),
