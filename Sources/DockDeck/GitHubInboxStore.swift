@@ -115,12 +115,16 @@ enum GitHubInboxStatus: Equatable {
 enum GitHubInboxError: LocalizedError {
     case cliUnavailable
     case requestFailed
+    case requestTimedOut
+    case outputTooLarge
     case invalidOutput
 
     var errorDescription: String? {
         switch self {
         case .cliUnavailable: "Install and sign in to GitHub CLI"
         case .requestFailed: "GitHub account check failed"
+        case .requestTimedOut: "GitHub notification check timed out"
+        case .outputTooLarge: "GitHub notification response exceeded its size limit"
         case .invalidOutput: "GitHub returned an invalid response"
         }
     }
@@ -278,27 +282,19 @@ final class GitHubInboxClient: GitHubInboxReading {
         guard let gh = executableLocator() else {
             throw GitHubInboxError.cliUnavailable
         }
-        let probe: GitHubIncludedResponse
-        do {
-            var arguments = [
-                "api", "--include", "-X", "GET", "notifications",
-                "-f", "all=false", "-f", "participating=false", "-F", "per_page=50",
-            ]
-            if let validatorHeader = lock.withLock({ validatorHeader }) {
-                arguments.append(contentsOf: ["-H", validatorHeader])
-            }
-            let output = try broker.run(
-                executableURL: gh,
-                arguments: arguments,
-                currentDirectoryURL: FileManager.default.homeDirectoryForCurrentUser,
-                environment: Self.environment,
-                allowedExitStatuses: [0, 1], cancellation: cancellation)
-            probe = try GitHubIncludedResponseParser.parse(output)
-        } catch BoundedProcessError.cancelled {
-            throw BoundedProcessError.cancelled
-        } catch {
-            throw GitHubInboxError.requestFailed
+        let notificationArguments = [
+            "-X", "GET", "notifications",
+            "-f", "all=false", "-f", "participating=false", "-F", "per_page=50",
+        ]
+        var arguments = ["api", "--include"] + notificationArguments
+        if let validatorHeader = lock.withLock({ validatorHeader }) {
+            arguments.append(contentsOf: ["-H", validatorHeader])
         }
+        let output = try requestNotifications(
+            gh: gh, arguments: arguments, allowedExitStatuses: [0, 1], cancellation: cancellation)
+        // gh uses exit 1 for HTTP 304 as well as failures before an HTTP response arrives.
+        guard !output.isEmpty else { throw GitHubInboxError.requestFailed }
+        let probe = try GitHubIncludedResponseParser.parse(output)
         updateMinimumPollInterval(probe)
         let nextValidatorHeader = conditionalHeader(from: probe)
 
@@ -308,22 +304,9 @@ final class GitHubInboxClient: GitHubInboxReading {
         case 200:
             cachesNotifications = true
             if probe.headers["link"]?.contains("rel=\"next\"") == true {
-                do {
-                    notifications = try broker.run(
-                        executableURL: gh,
-                        arguments: [
-                            "api", "--paginate", "--slurp", "-X", "GET", "notifications",
-                            "-f", "all=false", "-f", "participating=false",
-                            "-F", "per_page=50",
-                        ],
-                        currentDirectoryURL: FileManager.default.homeDirectoryForCurrentUser,
-                        environment: Self.environment,
-                        cacheKey: "inbox", cacheDuration: 30, cancellation: cancellation)
-                } catch BoundedProcessError.cancelled {
-                    throw BoundedProcessError.cancelled
-                } catch {
-                    throw GitHubInboxError.requestFailed
-                }
+                notifications = try requestNotifications(
+                    gh: gh, arguments: ["api", "--paginate", "--slurp"] + notificationArguments,
+                    cacheKey: "inbox", cancellation: cancellation)
             } else {
                 notifications = probe.body
             }
@@ -369,6 +352,27 @@ final class GitHubInboxClient: GitHubInboxReading {
             }
         }
         return snapshot
+    }
+
+    private func requestNotifications(
+        gh: URL, arguments: [String], cacheKey: String? = nil,
+        allowedExitStatuses: Set<Int32> = [0], cancellation: Progress?
+    ) throws -> Data {
+        do {
+            return try broker.run(
+                executableURL: gh, arguments: arguments,
+                currentDirectoryURL: FileManager.default.homeDirectoryForCurrentUser,
+                environment: Self.environment, cacheKey: cacheKey, cacheDuration: 30,
+                allowedExitStatuses: allowedExitStatuses, cancellation: cancellation)
+        } catch BoundedProcessError.cancelled {
+            throw BoundedProcessError.cancelled
+        } catch ProjectPulseError.commandTimedOut {
+            throw GitHubInboxError.requestTimedOut
+        } catch ProjectPulseError.outputTooLarge {
+            throw GitHubInboxError.outputTooLarge
+        } catch {
+            throw GitHubInboxError.requestFailed
+        }
     }
 
     private func updateMinimumPollInterval(_ response: GitHubIncludedResponse) {
