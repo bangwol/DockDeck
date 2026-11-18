@@ -54,6 +54,10 @@ Terminal output cannot read the Mac clipboard through OSC 52 queries. Use `⌘V`
 to explicitly paste clipboard contents into the session. OSC 52 copy requests
 and normal `⌘C`/`⌘V` behavior remain supported.
 
+Command-click to open a link in the terminal. Detected relative paths use the
+local working directory reported by the shell when available. Custom URL
+schemes require confirmation.
+
 ## Settings and local files
 
 Use **Settings → Terminal** to configure the focused size, font, and font size
